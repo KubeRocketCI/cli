@@ -1,0 +1,59 @@
+---
+version: "2"
+run:
+  allow-parallel-runners: true
+linters:
+  default: none
+  enable:
+    - dupl
+    - errcheck
+    - goconst
+    - gocyclo
+    - gocritic
+    - govet
+    - ineffassign
+    - lll
+    - misspell
+    - nakedret
+    - prealloc
+    - revive
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+  settings:
+    revive:
+      rules:
+        - name: comment-spacings
+        - name: import-shadowing
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - errcheck
+        path: _test\.go
+      - linters:
+          - lll
+        path: _test\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    gofmt:
+      rewrite-rules:
+        - pattern: 'interface{}'
+          replacement: 'any'
+    goimports:
+      local-prefixes:
+        - github.com/KubeRocketCI/cli
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

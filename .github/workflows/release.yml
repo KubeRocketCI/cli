@@ -1,0 +1,53 @@
+name: Release
+
+# This workflow requires the following repository secrets:
+# - GPG_PRIVATE_KEY: GPG private key for signing artifacts
+# - PASSPHRASE: GPG key passphrase
+# - HOMEBREW_TAP_GITHUB_TOKEN: GitHub token for updating Homebrew tap
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.1"
+          cache: true
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Install syft
+        uses: anchore/sbom-action/download-syft@v0.20.2
+
+      - name: Import GPG key
+        id: import_gpg
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.PASSPHRASE }}
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
