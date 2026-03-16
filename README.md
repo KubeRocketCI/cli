@@ -16,6 +16,15 @@ Command-line interface for the [KubeRocketCI](https://kuberocketci.io) platform 
 - **Deployments** — List and inspect CDPipeline and Stage resources *(planned)*
 - **Output** — Styled tables for terminals, plain text for pipes, JSON for automation
 
+## Installation
+
+```bash
+brew tap KubeRocketCI/homebrew-tap
+brew install krci
+```
+
+Or download a binary from [GitHub Releases](https://github.com/KubeRocketCI/cli/releases).
+
 ## Quick Start
 
 ```bash
