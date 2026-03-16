@@ -100,12 +100,10 @@ func Save(cfg *Config) error {
 
 	configPath := filepath.Join(configDir, "config.yaml")
 
-	// Load existing config to preserve values not being updated.
 	existing := viper.New()
 	existing.SetConfigFile(configPath)
 	_ = existing.ReadInConfig() // OK if doesn't exist yet
 
-	// Only set non-empty values.
 	if cfg.IssuerURL != "" {
 		existing.Set("issuer-url", cfg.IssuerURL)
 	}

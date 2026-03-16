@@ -160,6 +160,12 @@ func atomicWrite(path string, data []byte, perm os.FileMode) error {
 		}
 	}()
 
+	// Set restrictive permissions before writing sensitive data to avoid
+	// a window where the file is readable by other users on shared systems.
+	if err := tmp.Chmod(perm); err != nil {
+		return fmt.Errorf("setting token file permissions: %w", err)
+	}
+
 	if _, err := tmp.Write(data); err != nil {
 		return fmt.Errorf("writing token file: %w", err)
 	}
@@ -170,10 +176,6 @@ func atomicWrite(path string, data []byte, perm os.FileMode) error {
 
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("closing token file: %w", err)
-	}
-
-	if err := os.Chmod(tmpName, perm); err != nil {
-		return fmt.Errorf("setting token file permissions: %w", err)
 	}
 
 	if err := os.Rename(tmpName, path); err != nil {

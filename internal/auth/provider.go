@@ -115,6 +115,10 @@ func (p *tokenProvider) UserInfo() (*UserInfo, error) {
 // refresh uses the OIDC refresh_token grant to obtain new tokens.
 // oauth2.TokenSource handles the grant automatically.
 func (p *tokenProvider) refresh(ctx context.Context, stored *token.StoredToken) (*token.StoredToken, error) {
+	if err := validateIssuerURL(stored.IssuerURL); err != nil {
+		return nil, fmt.Errorf("stored issuer URL: %w", err)
+	}
+
 	provider, err := oidc.NewProvider(ctx, stored.IssuerURL)
 	if err != nil {
 		return nil, fmt.Errorf("OIDC discovery: %w", err)

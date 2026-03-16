@@ -74,7 +74,7 @@ func (p *tokenProvider) login(ctx context.Context) (*UserInfo, error) {
 	port := listener.Addr().(*net.TCPAddr).Port
 	redirectURL := fmt.Sprintf("http://localhost:%d/callback", port)
 
-	// 5. OAuth2 config — public client (no ClientSecret).
+	// 5. OAuth2 config (public client).
 	oauthCfg := &oauth2.Config{
 		ClientID:    p.cfg.ClientID,
 		Endpoint:    provider.Endpoint(),
