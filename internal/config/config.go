@@ -49,8 +49,13 @@ func Init() {
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
+	viper.SetDefault("issuer-url", "")
 	viper.SetDefault("client-id", "krci-cli")
 	viper.SetDefault("scopes", "openid email profile")
+	viper.SetDefault("portal-url", "")
+	viper.SetDefault("namespace", "")
+	viper.SetDefault("api-server", "")
+	viper.SetDefault("ca-data", "")
 
 	if err := viper.ReadInConfig(); err != nil {
 		var notFound viper.ConfigFileNotFoundError

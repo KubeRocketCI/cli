@@ -1,5 +1,12 @@
 # binary
 krci
 
+# build output
+dist/
+
+# development tools
+bin/
+
 # test coverage
 coverage.out
+coverage.html

@@ -17,7 +17,7 @@ DIST_DIR := dist
 BIN_DIR := bin
 
 # Tools - pinned versions
-GOLANGCI_LINT_VERSION ?= v1.64.8
+GOLANGCI_LINT_VERSION ?= v2.11.3
 GORELEASER_VERSION ?= v2.10.2
 
 # Cross-platform builds
@@ -67,7 +67,7 @@ $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
 $(BIN_DIR)/golangci-lint: $(BIN_DIR)
-	GOBIN=$(PWD)/$(BIN_DIR) go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	GOBIN=$(PWD)/$(BIN_DIR) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 
 $(BIN_DIR)/goreleaser: $(BIN_DIR)
 	GOBIN=$(PWD)/$(BIN_DIR) go install github.com/goreleaser/goreleaser/v2@$(GORELEASER_VERSION)
