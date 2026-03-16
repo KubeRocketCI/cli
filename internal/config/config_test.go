@@ -34,8 +34,6 @@ func TestEnvVarOverride(t *testing.T) {
 
 	Init()
 
-	// Env vars work for keys that have defaults or are explicitly known to Viper.
-	// Keys only introduced via BindFlags (portal-url, namespace) require a Cobra command.
 	cfg, err := Resolve()
 	require.NoError(t, err)
 
