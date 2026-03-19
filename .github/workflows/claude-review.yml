@@ -105,7 +105,7 @@ jobs:
             ## Step 0 — Gather changed files
 
             The repo is checked out on the PR branch with full history.
-            Run `git diff --name-only ${{ env.BASE_BRANCH }}` to get the list of changed files.
+            Run `git diff --name-only ${{ env.BASE_BRANCH }}...HEAD` to get the list of changed files.
             Then read each changed file using the Read tool.
             Do NOT use `gh pr diff` — it fails on large PRs.
 
@@ -114,7 +114,7 @@ jobs:
             Use the Agent tool to launch 3 code-reviewer agents in parallel
             (subagent_type: "krci-general:code-reviewer", run_in_background: true).
             Include the list of changed files and tell each agent to use
-            `git diff ${{ env.BASE_BRANCH }} -- <file>` and Read tool to review files.
+            `git diff ${{ env.BASE_BRANCH }}...HEAD -- <file>` and Read tool to review files.
 
             CRITICAL — tell each agent to keep output concise:
             "Return ONLY a list of findings. Each finding must be one line:
@@ -122,14 +122,14 @@ jobs:
             Maximum 15 findings. Do NOT include full file contents or verbose analysis."
 
             1. "Review for bugs, logic errors, security vulnerabilities, race conditions,
-               and functional correctness. Changed files: [LIST]. Use `git diff ${{ env.BASE_BRANCH }} -- <file>`
+               and functional correctness. Changed files: [LIST]. Use `git diff ${{ env.BASE_BRANCH }}...HEAD -- <file>`
                and Read tool to examine each file."
             2. "Review for simplicity, DRY violations, code elegance,
-               and readability issues. Changed files: [LIST]. Use `git diff ${{ env.BASE_BRANCH }} -- <file>`
+               and readability issues. Changed files: [LIST]. Use `git diff ${{ env.BASE_BRANCH }}...HEAD -- <file>`
                and Read tool to examine each file."
             3. "Review for project convention violations (check CLAUDE.md),
                architectural consistency, naming patterns, and import organization.
-               Changed files: [LIST]. Use `git diff ${{ env.BASE_BRANCH }} -- <file>`
+               Changed files: [LIST]. Use `git diff ${{ env.BASE_BRANCH }}...HEAD -- <file>`
                and Read tool to examine each file."
 
             ## Step 2 — Validate with domain expertise
@@ -186,7 +186,7 @@ jobs:
             After writing the summary file, post inline comments for each issue.
 
             IMPORTANT: Before posting an inline comment, verify the target line exists
-            in the PR diff by running `git diff ${{ env.BASE_BRANCH }} -- <file>`.
+            in the PR diff by running `git diff ${{ env.BASE_BRANCH }}...HEAD -- <file>`.
             Only comment on lines that appear in the diff (added or modified lines).
             If a line is not in the diff, it is already captured in the summary file.
 
