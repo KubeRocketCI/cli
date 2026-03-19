@@ -121,6 +121,10 @@ jobs:
             FILE:LINE | SEVERITY(critical/important) | CONFIDENCE(0-100) | description.
             Maximum 15 findings. Do NOT include full file contents or verbose analysis."
 
+            When reading background agent results, do NOT use the Read tool on output
+            files — they contain full execution traces and will exceed token limits.
+            Use `Bash(tail:*)` or `Bash(grep:*)` to extract the agent's final answer.
+
             1. "Review for bugs, logic errors, security vulnerabilities, race conditions,
                and functional correctness. Changed files: [LIST]. Use `git diff ${{ env.BASE_BRANCH }}...HEAD -- <file>`
                and Read tool to examine each file."
@@ -194,7 +198,7 @@ jobs:
             Do not execute /review as a slash command — this prompt IS the review.
           claude_args: |
             --max-turns 20
-            --allowedTools "Agent,Read,Write,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git blame:*),Bash(git fetch:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(go:*),Bash(python3:*),Bash(find:*),mcp__github_inline_comment__create_inline_comment"
+            --allowedTools "Agent,Read,Write,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git blame:*),Bash(git fetch:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(go:*),Bash(python3:*),Bash(find:*),Bash(tail:*),Bash(grep:*),Bash(head:*),Bash(wc:*),mcp__github_inline_comment__create_inline_comment"
 
       - name: Post review summary
         if: always() && steps.review.outcome != 'skipped'
