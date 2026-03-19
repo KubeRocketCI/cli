@@ -15,7 +15,7 @@ jobs:
         (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '/review'))
       )
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 15
     permissions:
       contents: read
       pull-requests: write
@@ -69,6 +69,12 @@ jobs:
           git fetch origin "$BASE" --depth=1
           echo "BASE_BRANCH=origin/$BASE" >> "$GITHUB_ENV"
 
+      - name: Setup Go
+        if: steps.auth.outputs.authorized == 'true'
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
       - name: Checkout plugin marketplace
         if: steps.auth.outputs.authorized == 'true'
         uses: actions/checkout@v6
@@ -108,7 +114,12 @@ jobs:
             Use the Agent tool to launch 3 code-reviewer agents in parallel
             (subagent_type: "krci-general:code-reviewer", run_in_background: true).
             Include the list of changed files and tell each agent to use
-            `git diff ${{ env.BASE_BRANCH }} -- <file>` and Read tool to review files:
+            `git diff ${{ env.BASE_BRANCH }} -- <file>` and Read tool to review files.
+
+            CRITICAL — tell each agent to keep output concise:
+            "Return ONLY a list of findings. Each finding must be one line:
+            FILE:LINE | SEVERITY(critical/important) | CONFIDENCE(0-100) | description.
+            Maximum 15 findings. Do NOT include full file contents or verbose analysis."
 
             1. "Review for bugs, logic errors, security vulnerabilities, race conditions,
                and functional correctness. Changed files: [LIST]. Use `git diff ${{ env.BASE_BRANCH }} -- <file>`
@@ -125,16 +136,24 @@ jobs:
 
             Send all findings to a go-dev agent
             (subagent_type: "krci-godev:go-dev") to validate against
-            project patterns (React/TypeScript/Radix UI/tRPC/form/table/K8s).
+            Go best practices (idiomatic Go, error handling, concurrency,
+            Kubernetes operator patterns, cobra CLI conventions).
             Reject false positives that are actually correct project patterns.
             Keep only issues with confidence >= 80.
 
-            ## Step 3 — Post results
+            IMPORTANT: Do NOT flag language or runtime version numbers as invalid
+            based on your training data — your knowledge may be outdated.
 
-            For each validated issue: post an inline comment on the exact line
-            with severity (critical/important), confidence score, and fix suggestion.
+            ## Step 3 — Save and post results
 
-            Then post one summary comment using this exact template:
+            ### 3a. Write summary file FIRST (mandatory)
+
+            As soon as you have validated findings, use the Write tool to save the
+            review summary to `review-summary.md` in the repo root. This file will
+            be posted by a later workflow step even if you run out of turns.
+            Do NOT post the summary yourself via `gh pr comment`.
+
+            Use this exact format for the file:
 
             ```
             ## Review Summary
@@ -151,7 +170,7 @@ jobs:
             **APPROVE** or **REQUEST CHANGES** — one sentence rationale
             ```
 
-            Omit empty sections. If no issues survived validation, post:
+            Omit empty sections. If no issues survived validation, write:
 
             ```
             ## Review Summary
@@ -162,41 +181,73 @@ jobs:
             **APPROVE**
             ```
 
+            ### 3b. Post inline comments (best effort)
+
+            After writing the summary file, post inline comments for each issue.
+
+            IMPORTANT: Before posting an inline comment, verify the target line exists
+            in the PR diff by running `git diff ${{ env.BASE_BRANCH }} -- <file>`.
+            Only comment on lines that appear in the diff (added or modified lines).
+            If a line is not in the diff, it is already captured in the summary file.
+
             If the user included extra instructions after /review, follow those too.
             Do not execute /review as a slash command — this prompt IS the review.
-
-            IMPORTANT: When posting summary via `gh pr comment`, use a heredoc to pass
-            the body safely:
-              gh pr comment NUMBER --body "$(cat <<'ENDOFBODY'
-              ... markdown content ...
-              ENDOFBODY
-              )"
-            Do NOT write temp files — the sandbox blocks writes outside the working directory,
-            and the Write tool is not in the allowed tools list.
           claude_args: |
-            --max-turns 10
-            --allowedTools "Agent,Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git blame:*),Bash(git fetch:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(pnpm:*),mcp__github_inline_comment__create_inline_comment"
+            --max-turns 20
+            --allowedTools "Agent,Read,Write,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git blame:*),Bash(git fetch:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(go:*),mcp__github_inline_comment__create_inline_comment"
+
+      - name: Post review summary
+        if: always() && steps.review.outcome != 'skipped'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+        run: |
+          if [ -f review-summary.md ]; then
+            gh pr comment "$PR_NUMBER" --body-file review-summary.md
+          else
+            gh pr comment "$PR_NUMBER" --body "$(cat <<EOF
+          ## Review Summary
+
+          Review did not complete — no summary was produced.
+          Check the workflow run for details.
+          EOF
+          )"
+          fi
 
       - name: Post review metrics
         if: always() && steps.review.outcome != 'skipped'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+          REVIEW_OUTCOME: ${{ steps.review.outcome }}
         run: |
           EXEC_FILE="${{ steps.review.outputs.execution_file }}"
+          if [ -z "$EXEC_FILE" ] || [ ! -f "$EXEC_FILE" ]; then
+            EXEC_FILE="${RUNNER_TEMP}/claude-execution-output.json"
+          fi
           if [ -f "$EXEC_FILE" ]; then
-            COST=$(jq -r '.[-1].total_cost_usd // "N/A"' "$EXEC_FILE")
-            TURNS=$(jq -r '.[-1].num_turns // "N/A"' "$EXEC_FILE")
-            DENIALS=$(jq -r '(.[-1].permission_denials // []) | length' "$EXEC_FILE")
-            STATUS=$(jq -r '.[-1].subtype // "unknown"' "$EXEC_FILE")
+            COST=$(jq -r '.[-1].total_cost_usd // "N/A"' "$EXEC_FILE" 2>/dev/null || echo "N/A")
+            TURNS=$(jq -r '.[-1].num_turns // "N/A"' "$EXEC_FILE" 2>/dev/null || echo "N/A")
+            DENIALS=$(jq -r '(.[-1].permission_denials // []) | length' "$EXEC_FILE" 2>/dev/null || echo "0")
+            STATUS=$(jq -r '.[-1].subtype // "unknown"' "$EXEC_FILE" 2>/dev/null || echo "unknown")
             gh pr comment "$PR_NUMBER" --body "$(cat <<EOF
           ### Review Metrics
           | Metric | Value |
           |--------|-------|
+          | Outcome | \`$REVIEW_OUTCOME\` |
           | Status | \`$STATUS\` |
           | Cost | \$$COST |
           | Turns | $TURNS |
           | Permission denials | $DENIALS |
+          EOF
+          )"
+          else
+            gh pr comment "$PR_NUMBER" --body "$(cat <<EOF
+          ### Review Metrics
+          | Metric | Value |
+          |--------|-------|
+          | Outcome | \`$REVIEW_OUTCOME\` |
+          | Status | No execution data (review may have been cancelled) |
           EOF
           )"
           fi
