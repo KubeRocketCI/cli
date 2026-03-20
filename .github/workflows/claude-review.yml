@@ -185,20 +185,11 @@ jobs:
             **APPROVE**
             ```
 
-            ### 3b. Post inline comments (best effort)
-
-            After writing the summary file, post inline comments for each issue.
-
-            IMPORTANT: Before posting an inline comment, verify the target line exists
-            in the PR diff by running `git diff ${{ env.BASE_BRANCH }}...HEAD -- <file>`.
-            Only comment on lines that appear in the diff (added or modified lines).
-            If a line is not in the diff, it is already captured in the summary file.
-
             If the user included extra instructions after /review, follow those too.
             Do not execute /review as a slash command — this prompt IS the review.
           claude_args: |
             --max-turns 20
-            --allowedTools "Agent,Read,Write,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git blame:*),Bash(git fetch:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(go:*),Bash(python3:*),Bash(find:*),Bash(tail:*),Bash(grep:*),Bash(head:*),Bash(wc:*),mcp__github_inline_comment__create_inline_comment"
+            --allowedTools "Agent,Read,Write,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git blame:*),Bash(git fetch:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(go:*),Bash(python3:*),Bash(find:*),Bash(tail:*),Bash(grep:*),Bash(head:*),Bash(wc:*)"
 
       - name: Post review summary
         if: always() && steps.review.outcome != 'skipped'
