@@ -3,21 +3,21 @@ package list
 
 import (
 	"context"
+	"errors"
 
 	"github.com/spf13/cobra"
-	"k8s.io/client-go/dynamic"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
-	"github.com/KubeRocketCI/cli/internal/k8s"
 	"github.com/KubeRocketCI/cli/internal/output"
+	"github.com/KubeRocketCI/cli/internal/portal"
 )
 
 // ListOptions holds all inputs for the project list command.
 type ListOptions struct {
 	IO           *iostreams.IOStreams
-	K8sClient    func() (dynamic.Interface, error)
+	PortalClient func() (*portal.Client, error)
 	Config       func() (*config.Config, error)
 	OutputFormat string
 }
@@ -26,9 +26,9 @@ type ListOptions struct {
 // runF is the business logic function; pass nil to use the default listRun.
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
-		IO:        f.IOStreams,
-		K8sClient: f.K8sClient,
-		Config:    f.Config,
+		IO:           f.IOStreams,
+		PortalClient: f.PortalClient,
+		Config:       f.Config,
 	}
 
 	cmd := &cobra.Command{
@@ -63,15 +63,19 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		return err
 	}
 
-	dynClient, err := opts.K8sClient()
+	client, err := opts.PortalClient()
 	if err != nil {
 		return err
 	}
 
-	svc := k8s.NewProjectService(dynClient, cfg.Namespace)
+	svc := portal.NewProjectService(client, cfg.ClusterName, cfg.Namespace)
 
 	projects, err := svc.List(ctx)
 	if err != nil {
+		if errors.Is(err, portal.ErrUnauthorized) {
+			return cmdutil.ErrAuthRequired(err)
+		}
+
 		return err
 	}
 

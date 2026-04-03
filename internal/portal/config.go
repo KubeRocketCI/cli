@@ -1,8 +1,6 @@
-// Package portal provides a client for the KubeRocketCI Portal public API.
 package portal
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,18 +13,7 @@ import (
 type Config struct {
 	ClusterName      string `json:"clusterName"`
 	DefaultNamespace string `json:"defaultNamespace"`
-}
-
-// tRPC v10 response envelope.
-type tRPCResponse struct {
-	Result struct {
-		Data json.RawMessage `json:"data"`
-	} `json:"result"`
-}
-
-// tRPC superjson wrapper (used by some Portal versions).
-type superJSONWrapper struct {
-	JSON Config `json:"json"`
+	OIDCIssuerURL    string `json:"oidcIssuerUrl"`
 }
 
 // FetchConfig calls the Portal public config.get endpoint (no auth required)
@@ -35,17 +22,16 @@ type superJSONWrapper struct {
 func FetchConfig(portalURL string) (*Config, error) {
 	u, err := url.Parse(portalURL)
 	if err != nil || u.Scheme != "https" || u.Host == "" {
-		return nil, fmt.Errorf("portal URL must use HTTPS with a valid host: %q", portalURL)
+		return nil, fmt.Errorf("%w with a valid host: %q", ErrHTTPSRequired, portalURL)
 	}
 
 	return fetchConfig(portalURL)
 }
 
-// fetchConfig performs the actual HTTP GET and response parsing.
 func fetchConfig(portalURL string) (*Config, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 
-	resp, err := client.Get(strings.TrimRight(portalURL, "/") + "/api/config.get")
+	resp, err := client.Get(strings.TrimSuffix(portalURL, "/") + "/api/config.get")
 	if err != nil {
 		return nil, fmt.Errorf("requesting portal config: %w", err)
 	}
@@ -63,29 +49,20 @@ func fetchConfig(portalURL string) (*Config, error) {
 	return parseConfig(body)
 }
 
-// parseConfig extracts Config from tRPC response body.
-// Handles both superjson-wrapped and plain data formats.
 func parseConfig(body []byte) (*Config, error) {
-	var trpc tRPCResponse
-	if err := json.Unmarshal(body, &trpc); err != nil {
-		return nil, fmt.Errorf("parsing portal config response: %w", err)
-	}
-
-	if len(trpc.Result.Data) == 0 {
-		return nil, fmt.Errorf("empty data in portal config response")
-	}
-
-	// Try superjson format: {"result": {"data": {"json": {...}}}}
-	var wrapped superJSONWrapper
-	if err := json.Unmarshal(trpc.Result.Data, &wrapped); err == nil && wrapped.JSON.DefaultNamespace != "" {
-		return &wrapped.JSON, nil
-	}
-
-	// Try plain format: {"result": {"data": {...}}}
 	var cfg Config
-	if err := json.Unmarshal(trpc.Result.Data, &cfg); err == nil && cfg.DefaultNamespace != "" {
-		return &cfg, nil
+	if err := parseTRPCResult(body, &cfg); err != nil {
+		return nil, fmt.Errorf("parsing portal config: %w", err)
 	}
 
-	return nil, fmt.Errorf("unexpected portal config response format")
+	if !isValidConfig(&cfg) {
+		return nil, fmt.Errorf("unexpected portal config response format")
+	}
+
+	return &cfg, nil
+}
+
+// isValidConfig returns true if at least one identifying field is populated.
+func isValidConfig(cfg *Config) bool {
+	return cfg.DefaultNamespace != "" || cfg.ClusterName != ""
 }
