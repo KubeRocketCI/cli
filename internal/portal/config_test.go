@@ -42,24 +42,37 @@ func TestFetchConfig_Integration(t *testing.T) {
 		wantErr         bool
 		wantClusterName string
 		wantDefaultNS   string
+		wantOIDCIssuer  string
 	}{
 		{
-			name: "SuperJSON format",
+			name: "SuperJSON format with OIDC issuer",
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				w.Write([]byte(`{"result":{"data":{"json":{"clusterName":"eks","defaultNamespace":"edp"}}}}`))
+				w.Write([]byte(`{"result":{"data":{"json":{"clusterName":"eks","defaultNamespace":"edp","oidcIssuerUrl":"https://issuer.example.com"},"meta":{}}}}`))
 			},
 			wantClusterName: "eks",
 			wantDefaultNS:   "edp",
+			wantOIDCIssuer:  "https://issuer.example.com",
 		},
 		{
-			name: "plain format",
+			name: "plain format with OIDC issuer",
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				w.Write([]byte(`{"result":{"data":{"clusterName":"in-cluster","defaultNamespace":"platform"}}}`))
+				w.Write([]byte(`{"result":{"data":{"clusterName":"in-cluster","defaultNamespace":"platform","oidcIssuerUrl":"https://auth.platform.dev"}}}`))
 			},
 			wantClusterName: "in-cluster",
 			wantDefaultNS:   "platform",
+			wantOIDCIssuer:  "https://auth.platform.dev",
+		},
+		{
+			name: "backward compat - no oidcIssuerUrl field",
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(`{"result":{"data":{"clusterName":"eks","defaultNamespace":"edp"}}}`))
+			},
+			wantClusterName: "eks",
+			wantDefaultNS:   "edp",
+			wantOIDCIssuer:  "",
 		},
 		{
 			name: "HTTP error",
@@ -74,6 +87,14 @@ func TestFetchConfig_Integration(t *testing.T) {
 				w.Write([]byte(`not json`))
 			},
 			wantErr: true,
+		},
+		{
+			name: "cluster name only",
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(`{"result":{"data":{"clusterName":"eks","defaultNamespace":""}}}`))
+			},
+			wantClusterName: "eks",
 		},
 		{
 			name: "empty data",
@@ -102,6 +123,7 @@ func TestFetchConfig_Integration(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantClusterName, cfg.ClusterName)
 			assert.Equal(t, tt.wantDefaultNS, cfg.DefaultNamespace)
+			assert.Equal(t, tt.wantOIDCIssuer, cfg.OIDCIssuerURL)
 		})
 	}
 }
@@ -126,20 +148,30 @@ func TestParseConfig(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		body    []byte
-		wantErr bool
-		wantNS  string
+		name            string
+		body            []byte
+		wantErr         bool
+		wantClusterName string
+		wantNS          string
+		wantOIDCIssuer  string
 	}{
 		{
-			name:   "SuperJSON",
-			body:   []byte(`{"result":{"data":{"json":{"clusterName":"eks","defaultNamespace":"edp"}}}}`),
-			wantNS: "edp",
+			name:            "SuperJSON with OIDC issuer",
+			body:            []byte(`{"result":{"data":{"json":{"clusterName":"eks","defaultNamespace":"edp","oidcIssuerUrl":"https://issuer.example.com"},"meta":{}}}}`),
+			wantClusterName: "eks",
+			wantNS:          "edp",
+			wantOIDCIssuer:  "https://issuer.example.com",
 		},
 		{
-			name:   "plain",
-			body:   []byte(`{"result":{"data":{"clusterName":"c","defaultNamespace":"ns"}}}`),
-			wantNS: "ns",
+			name:            "plain",
+			body:            []byte(`{"result":{"data":{"clusterName":"c","defaultNamespace":"ns"}}}`),
+			wantClusterName: "c",
+			wantNS:          "ns",
+		},
+		{
+			name:            "cluster name only",
+			body:            []byte(`{"result":{"data":{"clusterName":"eks","defaultNamespace":""}}}`),
+			wantClusterName: "eks",
 		},
 		{
 			name:    "malformed JSON",
@@ -161,7 +193,9 @@ func TestParseConfig(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+			assert.Equal(t, tt.wantClusterName, cfg.ClusterName)
 			assert.Equal(t, tt.wantNS, cfg.DefaultNamespace)
+			assert.Equal(t, tt.wantOIDCIssuer, cfg.OIDCIssuerURL)
 		})
 	}
 }

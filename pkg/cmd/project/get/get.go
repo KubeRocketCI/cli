@@ -3,23 +3,24 @@ package get
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"strconv"
 
 	"github.com/spf13/cobra"
-	"k8s.io/client-go/dynamic"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
-	"github.com/KubeRocketCI/cli/internal/k8s"
 	"github.com/KubeRocketCI/cli/internal/output"
+	"github.com/KubeRocketCI/cli/internal/portal"
 )
 
 // GetOptions holds all inputs for the project get command.
 type GetOptions struct {
 	IO           *iostreams.IOStreams
-	K8sClient    func() (dynamic.Interface, error)
+	PortalClient func() (*portal.Client, error)
 	Config       func() (*config.Config, error)
 	Name         string
 	OutputFormat string
@@ -29,9 +30,9 @@ type GetOptions struct {
 // runF is the business logic function; pass nil to use the default getRun.
 func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command {
 	opts := &GetOptions{
-		IO:        f.IOStreams,
-		K8sClient: f.K8sClient,
-		Config:    f.Config,
+		IO:           f.IOStreams,
+		PortalClient: f.PortalClient,
+		Config:       f.Config,
 	}
 
 	cmd := &cobra.Command{
@@ -65,19 +66,27 @@ func getRun(ctx context.Context, opts *GetOptions) error {
 		return err
 	}
 
-	dynClient, err := opts.K8sClient()
+	client, err := opts.PortalClient()
 	if err != nil {
 		return err
 	}
 
-	svc := k8s.NewProjectService(dynClient, cfg.Namespace)
+	svc := portal.NewProjectService(client, cfg.ClusterName, cfg.Namespace)
 
 	project, err := svc.Get(ctx, opts.Name)
 	if err != nil {
+		if errors.Is(err, portal.ErrNotFound) {
+			return fmt.Errorf("project %q not found", opts.Name)
+		}
+
+		if errors.Is(err, portal.ErrUnauthorized) {
+			return cmdutil.ErrAuthRequired(err)
+		}
+
 		return err
 	}
 
-	return output.RenderDetail(opts.IO, opts.OutputFormat, project, output.DetailRenderer[*k8s.Project]{
+	return output.RenderDetail(opts.IO, opts.OutputFormat, project, output.DetailRenderer[*portal.Project]{
 		Styled: printStyledProjectDetail,
 		Plain:  printPlainProjectDetail,
 	})
@@ -85,7 +94,7 @@ func getRun(ctx context.Context, opts *GetOptions) error {
 
 // projectDetailLines builds the ordered field list for a project.
 // When styled is true, Status and Available get colorized representations.
-func projectDetailLines(p *k8s.Project, styled bool) []output.DetailLine {
+func projectDetailLines(p *portal.Project, styled bool) []output.DetailLine {
 	lines := []output.DetailLine{
 		{Label: "Name", Value: p.Name},
 		{Label: "Namespace", Value: p.Namespace},
@@ -118,11 +127,11 @@ func projectDetailLines(p *k8s.Project, styled bool) []output.DetailLine {
 }
 
 // printStyledProjectDetail renders project details with lipgloss styling.
-func printStyledProjectDetail(w io.Writer, p *k8s.Project) error {
+func printStyledProjectDetail(w io.Writer, p *portal.Project) error {
 	return output.PrintStyledDetailLines(w, projectDetailLines(p, true))
 }
 
 // printPlainProjectDetail renders project details as plain text for piped output.
-func printPlainProjectDetail(w io.Writer, p *k8s.Project) error {
+func printPlainProjectDetail(w io.Writer, p *portal.Project) error {
 	return output.PrintPlainDetailLines(w, projectDetailLines(p, false))
 }

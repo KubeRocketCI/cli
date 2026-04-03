@@ -16,10 +16,10 @@ import (
 	"github.com/KubeRocketCI/cli/internal/token"
 )
 
-// TokenProvider resolves a valid access token using the precedence chain:
+// TokenProvider resolves a valid ID token using the precedence chain:
 // KRCI_TOKEN env → cached token → refresh → error.
 type TokenProvider interface {
-	// GetToken returns a valid access token.
+	// GetToken returns a valid ID token for portal Bearer auth.
 	GetToken(ctx context.Context) (string, error)
 	// Login performs the interactive OIDC login flow.
 	Login(ctx context.Context) error
@@ -42,37 +42,44 @@ func NewTokenProvider(store token.Store, cfg *config.Config) *tokenProvider {
 	}
 }
 
-// GetToken returns a valid access token following the precedence chain.
+// GetToken returns a valid ID token for portal Bearer auth.
+// Precedence: KRCI_TOKEN env → cached ID token → refresh → error.
 func (p *tokenProvider) GetToken(ctx context.Context) (string, error) {
-	// 1. Environment variable (highest priority, for CI/automation).
 	if t := os.Getenv("KRCI_TOKEN"); t != "" {
 		return t, nil
 	}
 
-	// 2. Load cached token.
+	stored, err := p.resolveStoredToken(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return stored.IDToken, nil
+}
+
+// resolveStoredToken loads, validates, and optionally refreshes the cached token.
+func (p *tokenProvider) resolveStoredToken(ctx context.Context) (*token.StoredToken, error) {
 	stored, err := p.store.Load()
 	if err != nil {
 		if errors.Is(err, token.ErrNoToken) {
-			return "", ErrNotAuthenticated
+			return nil, ErrNotAuthenticated
 		}
-		return "", fmt.Errorf("loading cached token: %w", err)
+		return nil, fmt.Errorf("loading cached token: %w", err)
 	}
 
-	// 3. Check if still valid (with 30-second buffer).
 	if stored.Valid() {
-		return stored.AccessToken, nil
+		return stored, nil
 	}
 
-	// 4. Attempt refresh.
 	if stored.RefreshToken != "" {
 		refreshed, err := p.refresh(ctx, stored)
 		if err != nil {
-			return "", fmt.Errorf("%w: %w", ErrRefreshFailed, err)
+			return nil, fmt.Errorf("%w: %w", ErrRefreshFailed, err)
 		}
-		return refreshed.AccessToken, nil
+		return refreshed, nil
 	}
 
-	return "", ErrTokenExpired
+	return nil, ErrTokenExpired
 }
 
 // Login performs the interactive OIDC login flow.
@@ -115,7 +122,7 @@ func (p *tokenProvider) UserInfo() (*UserInfo, error) {
 // refresh uses the OIDC refresh_token grant to obtain new tokens.
 // oauth2.TokenSource handles the grant automatically.
 func (p *tokenProvider) refresh(ctx context.Context, stored *token.StoredToken) (*token.StoredToken, error) {
-	if err := validateIssuerURL(stored.IssuerURL); err != nil {
+	if err := ValidateIssuerURL(stored.IssuerURL); err != nil {
 		return nil, fmt.Errorf("stored issuer URL: %w", err)
 	}
 

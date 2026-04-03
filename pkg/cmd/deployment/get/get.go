@@ -3,25 +3,25 @@ package get
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"k8s.io/client-go/dynamic"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
-	"github.com/KubeRocketCI/cli/internal/k8s"
 	"github.com/KubeRocketCI/cli/internal/output"
+	"github.com/KubeRocketCI/cli/internal/portal"
 )
 
 // GetOptions holds all inputs for the deployment get command.
 type GetOptions struct {
 	IO           *iostreams.IOStreams
-	K8sClient    func() (dynamic.Interface, error)
+	PortalClient func() (*portal.Client, error)
 	Config       func() (*config.Config, error)
 	Name         string
 	OutputFormat string
@@ -31,9 +31,9 @@ type GetOptions struct {
 // runF is the business logic function; pass nil to use the default getRun.
 func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command {
 	opts := &GetOptions{
-		IO:        f.IOStreams,
-		K8sClient: f.K8sClient,
-		Config:    f.Config,
+		IO:           f.IOStreams,
+		PortalClient: f.PortalClient,
+		Config:       f.Config,
 	}
 
 	cmd := &cobra.Command{
@@ -67,26 +67,34 @@ func getRun(ctx context.Context, opts *GetOptions) error {
 		return err
 	}
 
-	dynClient, err := opts.K8sClient()
+	client, err := opts.PortalClient()
 	if err != nil {
 		return err
 	}
 
-	svc := k8s.NewDeploymentService(dynClient, cfg.Namespace)
+	svc := portal.NewDeploymentService(client, cfg.ClusterName, cfg.Namespace)
 
 	detail, err := svc.Get(ctx, opts.Name)
 	if err != nil {
+		if errors.Is(err, portal.ErrNotFound) {
+			return fmt.Errorf("deployment %q not found", opts.Name)
+		}
+
+		if errors.Is(err, portal.ErrUnauthorized) {
+			return cmdutil.ErrAuthRequired(err)
+		}
+
 		return err
 	}
 
-	return output.RenderDetail(opts.IO, opts.OutputFormat, detail, output.DetailRenderer[*k8s.DeploymentDetail]{
+	return output.RenderDetail(opts.IO, opts.OutputFormat, detail, output.DetailRenderer[*portal.DeploymentDetail]{
 		Styled: printStyledDeploymentDetail,
 		Plain:  printPlainDeploymentDetail,
 	})
 }
 
 // deploymentDetailLines builds the ordered field list for a deployment detail.
-func deploymentDetailLines(d *k8s.DeploymentDetail, styled bool) []output.DetailLine {
+func deploymentDetailLines(d *portal.DeploymentDetail, styled bool) []output.DetailLine {
 	lines := []output.DetailLine{
 		{Label: "Name", Value: d.Name},
 		{Label: "Namespace", Value: d.Namespace},
@@ -111,7 +119,7 @@ func deploymentDetailLines(d *k8s.DeploymentDetail, styled bool) []output.Detail
 }
 
 // printStyledDeploymentDetail renders deployment details with lipgloss styling.
-func printStyledDeploymentDetail(w io.Writer, d *k8s.DeploymentDetail) error {
+func printStyledDeploymentDetail(w io.Writer, d *portal.DeploymentDetail) error {
 	if err := output.PrintStyledDetailLines(w, deploymentDetailLines(d, true)); err != nil {
 		return err
 	}
@@ -120,7 +128,7 @@ func printStyledDeploymentDetail(w io.Writer, d *k8s.DeploymentDetail) error {
 }
 
 // printPlainDeploymentDetail renders deployment details as plain text for piped output.
-func printPlainDeploymentDetail(w io.Writer, d *k8s.DeploymentDetail) error {
+func printPlainDeploymentDetail(w io.Writer, d *portal.DeploymentDetail) error {
 	if err := output.PrintPlainDetailLines(w, deploymentDetailLines(d, false)); err != nil {
 		return err
 	}
@@ -129,7 +137,7 @@ func printPlainDeploymentDetail(w io.Writer, d *k8s.DeploymentDetail) error {
 }
 
 // printStageSection renders the stages table below the detail lines.
-func printStageSection(w io.Writer, stages []k8s.Stage, styled bool) error {
+func printStageSection(w io.Writer, stages []portal.Stage, styled bool) error {
 	if len(stages) == 0 {
 		return nil
 	}
@@ -159,7 +167,7 @@ func printStageSection(w io.Writer, stages []k8s.Stage, styled bool) error {
 }
 
 // stageRows builds table rows from stages. When styled is true, status is colorized.
-func stageRows(stages []k8s.Stage, styled bool) [][]string {
+func stageRows(stages []portal.Stage, styled bool) [][]string {
 	rows := make([][]string, 0, len(stages))
 
 	for _, s := range stages {
@@ -183,7 +191,7 @@ func stageRows(stages []k8s.Stage, styled bool) [][]string {
 
 // summarizeGates returns a human-readable summary of quality gates by type.
 // e.g., "1 autotest, 1 manual" or "—" if none.
-func summarizeGates(gates []k8s.QualityGate) string {
+func summarizeGates(gates []portal.QualityGate) string {
 	if len(gates) == 0 {
 		return "—"
 	}
@@ -192,9 +200,9 @@ func summarizeGates(gates []k8s.QualityGate) string {
 
 	for _, g := range gates {
 		switch g.Type {
-		case k8s.QualityGateTypeAutotests:
+		case portal.QualityGateTypeAutotests:
 			autotests++
-		case k8s.QualityGateTypeManual:
+		case portal.QualityGateTypeManual:
 			manual++
 		}
 	}

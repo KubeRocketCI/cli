@@ -19,9 +19,8 @@ type Config struct {
 	ClientID       string `mapstructure:"client-id"`
 	Scopes         string `mapstructure:"scopes"`
 	PortalURL      string `mapstructure:"portal-url"`
+	ClusterName    string `mapstructure:"cluster-name"`
 	Namespace      string `mapstructure:"namespace"`
-	APIServer      string `mapstructure:"api-server"`
-	CAData         string `mapstructure:"ca-data"`
 	TokenPath      string
 	KeyringService string
 	ConfigDir      string
@@ -53,9 +52,8 @@ func Init() {
 	viper.SetDefault("client-id", "krci-cli")
 	viper.SetDefault("scopes", "openid email profile")
 	viper.SetDefault("portal-url", "")
+	viper.SetDefault("cluster-name", "")
 	viper.SetDefault("namespace", "")
-	viper.SetDefault("api-server", "")
-	viper.SetDefault("ca-data", "")
 
 	if err := viper.ReadInConfig(); err != nil {
 		var notFound viper.ConfigFileNotFoundError
@@ -68,12 +66,7 @@ func Init() {
 // BindFlags registers persistent flags on the root command and binds them to Viper.
 func BindFlags(cmd *cobra.Command) {
 	pf := cmd.PersistentFlags()
-	pf.String("issuer-url", "", "OIDC issuer URL (Keycloak realm)")
-	pf.String("client-id", "krci-cli", "OIDC client ID")
 	pf.String("portal-url", "", "KubeRocketCI Portal URL")
-	pf.StringP("namespace", "n", "", "Kubernetes namespace")
-	pf.String("api-server", "", "Kubernetes API server URL")
-	pf.String("ca-data", "", "Base64-encoded Kubernetes CA certificate")
 
 	_ = viper.BindPFlags(pf)
 }
@@ -118,17 +111,14 @@ func Save(cfg *Config) error {
 	if cfg.PortalURL != "" {
 		existing.Set("portal-url", cfg.PortalURL)
 	}
+	if cfg.ClusterName != "" {
+		existing.Set("cluster-name", cfg.ClusterName)
+	}
 	if cfg.Namespace != "" {
 		existing.Set("namespace", cfg.Namespace)
 	}
 	if cfg.Scopes != "" && cfg.Scopes != "openid email profile" {
 		existing.Set("scopes", cfg.Scopes)
-	}
-	if cfg.APIServer != "" {
-		existing.Set("api-server", cfg.APIServer)
-	}
-	if cfg.CAData != "" {
-		existing.Set("ca-data", cfg.CAData)
 	}
 
 	if err := existing.WriteConfigAs(configPath); err != nil {

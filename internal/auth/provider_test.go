@@ -60,7 +60,7 @@ func TestGetTokenEnvVarTakesPrecedence(t *testing.T) {
 	t.Setenv("KRCI_TOKEN", "env-token-value")
 
 	store := &mockStore{
-		tok: &token.StoredToken{AccessToken: "cached-token", ExpiresAt: time.Now().Add(time.Hour)},
+		tok: &token.StoredToken{IDToken: "cached-id-token", ExpiresAt: time.Now().Add(time.Hour)},
 	}
 
 	tp := NewTokenProvider(store, &config.Config{})
@@ -82,11 +82,11 @@ func TestGetToken(t *testing.T) {
 			name: "from cache",
 			store: &mockStore{
 				tok: &token.StoredToken{
-					AccessToken: "cached-access-token",
-					ExpiresAt:   time.Now().Add(time.Hour),
+					IDToken:   "cached-id-token",
+					ExpiresAt: time.Now().Add(time.Hour),
 				},
 			},
-			wantTok: "cached-access-token",
+			wantTok: "cached-id-token",
 		},
 		{
 			name:    "not authenticated",
@@ -208,7 +208,7 @@ func TestValidateIssuerURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := validateIssuerURL(tt.url)
+			err := ValidateIssuerURL(tt.url)
 
 			if tt.wantErr {
 				assert.Error(t, err)
