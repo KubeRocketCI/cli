@@ -7,11 +7,13 @@ import (
 	"io"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/table"
 
 	"github.com/KubeRocketCI/cli/internal/iostreams"
+	"github.com/KubeRocketCI/cli/internal/portal"
 )
 
 const (
@@ -59,6 +61,19 @@ func StatusColor(status string) string {
 	}
 }
 
+func PipelineStatusColor(status string) string {
+	switch status {
+	case portal.StatusSucceeded:
+		return greenStyle.Render(status)
+	case portal.StatusFailed, portal.StatusCancelled, portal.StatusTimeout:
+		return redStyle.Render(status)
+	case portal.StatusRunning:
+		return yellowStyle.Render(status)
+	default:
+		return status
+	}
+}
+
 // AvailableText returns a colorized "Yes" or "No" instead of true/false.
 func AvailableText(available bool) string {
 	if available {
@@ -68,17 +83,66 @@ func AvailableText(available bool) string {
 	return redStyle.Render("No")
 }
 
+// FormatRelativeTime converts an RFC3339 timestamp to a short relative display.
+// Returns the original string if parsing fails.
+func FormatRelativeTime(rfc3339 string) string {
+	t, err := time.Parse(time.RFC3339, rfc3339)
+	if err != nil {
+		return rfc3339
+	}
+
+	now := time.Now()
+	d := now.Sub(t)
+
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	case d < 7*24*time.Hour:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	default:
+		return t.Format("Jan 02 15:04")
+	}
+}
+
+// Truncate shortens s to maxWidth characters, appending "..." if truncated.
+// Returns s unchanged if it fits within maxWidth or maxWidth is 0 (no limit).
+func Truncate(s string, maxWidth int) string {
+	if maxWidth <= 0 || len(s) <= maxWidth {
+		return s
+	}
+
+	if maxWidth <= 3 {
+		return s[:maxWidth]
+	}
+
+	return s[:maxWidth-3] + "..."
+}
+
+// Hyperlink wraps text in an OSC 8 terminal hyperlink sequence.
+// The text is displayed normally but is clickable in supported terminals.
+func Hyperlink(text, url string) string {
+	if url == "" {
+		return text
+	}
+
+	return fmt.Sprintf("\x1b]8;;%s\x1b\\%s\x1b]8;;\x1b\\", url, text)
+}
+
 // GreenText returns s rendered in green.
 func GreenText(s string) string { return greenStyle.Render(s) }
 
 // YellowText returns s rendered in yellow.
 func YellowText(s string) string { return yellowStyle.Render(s) }
 
-// PrintStyledTable renders a lipgloss table with rounded borders and styled rows.
+// PrintStyledTable renders a lipgloss table with colored headers, alternating row colors, and no borders.
+// Uses lipgloss for ANSI-aware column width calculation.
 func PrintStyledTable(w io.Writer, headers []string, rows [][]string) error {
 	t := table.New().
-		Border(lipgloss.RoundedBorder()).
-		BorderStyle(BorderStyle).
+		Border(lipgloss.HiddenBorder()).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			if row == table.HeaderRow {
 				return HeaderStyle

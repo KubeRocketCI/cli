@@ -39,7 +39,7 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 	cmd := &cobra.Command{
 		Use:   "get <name>",
 		Short: "Get deployment details",
-		Args:  cobra.ExactArgs(1),
+		Args:  cmdutil.ExactArgs(1, "a deployment name", "to see available deployments: krci deployment list"),
 		Example: `  # Get details for a deployment
   krci deployment get my-pipeline
 
