@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/spf13/cobra"
 )
 
 // ConfigOption describes one way to set a configuration value.
@@ -39,6 +41,25 @@ var NamespaceOption = ConfigOption{
 var IssuerURLOption = ConfigOption{
 	EnvVar:    "KRCI_ISSUER_URL",
 	ConfigKey: "issuer-url in ~/.config/krci/config.yaml",
+}
+
+// ExactArgs returns a cobra.PositionalArgs that requires exactly n arguments,
+// producing a user-friendly error message that names the missing argument.
+// An optional hint is appended as a "Hint:" line when provided.
+func ExactArgs(n int, usage string, hint ...string) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if len(args) == n {
+			return nil
+		}
+
+		msg := fmt.Sprintf("requires %s\n\nUsage: %s", usage, cmd.UseLine())
+
+		if len(hint) > 0 && hint[0] != "" {
+			msg += fmt.Sprintf("\n\nHint: %s", hint[0])
+		}
+
+		return errors.New(msg)
+	}
 }
 
 // ErrAuthRequired wraps a cause into a user-facing "authentication required" error

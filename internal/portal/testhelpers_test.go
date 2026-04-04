@@ -15,13 +15,10 @@ func newTestClient(t *testing.T, srv *httptest.Server) *Client {
 
 	client, err := NewClient(srv.URL, func(_ context.Context) (string, error) {
 		return "test-token", nil
-	})
+	}, WithHTTPClient(srv.Client()))
 	if err != nil {
 		t.Fatalf("newTestClient: %v", err)
 	}
-
-	// Use the TLS server's own client so self-signed certs are trusted.
-	client.http = srv.Client()
 
 	return client
 }

@@ -38,7 +38,7 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 	cmd := &cobra.Command{
 		Use:   "get <name>",
 		Short: "Get project details",
-		Args:  cobra.ExactArgs(1),
+		Args:  cmdutil.ExactArgs(1, "a project name", "to see available projects: krci project list"),
 		Example: `  # Get details for a project
   krci project get my-app
 

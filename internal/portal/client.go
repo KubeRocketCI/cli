@@ -18,6 +18,14 @@ const (
 	procedureK8sGet  = "k8s.get"
 )
 
+// tRPC procedure names for Tekton Results access.
+const (
+	procedurePipelineRunResults = "tektonResults.getPipelineRunResults"
+	procedurePipelineRunLogs    = "tektonResults.getPipelineRunLogs"
+	procedureTaskRunRecords     = "tektonResults.getTaskRunRecords"
+	procedureTaskRunLogs        = "tektonResults.getTaskRunLogs"
+)
+
 // Client provides authenticated access to the KubeRocketCI Portal tRPC API.
 type Client struct {
 	baseURL   string
@@ -25,20 +33,37 @@ type Client struct {
 	http      *http.Client
 }
 
+// ClientOption configures a Client.
+type ClientOption func(*Client)
+
+// WithHTTPClient overrides the HTTP client used for requests.
+// Intended for tests that use httptest servers with self-signed certificates.
+func WithHTTPClient(c *http.Client) ClientOption {
+	return func(cl *Client) { cl.http = c }
+}
+
 // NewClient creates a portal tRPC client.
 // tokenFunc returns the idToken for Bearer authentication.
 // The portalURL must use HTTPS to prevent Bearer tokens from being sent in cleartext.
-func NewClient(portalURL string, tokenFunc func(context.Context) (string, error)) (*Client, error) {
+func NewClient(
+	portalURL string, tokenFunc func(context.Context) (string, error), opts ...ClientOption,
+) (*Client, error) {
 	u, err := url.Parse(portalURL)
 	if err != nil || u.Scheme != "https" || u.Host == "" {
 		return nil, fmt.Errorf("%w: %q", ErrHTTPSRequired, portalURL)
 	}
 
-	return &Client{
+	c := &Client{
 		baseURL:   strings.TrimSuffix(portalURL, "/"),
 		tokenFunc: tokenFunc,
 		http:      &http.Client{Timeout: 30 * time.Second},
-	}, nil
+	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	return c, nil
 }
 
 // Query calls a tRPC query procedure (HTTP GET) and unmarshals the result into out.

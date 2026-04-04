@@ -14,6 +14,7 @@ Command-line interface for the [KubeRocketCI](https://kuberocketci.io) platform 
 - **Authentication** — OIDC Authorization Code + PKCE flow, encrypted token storage (AES-256-GCM), OS keyring integration
 - **Projects** — List and inspect Codebase resources
 - **Deployments** — List and inspect CDPipeline and Stage resources
+- **Pipeline Runs** — List, filter, diagnose failures, and stream logs
 - **Output** — Styled tables for terminals, plain text for pipes, JSON for automation
 
 ## Installation
@@ -46,6 +47,20 @@ krci deployment list
 # Get deployment details
 krci deployment get my-pipeline
 
+# List recent pipeline runs
+krci pipelinerun list
+
+# Filter by project, PR, status, author, type
+krci pipelinerun list --project my-app --pr 44
+krci pipelinerun list --status failed --type review
+krci pipelinerun list --project my-app --author "John Doe"
+
+# Diagnose why a pipeline failed
+krci pipelinerun list --project my-app --pr 44 --reason
+
+# Get a specific pipeline run's logs
+krci pipelinerun get review-my-app-main-a1b2c3 --logs
+
 # JSON output for scripting
 krci project list -o json
 ```
@@ -54,22 +69,91 @@ krci project list -o json
 
 ```
 krci [--portal-url <url>]
-  auth login          Authenticate via browser (OIDC)
-  auth status         Show authentication state
-  auth logout         Clear stored credentials
-  project list|ls     List projects
-  project get <name>  Show project details
-  deployment list|ls  List deployments
-  deployment get <name>  Show deployment details
-  version             Print version info
+  auth login              Authenticate via browser (OIDC)
+  auth status             Show authentication state
+  auth logout             Clear stored credentials
+  project list|ls         List projects
+  project get <name>      Show project details
+  deployment list|ls      List deployments
+  deployment get <name>   Show deployment details
+  pipelinerun list|ls     List and filter pipeline runs
+  pipelinerun get <name>  Get a specific pipeline run
+  version                 Print version info
 ```
 
-**Aliases:** `project` → `proj`, `deployment` → `dp`
+**Aliases:** `project` → `proj`, `deployment` → `dp`, `pipelinerun` → `run`
+
+### Pipeline Run Filters
+
+All filters combine with AND logic.
+
+| Flag        | Description                                                       |
+|-------------|-------------------------------------------------------------------|
+| `--project` | Filter by project name                                            |
+| `--pr`      | Filter by pull request number                                     |
+| `--author`  | Filter by author name                                             |
+| `--branch`  | Filter by source branch                                           |
+| `--type`    | Filter by type (review, build, deploy, release)                   |
+| `--status`  | Filter by status (succeeded, failed, running, timeout, cancelled) |
+| `--logs`    | Append logs for the most recent run                               |
+| `--reason`  | Show task tree and failure diagnosis                              |
+
+## Inspecting a Specific Pipeline Run
+
+Use `get` to inspect a specific run by name (from `list -o json` or the table output):
+
+```bash
+# Basic info
+krci run get review-my-app-main-a1b2c3
+
+# Full logs
+krci run get review-my-app-main-a1b2c3 --logs
+
+# Failure diagnosis (task tree + failed step + logs)
+krci run get review-my-app-main-a1b2c3 --reason
+```
+
+## Diagnosing Failed Pipelines
+
+Use `--reason` on either `list` or `get` for a full diagnosis — task tree, failed step, and relevant logs:
+
+```bash
+# From the list (targets most recent run matching filters)
+krci run list --project my-app --pr 44 --reason
+
+# Or by specific name
+krci run get review-my-app-main-a1b2c3 --reason
+```
+
+```bash
+Pipeline: review-my-app-main-a1b2c3
+  Status:   Failed
+  Duration: 3m 14s
+
+Tasks:
+  ✓ fetch-repository             Succeeded   11s
+  ✓ build                        Succeeded   2m 8s
+  ✗ sonar                        Failed      52s
+  ✓ helm-lint                    Succeeded   8s
+
+Failed: sonar
+  Step:    sonar-scanner (exit code 2)
+  Message: "step-sonar-scanner" exited with code 2
+
+Logs: sonar
+  [sonar-scanner] ERROR: QUALITY GATE STATUS: FAILED
+```
+
+For AI agents, use JSON output and filter failed tasks:
+
+```bash
+krci run get review-my-app-main-a1b2c3 --reason -o json | jq '.tasks[] | select(.failedStep)'
+```
 
 ### Global Flag
 
-| Flag | Env | Description |
-|---|---|---|
+| Flag           | Env               | Description             |
+|----------------|-------------------|-------------------------|
 | `--portal-url` | `KRCI_PORTAL_URL` | KubeRocketCI Portal URL |
 
 All other settings (issuer URL, cluster name, namespace) are auto-discovered on login.
