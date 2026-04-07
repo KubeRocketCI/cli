@@ -15,12 +15,13 @@ import (
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
+	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 )
 
 // GetOptions holds all inputs for the project get command.
 type GetOptions struct {
 	IO           *iostreams.IOStreams
-	PortalClient func() (*portal.Client, error)
+	RestClient   func() (*restapi.ClientWithResponses, error)
 	Config       func() (*config.Config, error)
 	Name         string
 	OutputFormat string
@@ -30,9 +31,9 @@ type GetOptions struct {
 // runF is the business logic function; pass nil to use the default getRun.
 func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command {
 	opts := &GetOptions{
-		IO:           f.IOStreams,
-		PortalClient: f.PortalClient,
-		Config:       f.Config,
+		IO:         f.IOStreams,
+		RestClient: f.RestClient,
+		Config:     f.Config,
 	}
 
 	cmd := &cobra.Command{
@@ -66,7 +67,7 @@ func getRun(ctx context.Context, opts *GetOptions) error {
 		return err
 	}
 
-	client, err := opts.PortalClient()
+	client, err := opts.RestClient()
 	if err != nil {
 		return err
 	}

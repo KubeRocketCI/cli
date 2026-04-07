@@ -2,13 +2,16 @@
 package cmdutil
 
 import (
+	"context"
 	"fmt"
+	"net/http"
 	"sync"
+	"time"
 
 	"github.com/KubeRocketCI/cli/internal/auth"
 	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
-	"github.com/KubeRocketCI/cli/internal/portal"
+	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/internal/token"
 )
 
@@ -19,11 +22,11 @@ type Factory struct {
 	IOStreams     *iostreams.IOStreams
 	Config        func() (*config.Config, error)
 	TokenProvider func() (auth.TokenProvider, error)
-	PortalClient  func() (*portal.Client, error)
+	RestClient    func() (*restapi.ClientWithResponses, error)
 }
 
 // New creates a Factory wired to real system resources.
-// Config, TokenProvider, and PortalClient are lazily resolved after Cobra
+// Config, TokenProvider, and RestClient are lazily resolved after Cobra
 // parses command-line flags (triggered by PersistentPreRunE on the root command).
 func New() *Factory {
 	f := &Factory{
@@ -75,44 +78,59 @@ func New() *Factory {
 	}
 
 	var (
-		oncePortal      sync.Once
-		cachedPortal    *portal.Client
-		cachedPortalErr error
+		onceRest      sync.Once
+		cachedRest    *restapi.ClientWithResponses
+		cachedRestErr error
 	)
 
-	f.PortalClient = func() (*portal.Client, error) {
-		oncePortal.Do(func() {
+	f.RestClient = func() (*restapi.ClientWithResponses, error) {
+		onceRest.Do(func() {
 			cfg, err := f.Config()
 			if err != nil {
-				cachedPortalErr = err
+				cachedRestErr = err
 				return
 			}
 
 			if cfg.PortalURL == "" {
-				cachedPortalErr = ConfigNotSetError("portal URL", "", PortalURLOption, LoginHint)
+				cachedRestErr = ConfigNotSetError("portal URL", "", PortalURLOption, LoginHint)
 				return
 			}
 
 			if cfg.ClusterName == "" {
-				cachedPortalErr = ConfigNotSetError("cluster name", "", ClusterNameOption, LoginHint)
+				cachedRestErr = ConfigNotSetError("cluster name", "", ClusterNameOption, LoginHint)
 				return
 			}
 
 			if cfg.Namespace == "" {
-				cachedPortalErr = ConfigNotSetError("namespace", "", NamespaceOption, LoginHint)
+				cachedRestErr = ConfigNotSetError("namespace", "", NamespaceOption, LoginHint)
 				return
 			}
 
 			tp, err := f.TokenProvider()
 			if err != nil {
-				cachedPortalErr = err
+				cachedRestErr = err
 				return
 			}
 
-			cachedPortal, cachedPortalErr = portal.NewClient(cfg.PortalURL, tp.GetToken)
+			httpClient := &http.Client{Timeout: 30 * time.Second}
+
+			bearerAuth := func(ctx context.Context, req *http.Request) error {
+				tok, err := tp.GetToken(ctx)
+				if err != nil {
+					return fmt.Errorf("obtaining auth token: %w", err)
+				}
+				req.Header.Set("Authorization", "Bearer "+tok)
+				return nil
+			}
+
+			cachedRest, cachedRestErr = restapi.NewClientWithResponses(
+				cfg.PortalURL+"/rest",
+				restapi.WithHTTPClient(httpClient),
+				restapi.WithRequestEditorFn(bearerAuth),
+			)
 		})
 
-		return cachedPortal, cachedPortalErr
+		return cachedRest, cachedRestErr
 	}
 
 	return f

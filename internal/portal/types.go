@@ -1,36 +1,5 @@
 package portal
 
-// k8sResourceConfig matches the portal's tRPC k8sResourceConfigSchema.
-type k8sResourceConfig struct {
-	APIVersion   string `json:"apiVersion"`
-	Kind         string `json:"kind"`
-	Group        string `json:"group"`
-	Version      string `json:"version"`
-	SingularName string `json:"singularName"`
-	PluralName   string `json:"pluralName"`
-}
-
-// k8sListInput is the input for the portal's k8s.list tRPC procedure.
-type k8sListInput struct {
-	ClusterName    string            `json:"clusterName"`
-	Namespace      string            `json:"namespace,omitempty"`
-	ResourceConfig k8sResourceConfig `json:"resourceConfig"`
-	Labels         map[string]string `json:"labels,omitempty"`
-}
-
-// k8sGetInput is the input for the portal's k8s.get tRPC procedure.
-type k8sGetInput struct {
-	ClusterName    string            `json:"clusterName"`
-	Namespace      string            `json:"namespace,omitempty"`
-	Name           string            `json:"name"`
-	ResourceConfig k8sResourceConfig `json:"resourceConfig"`
-}
-
-// k8sList represents a Kubernetes List response with unstructured items.
-type k8sList struct {
-	Items []map[string]any `json:"items"`
-}
-
 // Project represents a KubeRocketCI Codebase resource.
 type Project struct {
 	Name      string `json:"name"`
@@ -80,7 +49,6 @@ type Stage struct {
 	Available    bool          `json:"available"`
 }
 
-// Quality gate type constants.
 const (
 	QualityGateTypeAutotests = "autotests"
 	QualityGateTypeManual    = "manual"

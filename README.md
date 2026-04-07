@@ -167,6 +167,27 @@ All data commands accept `-o, --output` with values `table` (default) or `json`.
 Config file: `~/.config/krci/config.yaml` (auto-populated on login).
 Token storage: `~/.config/krci/tokens.enc` (AES-encrypted, key in OS keyring).
 
+## Local Development
+
+When testing against a locally running portal (HTTP, no TLS), the CLI's HTTPS
+requirement blocks `FetchOIDCConfig` and `FetchClusterConfig`. Bypass it by
+supplying the OIDC issuer URL and cluster settings via environment variables:
+
+```bash
+# 1. Login — provide issuer URL explicitly to skip OIDC discovery over HTTPS
+KRCI_ISSUER_URL=https://idp.example.com/realms/my-realm \
+  krci auth login --portal-url http://localhost:3001
+
+# 2. Run commands — provide cluster name and namespace that would normally
+#    be auto-discovered from the portal's protected config endpoint
+KRCI_CLUSTER_NAME=my-cluster KRCI_NAMESPACE=my-namespace \
+  krci project list
+```
+
+> Port 3001 is the portal backend (Fastify). The Vite dev server on port 5173
+> only proxies `/api` — REST endpoints under `/rest/v1/` require hitting the
+> backend directly.
+
 ## Prerequisites
 
 - Go 1.26+ (for building from source)
