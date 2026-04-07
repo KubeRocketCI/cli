@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 )
 
@@ -114,5 +113,5 @@ func validatePortalURL(portalURL string) error {
 }
 
 func restURL(portalURL, path string) string {
-	return strings.TrimSuffix(portalURL, "/") + "/rest" + path
+	return portalURL + "/rest" + path
 }

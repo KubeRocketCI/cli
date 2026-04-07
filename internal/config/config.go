@@ -81,6 +81,7 @@ func Resolve() (*Config, error) {
 		return nil, fmt.Errorf("parsing config: %w", err)
 	}
 
+	cfg.PortalURL = strings.TrimRight(cfg.PortalURL, "/")
 	cfg.ConfigDir = configDir
 	cfg.TokenPath = filepath.Join(configDir, "tokens.enc")
 	cfg.KeyringService = "krci"
@@ -109,7 +110,7 @@ func Save(cfg *Config) error {
 		existing.Set("client-id", cfg.ClientID)
 	}
 	if cfg.PortalURL != "" {
-		existing.Set("portal-url", cfg.PortalURL)
+		existing.Set("portal-url", strings.TrimRight(cfg.PortalURL, "/"))
 	}
 	if cfg.ClusterName != "" {
 		existing.Set("cluster-name", cfg.ClusterName)

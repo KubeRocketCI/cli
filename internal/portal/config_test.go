@@ -180,5 +180,5 @@ func TestRestURL(t *testing.T) {
 	assert.Equal(t, "https://portal.example.com/rest/v1/config/oidc",
 		restURL("https://portal.example.com", "/v1/config/oidc"))
 	assert.Equal(t, "https://portal.example.com/rest/v1/config",
-		restURL("https://portal.example.com/", "/v1/config"))
+		restURL("https://portal.example.com", "/v1/config"))
 }

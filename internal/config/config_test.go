@@ -68,6 +68,48 @@ func TestSaveAndLoad(t *testing.T) {
 	assert.Equal(t, cfg.PortalURL, viper.GetString("portal-url"))
 }
 
+func TestResolveTrimsPortalURLTrailingSlashes(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"no trailing slash", "https://portal.example.com", "https://portal.example.com"},
+		{"single trailing slash", "https://portal.example.com/", "https://portal.example.com"},
+		{"multiple trailing slashes", "https://portal.example.com///", "https://portal.example.com"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			viper.Reset()
+			t.Setenv("KRCI_PORTAL_URL", tt.input)
+			Init()
+
+			cfg, err := Resolve()
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.want, cfg.PortalURL)
+		})
+	}
+}
+
+func TestSaveTrimsPortalURLTrailingSlash(t *testing.T) {
+	dir := t.TempDir()
+
+	cfg := &Config{
+		PortalURL: "https://portal.example.com/",
+		ConfigDir: dir,
+	}
+
+	require.NoError(t, Save(cfg))
+
+	configPath := filepath.Join(dir, "config.yaml")
+	viper.Reset()
+	viper.SetConfigFile(configPath)
+	require.NoError(t, viper.ReadInConfig())
+
+	assert.Equal(t, "https://portal.example.com", viper.GetString("portal-url"))
+}
+
 func TestSaveSkipsDefaults(t *testing.T) {
 	dir := t.TempDir()
 
