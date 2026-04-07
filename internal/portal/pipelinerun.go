@@ -30,7 +30,7 @@ func NewPipelineRunService(
 ) *PipelineRunService {
 	return &PipelineRunService{
 		client:      client,
-		portalURL:   strings.TrimSuffix(portalURL, "/"),
+		portalURL:   portalURL,
 		clusterName: clusterName,
 		namespace:   namespace,
 	}
