@@ -1215,8 +1215,8 @@ type K8sList_200_Items_Metadata struct {
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
 type K8sList_200_Items_Item struct {
-	ApiVersion           string                     `json:"apiVersion"`
-	Kind                 string                     `json:"kind"`
+	ApiVersion           *string                    `json:"apiVersion,omitempty"`
+	Kind                 *string                    `json:"kind,omitempty"`
 	Metadata             K8sList_200_Items_Metadata `json:"metadata"`
 	Spec                 *map[string]interface{}    `json:"spec,omitempty"`
 	Status               *map[string]interface{}    `json:"status,omitempty"`

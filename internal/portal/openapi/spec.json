@@ -425,8 +425,6 @@
                           }
                         },
                         "required": [
-                          "apiVersion",
-                          "kind",
                           "metadata"
                         ],
                         "additionalProperties": true
