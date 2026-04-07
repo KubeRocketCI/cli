@@ -19,11 +19,16 @@ BIN_DIR := bin
 # Tools - pinned versions
 GOLANGCI_LINT_VERSION ?= v2.11.3
 GORELEASER_VERSION ?= v2.10.2
+OAPICODEGEN_VERSION ?= v2.4.1
 
 # Cross-platform builds
 PLATFORMS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64
 
-.PHONY: build test lint lint-fix clean
+.PHONY: build test lint lint-fix clean generate
+
+generate: $(BIN_DIR)/oapi-codegen ## Generate portal API client from OpenAPI spec
+	# Spec source: https://github.com/KubeRocketCI/krci-portal/blob/main/packages/trpc/api/openapi.json
+	$(BIN_DIR)/oapi-codegen --config=internal/portal/openapi/config.yaml internal/portal/openapi/spec.json
 
 build: ## Build the CLI binary
 	@mkdir -p $(DIST_DIR)
@@ -72,4 +77,7 @@ $(BIN_DIR)/golangci-lint: $(BIN_DIR)
 $(BIN_DIR)/goreleaser: $(BIN_DIR)
 	GOBIN=$(PWD)/$(BIN_DIR) go install github.com/goreleaser/goreleaser/v2@$(GORELEASER_VERSION)
 
-tools: $(BIN_DIR)/golangci-lint $(BIN_DIR)/goreleaser ## Install all development tools
+$(BIN_DIR)/oapi-codegen: $(BIN_DIR)
+	GOBIN=$(PWD)/$(BIN_DIR) go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@$(OAPICODEGEN_VERSION)
+
+tools: $(BIN_DIR)/golangci-lint $(BIN_DIR)/goreleaser $(BIN_DIR)/oapi-codegen ## Install all development tools

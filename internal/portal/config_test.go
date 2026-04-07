@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFetchConfig_RequiresHTTPS(t *testing.T) {
+func TestFetchOIDCConfig_RequiresHTTPS(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -26,82 +26,57 @@ func TestFetchConfig_RequiresHTTPS(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := FetchConfig(tt.portalURL)
+			_, err := FetchOIDCConfig(tt.portalURL)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "portal URL must use HTTPS")
 		})
 	}
 }
 
-func TestFetchConfig_Integration(t *testing.T) {
+func TestFetchOIDCConfig(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name            string
-		handler         http.HandlerFunc
-		wantErr         bool
-		wantClusterName string
-		wantDefaultNS   string
-		wantOIDCIssuer  string
+		name       string
+		handler    http.HandlerFunc
+		wantErr    bool
+		wantErrMsg string
+		wantURL    string
 	}{
 		{
-			name: "SuperJSON format with OIDC issuer",
-			handler: func(w http.ResponseWriter, _ *http.Request) {
+			name: "success",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, "/rest/v1/config/oidc", r.URL.Path)
 				w.Header().Set("Content-Type", "application/json")
-				w.Write([]byte(`{"result":{"data":{"json":{"clusterName":"eks","defaultNamespace":"edp","oidcIssuerUrl":"https://issuer.example.com"},"meta":{}}}}`))
+				w.Write([]byte(`{"oidcIssuerUrl":"https://auth.example.com"}`))
 			},
-			wantClusterName: "eks",
-			wantDefaultNS:   "edp",
-			wantOIDCIssuer:  "https://issuer.example.com",
-		},
-		{
-			name: "plain format with OIDC issuer",
-			handler: func(w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				w.Write([]byte(`{"result":{"data":{"clusterName":"in-cluster","defaultNamespace":"platform","oidcIssuerUrl":"https://auth.platform.dev"}}}`))
-			},
-			wantClusterName: "in-cluster",
-			wantDefaultNS:   "platform",
-			wantOIDCIssuer:  "https://auth.platform.dev",
-		},
-		{
-			name: "backward compat - no oidcIssuerUrl field",
-			handler: func(w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				w.Write([]byte(`{"result":{"data":{"clusterName":"eks","defaultNamespace":"edp"}}}`))
-			},
-			wantClusterName: "eks",
-			wantDefaultNS:   "edp",
-			wantOIDCIssuer:  "",
+			wantURL: "https://auth.example.com",
 		},
 		{
 			name: "HTTP error",
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(`internal error`))
 			},
-			wantErr: true,
+			wantErr:    true,
+			wantErrMsg: "HTTP 500",
 		},
 		{
 			name: "invalid JSON",
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.Write([]byte(`not json`))
 			},
-			wantErr: true,
+			wantErr:    true,
+			wantErrMsg: "parsing OIDC config",
 		},
 		{
-			name: "cluster name only",
+			name: "empty issuer URL",
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				w.Write([]byte(`{"result":{"data":{"clusterName":"eks","defaultNamespace":""}}}`))
+				w.Write([]byte(`{"oidcIssuerUrl":""}`))
 			},
-			wantClusterName: "eks",
-		},
-		{
-			name: "empty data",
-			handler: func(w http.ResponseWriter, _ *http.Request) {
-				w.Write([]byte(`{"result":{"data":{}}}`))
-			},
-			wantErr: true,
+			wantErr:    true,
+			wantErrMsg: "empty OIDC issuer URL",
 		},
 	}
 
@@ -112,71 +87,67 @@ func TestFetchConfig_Integration(t *testing.T) {
 			srv := httptest.NewServer(tt.handler)
 			defer srv.Close()
 
-			cfg, err := fetchConfig(srv.URL)
+			// Use http:// for test server (validatePortalURL requires https, so bypass it)
+			issuerURL, err := fetchOIDCConfig(srv.URL)
 
 			if tt.wantErr {
 				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErrMsg)
 
 				return
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantClusterName, cfg.ClusterName)
-			assert.Equal(t, tt.wantDefaultNS, cfg.DefaultNamespace)
-			assert.Equal(t, tt.wantOIDCIssuer, cfg.OIDCIssuerURL)
+			assert.Equal(t, tt.wantURL, issuerURL)
 		})
 	}
 }
 
-func TestFetchConfig_RequestPath(t *testing.T) {
+func TestFetchClusterConfig_RequiresHTTPS(t *testing.T) {
 	t.Parallel()
 
-	var gotPath string
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.Path
-		w.Write([]byte(`{"result":{"data":{"clusterName":"c","defaultNamespace":"n"}}}`))
-	}))
-	defer srv.Close()
-
-	_, err := fetchConfig(srv.URL)
-	require.NoError(t, err)
-	assert.Equal(t, "/api/config.get", gotPath)
+	_, err := FetchClusterConfig("http://portal.example.com", "token")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "portal URL must use HTTPS")
 }
 
-func TestParseConfig(t *testing.T) {
+func TestFetchClusterConfig(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name            string
-		body            []byte
-		wantErr         bool
-		wantClusterName string
-		wantNS          string
-		wantOIDCIssuer  string
+		name        string
+		handler     http.HandlerFunc
+		wantErr     bool
+		wantErrMsg  string
+		wantCluster string
+		wantNS      string
 	}{
 		{
-			name:            "SuperJSON with OIDC issuer",
-			body:            []byte(`{"result":{"data":{"json":{"clusterName":"eks","defaultNamespace":"edp","oidcIssuerUrl":"https://issuer.example.com"},"meta":{}}}}`),
-			wantClusterName: "eks",
-			wantNS:          "edp",
-			wantOIDCIssuer:  "https://issuer.example.com",
+			name: "success",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, "/rest/v1/config", r.URL.Path)
+				assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(`{"clusterName":"in-cluster","defaultNamespace":"platform","sonarWebUrl":"","dependencyTrackWebUrl":""}`))
+			},
+			wantCluster: "in-cluster",
+			wantNS:      "platform",
 		},
 		{
-			name:            "plain",
-			body:            []byte(`{"result":{"data":{"clusterName":"c","defaultNamespace":"ns"}}}`),
-			wantClusterName: "c",
-			wantNS:          "ns",
+			name: "unauthorized",
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusUnauthorized)
+			},
+			wantErr:    true,
+			wantErrMsg: "unauthorized",
 		},
 		{
-			name:            "cluster name only",
-			body:            []byte(`{"result":{"data":{"clusterName":"eks","defaultNamespace":""}}}`),
-			wantClusterName: "eks",
-		},
-		{
-			name:    "malformed JSON",
-			body:    []byte(`{broken`),
-			wantErr: true,
+			name: "invalid JSON",
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.Write([]byte(`not json`))
+			},
+			wantErr:    true,
+			wantErrMsg: "parsing cluster config",
 		},
 	}
 
@@ -184,18 +155,30 @@ func TestParseConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			cfg, err := parseConfig(tt.body)
+			srv := httptest.NewServer(tt.handler)
+			defer srv.Close()
+
+			cfg, err := fetchClusterConfig(srv.URL, "test-token")
 
 			if tt.wantErr {
 				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErrMsg)
 
 				return
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantClusterName, cfg.ClusterName)
+			assert.Equal(t, tt.wantCluster, cfg.ClusterName)
 			assert.Equal(t, tt.wantNS, cfg.DefaultNamespace)
-			assert.Equal(t, tt.wantOIDCIssuer, cfg.OIDCIssuerURL)
 		})
 	}
+}
+
+func TestRestURL(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "https://portal.example.com/rest/v1/config/oidc",
+		restURL("https://portal.example.com", "/v1/config/oidc"))
+	assert.Equal(t, "https://portal.example.com/rest/v1/config",
+		restURL("https://portal.example.com/", "/v1/config"))
 }

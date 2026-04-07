@@ -160,17 +160,13 @@ func renderRunHeader(w io.Writer, run *portal.PipelineRunInfo) error {
 	return nil
 }
 
-func isFailureStatus(status string) bool {
-	return status == portal.StatusFailed || status == portal.StatusTimeout
-}
-
 func taskListEnumerator(tasks []portal.TaskRunInfo) list.Enumerator {
 	return func(_ list.Items, i int) string {
 		if i >= len(tasks) {
 			return "  "
 		}
 
-		if isFailureStatus(tasks[i].Status) {
+		if portal.IsFailureStatus(tasks[i].Status) {
 			return FailStyle.Render("✗") + " "
 		}
 
@@ -180,7 +176,7 @@ func taskListEnumerator(tasks []portal.TaskRunInfo) list.Enumerator {
 
 func formatTaskLine(t portal.TaskRunInfo) string {
 	status := SuccessStyle.Render(t.Status)
-	if isFailureStatus(t.Status) {
+	if portal.IsFailureStatus(t.Status) {
 		status = FailStyle.Render(t.Status)
 	}
 

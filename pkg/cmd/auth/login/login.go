@@ -73,35 +73,25 @@ func loginRun(cmd *cobra.Command, opts *LoginOptions) error {
 		return cmdutil.ConfigNotSetError("portal URL", "", cmdutil.PortalURLOption, "")
 	}
 
-	// Fetch portal config to auto-discover namespace and cluster name.
-	portalCfg, err := portal.FetchConfig(cfg.PortalURL)
-	if err != nil {
-		if errors.Is(err, portal.ErrHTTPSRequired) {
-			return fmt.Errorf("invalid portal URL: %w", err)
-		}
-
-		_, _ = fmt.Fprintf(opts.IO.ErrOut, "Warning: could not fetch portal config: %v\n", err)
-	}
-
-	// Auto-discover issuer URL from portal config if not explicitly set.
+	// Auto-discover OIDC issuer URL from portal (public endpoint, no auth needed).
 	// Mutate the factory-cached pointer so TokenProvider() (which holds the
 	// same *config.Config) sees the discovered issuer URL during construction.
 	if cfg.IssuerURL == "" {
-		switch {
-		case portalCfg != nil && portalCfg.OIDCIssuerURL != "":
-			cfg.IssuerURL = portalCfg.OIDCIssuerURL
-
-			if err := auth.ValidateIssuerURL(cfg.IssuerURL); err != nil {
-				return fmt.Errorf("portal returned invalid OIDC issuer URL: %w", err)
+		issuerURL, err := portal.FetchOIDCConfig(cfg.PortalURL)
+		if err != nil {
+			if errors.Is(err, portal.ErrHTTPSRequired) {
+				return fmt.Errorf("invalid portal URL: %w", err)
 			}
-		case portalCfg != nil:
+
 			return cmdutil.ConfigNotSetError("OIDC issuer URL",
-				"portal did not return an OIDC issuer URL (portal may be outdated)",
+				fmt.Sprintf("could not discover OIDC issuer from portal: %v", err),
 				cmdutil.IssuerURLOption, "")
-		default:
-			return cmdutil.ConfigNotSetError("OIDC issuer URL",
-				"could not fetch portal config; unable to discover OIDC issuer URL",
-				cmdutil.IssuerURLOption, "")
+		}
+
+		cfg.IssuerURL = issuerURL
+
+		if err := auth.ValidateIssuerURL(cfg.IssuerURL); err != nil {
+			return fmt.Errorf("portal returned invalid OIDC issuer URL: %w", err)
 		}
 	}
 
@@ -115,23 +105,29 @@ func loginRun(cmd *cobra.Command, opts *LoginOptions) error {
 	}
 
 	// Clone cfg so Save() writes only the fields we intend to persist.
-	// The in-memory mutation of cfg.IssuerURL above is intentional (for
-	// TokenProvider) and is also captured in cfgCopy for disk persistence.
 	cfgCopy := *cfg
 
-	// Auto-populate cluster name and namespace from portal.
-	if portalCfg != nil {
-		if cfgCopy.ClusterName == "" && portalCfg.ClusterName != "" {
-			cfgCopy.ClusterName = portalCfg.ClusterName
-		}
+	// Fetch cluster config (authenticated) to auto-populate cluster name and namespace.
+	tok, err := tp.GetToken(cmd.Context())
+	if err != nil {
+		_, _ = fmt.Fprintf(opts.IO.ErrOut, "Warning: could not get token for cluster config: %v\n", err)
+	} else {
+		clusterCfg, err := portal.FetchClusterConfig(cfg.PortalURL, tok)
+		if err != nil {
+			_, _ = fmt.Fprintf(opts.IO.ErrOut, "Warning: could not fetch cluster config: %v\n", err)
+		} else {
+			if cfgCopy.ClusterName == "" && clusterCfg.ClusterName != "" {
+				cfgCopy.ClusterName = clusterCfg.ClusterName
+			}
 
-		if cfgCopy.Namespace == "" && portalCfg.DefaultNamespace != "" {
-			if dns1123LabelRegexp.MatchString(portalCfg.DefaultNamespace) {
-				cfgCopy.Namespace = portalCfg.DefaultNamespace
-				_, _ = fmt.Fprintf(opts.IO.ErrOut, "Namespace: %s (from portal)\n", cfgCopy.Namespace)
-			} else {
-				_, _ = fmt.Fprintf(opts.IO.ErrOut,
-					"Warning: portal returned invalid namespace %q, ignoring\n", portalCfg.DefaultNamespace)
+			if cfgCopy.Namespace == "" && clusterCfg.DefaultNamespace != "" {
+				if dns1123LabelRegexp.MatchString(clusterCfg.DefaultNamespace) {
+					cfgCopy.Namespace = clusterCfg.DefaultNamespace
+					_, _ = fmt.Fprintf(opts.IO.ErrOut, "Namespace: %s (from portal)\n", cfgCopy.Namespace)
+				} else {
+					_, _ = fmt.Fprintf(opts.IO.ErrOut,
+						"Warning: portal returned invalid namespace %q, ignoring\n", clusterCfg.DefaultNamespace)
+				}
 			}
 		}
 	}

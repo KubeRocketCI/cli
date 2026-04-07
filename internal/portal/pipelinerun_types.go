@@ -1,7 +1,11 @@
 package portal
 
+import (
+	"github.com/KubeRocketCI/cli/internal/portal/restapi"
+	"github.com/KubeRocketCI/cli/internal/ptr"
+)
+
 // Tekton Result annotation keys.
-// Source of truth: krci-portal/packages/shared/src/models/tektonResults/annotations.ts
 const (
 	annotationCodebase        = "app.edp.epam.com/codebase"
 	annotationPipelineType    = "app.edp.epam.com/pipelinetype"
@@ -11,12 +15,10 @@ const (
 	annotationGitBranch       = "app.edp.epam.com/git-branch"
 	annotationGitTargetBranch = "app.edp.epam.com/git-target-branch"
 	annotationGitCommitSHA    = "app.edp.epam.com/git-commit-sha"
-	annotationGitRepository   = "app.edp.epam.com/git-repository"
 	annotationPipeline        = "tekton.dev/pipeline"
 	annotationObjectName      = "object.metadata.name"
 )
 
-// Pipeline run status values from Tekton Results summary.
 const (
 	resultStatusSuccess   = "SUCCESS"
 	resultStatusFailure   = "FAILURE"
@@ -33,8 +35,10 @@ const (
 	StatusRunning   = "Running"
 )
 
-// statusDisplay maps Tekton Result summary status to human-readable display text.
-// Matches portal's RESULT_STATUS_MAP (adapters.ts:142-148).
+func IsFailureStatus(status string) bool {
+	return status == StatusFailed || status == StatusTimeout
+}
+
 var statusDisplay = map[string]string{
 	resultStatusSuccess:   StatusSucceeded,
 	resultStatusFailure:   StatusFailed,
@@ -43,7 +47,6 @@ var statusDisplay = map[string]string{
 	resultStatusUnknown:   StatusRunning,
 }
 
-// displayStatus returns the human-readable status text for a Tekton Result status.
 func displayStatus(resultStatus string) string {
 	if s, ok := statusDisplay[resultStatus]; ok {
 		return s
@@ -52,51 +55,15 @@ func displayStatus(resultStatus string) string {
 	return resultStatus
 }
 
-// --- tRPC input types ---
+const conditionSucceeded = "Succeeded"
 
-// pipelineRunResultsInput is the input for tektonResults.getPipelineRunResults.
-type pipelineRunResultsInput struct {
-	Namespace string `json:"namespace"`
-	Filter    string `json:"filter,omitempty"`
-	PageSize  int    `json:"pageSize,omitempty"`
-	PageToken string `json:"pageToken,omitempty"`
-}
-
-// pipelineRunLogsInput is the input for tektonResults.getPipelineRunLogs.
-type pipelineRunLogsInput struct {
-	Namespace string `json:"namespace"`
-	ResultUID string `json:"resultUid"`
-	RecordUID string `json:"recordUid"`
-}
-
-// --- tRPC response types (match portal shared types) ---
-
-// tektonResultSummary is the summary section of a Tekton Result.
-type tektonResultSummary struct {
-	Record string `json:"record"`
-	Type   string `json:"type"`
-	Status string `json:"status"`
-	Start  string `json:"start_time,omitempty"`
-	End    string `json:"end_time,omitempty"`
-}
-
-// tektonResult represents a single Result from the Tekton Results API.
-type tektonResult struct {
-	UID         string               `json:"uid"`
-	Name        string               `json:"name"`
-	CreateTime  string               `json:"create_time"`
-	UpdateTime  string               `json:"update_time"`
-	Summary     *tektonResultSummary `json:"summary,omitempty"`
-	Annotations map[string]any       `json:"annotations,omitempty"`
-}
-
-// resultAnnotation returns the string value of an annotation, or "" if absent.
-func (r *tektonResult) resultAnnotation(key string) string {
-	if r.Annotations == nil {
+func resultAnnotation(r *restapi.TektonResult, key string) string {
+	annotations := ptr.Deref(r.Annotations, nil)
+	if annotations == nil {
 		return ""
 	}
 
-	v, ok := r.Annotations[key]
+	v, ok := annotations[key]
 	if !ok {
 		return ""
 	}
@@ -109,96 +76,27 @@ func (r *tektonResult) resultAnnotation(key string) string {
 	return s
 }
 
-// tektonResultsList is the response from tektonResults.getPipelineRunResults.
-type tektonResultsList struct {
-	Results       []tektonResult `json:"results"`
-	NextPageToken string         `json:"nextPageToken,omitempty"`
-}
+func succeededCondition(t *restapi.TaskRun) *restapi.TaskRunCondition {
+	if t.Status.Conditions == nil {
+		return nil
+	}
 
-// pipelineRunLogsResponse is the response from tektonResults.getPipelineRunLogs.
-type pipelineRunLogsResponse struct {
-	Logs string `json:"logs"`
-}
-
-// taskRunRecordsInput is the input for tektonResults.getTaskRunRecords.
-type taskRunRecordsInput struct {
-	Namespace string `json:"namespace"`
-	ResultUID string `json:"resultUid"`
-}
-
-// taskRunLogsInput is the input for tektonResults.getTaskRunLogs.
-type taskRunLogsInput struct {
-	Namespace   string `json:"namespace"`
-	ResultUID   string `json:"resultUid"`
-	TaskRunName string `json:"taskRunName"`
-}
-
-// K8s condition type for pipeline/task run completion.
-const conditionSucceeded = "Succeeded"
-
-// decodedTaskRunCondition is a K8s-style condition on a TaskRun.
-type decodedTaskRunCondition struct {
-	Type    string `json:"type"`
-	Status  string `json:"status"`
-	Reason  string `json:"reason,omitempty"`
-	Message string `json:"message,omitempty"`
-}
-
-// decodedTaskRunStepTerminated holds termination state for a step.
-type decodedTaskRunStepTerminated struct {
-	ExitCode   int    `json:"exitCode"`
-	Reason     string `json:"reason,omitempty"`
-	Message    string `json:"message,omitempty"`
-	StartedAt  string `json:"startedAt,omitempty"`
-	FinishedAt string `json:"finishedAt,omitempty"`
-}
-
-// decodedTaskRunStep represents a single step within a TaskRun.
-type decodedTaskRunStep struct {
-	Name       string                        `json:"name,omitempty"`
-	Terminated *decodedTaskRunStepTerminated `json:"terminated,omitempty"`
-}
-
-// decodedTaskRunStatus is the status section of a decoded TaskRun.
-type decodedTaskRunStatus struct {
-	Conditions     []decodedTaskRunCondition `json:"conditions,omitempty"`
-	Steps          []decodedTaskRunStep      `json:"steps,omitempty"`
-	StartTime      string                    `json:"startTime,omitempty"`
-	CompletionTime string                    `json:"completionTime,omitempty"`
-}
-
-// decodedTaskRunMetadata is the metadata section of a decoded TaskRun.
-type decodedTaskRunMetadata struct {
-	Name   string            `json:"name"`
-	Labels map[string]string `json:"labels,omitempty"`
-}
-
-// decodedTaskRun is a decoded TaskRun from Tekton Results records.
-type decodedTaskRun struct {
-	Metadata decodedTaskRunMetadata `json:"metadata"`
-	Status   decodedTaskRunStatus   `json:"status"`
-}
-
-// succeededCondition returns the Succeeded condition, or nil if absent.
-func (t *decodedTaskRun) succeededCondition() *decodedTaskRunCondition {
-	for i := range t.Status.Conditions {
-		if t.Status.Conditions[i].Type == conditionSucceeded {
-			return &t.Status.Conditions[i]
+	for i := range *t.Status.Conditions {
+		if (*t.Status.Conditions)[i].Type == conditionSucceeded {
+			return &(*t.Status.Conditions)[i]
 		}
 	}
 
 	return nil
 }
 
-// isFailed returns true if the TaskRun's Succeeded condition is False.
-func (t *decodedTaskRun) isFailed() bool {
-	c := t.succeededCondition()
+func isFailed(t *restapi.TaskRun) bool {
+	c := succeededCondition(t)
 	return c != nil && c.Status == "False"
 }
 
-// conditionStatus returns the human-readable status from the Succeeded condition.
-func (t *decodedTaskRun) conditionStatus() string {
-	c := t.succeededCondition()
+func conditionStatus(t *restapi.TaskRun) string {
+	c := succeededCondition(t)
 	if c == nil {
 		return ""
 	}
@@ -213,20 +111,22 @@ func (t *decodedTaskRun) conditionStatus() string {
 	}
 }
 
-// conditionMessage returns the message from the Succeeded condition.
-func (t *decodedTaskRun) conditionMessage() string {
-	c := t.succeededCondition()
+func conditionMessage(t *restapi.TaskRun) string {
+	c := succeededCondition(t)
 	if c == nil {
 		return ""
 	}
 
-	return c.Message
+	return ptr.Deref(c.Message, "")
 }
 
-// failedStep returns the first step with a non-zero exit code, or nil.
-func (t *decodedTaskRun) failedStep() *decodedTaskRunStep {
-	for i := range t.Status.Steps {
-		s := &t.Status.Steps[i]
+func failedStep(t *restapi.TaskRun) *restapi.TaskRunStep {
+	if t.Status.Steps == nil {
+		return nil
+	}
+
+	for i := range *t.Status.Steps {
+		s := &(*t.Status.Steps)[i]
 		if s.Terminated != nil && s.Terminated.ExitCode != 0 {
 			return s
 		}
@@ -235,22 +135,8 @@ func (t *decodedTaskRun) failedStep() *decodedTaskRunStep {
 	return nil
 }
 
-// taskRunRecordsResponse is the response from tektonResults.getTaskRunRecords.
-type taskRunRecordsResponse struct {
-	TaskRuns []decodedTaskRun `json:"taskRuns"`
-}
-
-// taskRunLogsResponse is the response from tektonResults.getTaskRunLogs.
-type taskRunLogsResponse struct {
-	TaskRunName string `json:"taskRunName"`
-	Logs        string `json:"logs"`
-	HasLogs     bool   `json:"hasLogs"`
-	Error       string `json:"error"`
-}
-
 // --- Domain output types ---
 
-// PipelineRunInfo holds the display data for a single pipeline run.
 type PipelineRunInfo struct {
 	Name         string `json:"name"`
 	PortalURL    string `json:"portalUrl,omitempty"`
@@ -268,7 +154,6 @@ type PipelineRunInfo struct {
 	CommitSHA    string `json:"commitSha,omitempty"`
 }
 
-// TaskRunInfo holds the display data for a single task run.
 type TaskRunInfo struct {
 	Name       string `json:"name"`
 	Status     string `json:"status"`
@@ -279,7 +164,6 @@ type TaskRunInfo struct {
 	Logs       string `json:"logs,omitempty"`
 }
 
-// PipelineRunListResult is the full output for the pipelinerun list command.
 type PipelineRunListResult struct {
 	PipelineRuns []PipelineRunInfo `json:"pipelineRuns"`
 	Logs         string            `json:"logs,omitempty"`

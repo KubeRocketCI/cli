@@ -122,14 +122,12 @@ func Truncate(s string, maxWidth int) string {
 	return s[:maxWidth-3] + "..."
 }
 
-// Hyperlink wraps text in an OSC 8 terminal hyperlink sequence.
-// The text is displayed normally but is clickable in supported terminals.
 func Hyperlink(text, url string) string {
 	if url == "" {
 		return text
 	}
 
-	return fmt.Sprintf("\x1b]8;;%s\x1b\\%s\x1b]8;;\x1b\\", url, text)
+	return lipgloss.NewStyle().Hyperlink(url).Render(text)
 }
 
 // GreenText returns s rendered in green.

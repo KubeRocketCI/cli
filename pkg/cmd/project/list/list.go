@@ -12,12 +12,13 @@ import (
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
+	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 )
 
 // ListOptions holds all inputs for the project list command.
 type ListOptions struct {
 	IO           *iostreams.IOStreams
-	PortalClient func() (*portal.Client, error)
+	RestClient   func() (*restapi.ClientWithResponses, error)
 	Config       func() (*config.Config, error)
 	OutputFormat string
 }
@@ -26,9 +27,9 @@ type ListOptions struct {
 // runF is the business logic function; pass nil to use the default listRun.
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
-		IO:           f.IOStreams,
-		PortalClient: f.PortalClient,
-		Config:       f.Config,
+		IO:         f.IOStreams,
+		RestClient: f.RestClient,
+		Config:     f.Config,
 	}
 
 	cmd := &cobra.Command{
@@ -63,7 +64,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		return err
 	}
 
-	client, err := opts.PortalClient()
+	client, err := opts.RestClient()
 	if err != nil {
 		return err
 	}
