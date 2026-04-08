@@ -267,11 +267,16 @@ func (s *PipelineRunService) fetchReason(
 
 	out.Tasks = make([]TaskRunInfo, 0, len(taskRuns))
 
+	// Not all task names carry runPrefix (Tekton truncates at 63 chars),
+	// so re-adding it after TrimPrefix is lossy — keep originals for log lookup.
+	originalNames := make([]string, 0, len(taskRuns))
+
 	var failedTaskRuns []restapi.TaskRun
 
 	for i := range taskRuns {
 		t := &taskRuns[i]
 		ti := mapTaskRunInfo(t)
+		originalNames = append(originalNames, ti.Name)
 		ti.Name = strings.TrimPrefix(ti.Name, runPrefix)
 		out.Tasks = append(out.Tasks, ti)
 
@@ -327,8 +332,7 @@ func (s *PipelineRunService) fetchReason(
 		}
 
 		for i := range out.Tasks {
-			fullName := runPrefix + out.Tasks[i].Name
-			if logs, ok := logsByName[fullName]; ok {
+			if logs, ok := logsByName[originalNames[i]]; ok {
 				out.Tasks[i].Logs = logs
 			}
 		}
