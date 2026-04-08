@@ -3,12 +3,15 @@ package output
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/list"
 
 	"github.com/KubeRocketCI/cli/internal/portal"
 )
+
+const reasonMaxLogLines = 25
 
 // Pipeline run output styles.
 var (
@@ -172,6 +175,30 @@ func taskListEnumerator(tasks []portal.TaskRunInfo) list.Enumerator {
 
 		return SuccessStyle.Render("✓") + " "
 	}
+}
+
+// TruncateTaskLogs trims each failed task's log to the last N lines,
+// keeping only the tail that typically contains the real failure reason.
+func TruncateTaskLogs(result *portal.PipelineRunListResult) {
+	for i := range result.Tasks {
+		if result.Tasks[i].Logs != "" {
+			result.Tasks[i].Logs = tailLines(result.Tasks[i].Logs, reasonMaxLogLines)
+		}
+	}
+}
+
+func tailLines(s string, n int) string {
+	lines := strings.Split(s, "\n")
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+
+	if len(lines) <= n {
+		return s
+	}
+
+	return fmt.Sprintf("... (%d lines truncated)\n", len(lines)-n) +
+		strings.Join(lines[len(lines)-n:], "\n") + "\n"
 }
 
 func formatTaskLine(t portal.TaskRunInfo) string {
