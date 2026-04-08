@@ -2,8 +2,10 @@
 package login
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"regexp"
 
 	"github.com/spf13/cobra"
@@ -17,6 +19,9 @@ import (
 
 // dns1123LabelRegexp validates a Kubernetes namespace name.
 var dns1123LabelRegexp = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+
+// clusterFetchFunc fetches cluster configuration from a portal URL using a bearer token.
+type clusterFetchFunc func(portalURL, token string) (*portal.ClusterConfig, error)
 
 // LoginOptions holds all inputs for the login command.
 type LoginOptions struct {
@@ -107,39 +112,60 @@ func loginRun(cmd *cobra.Command, opts *LoginOptions) error {
 	// Clone cfg so Save() writes only the fields we intend to persist.
 	cfgCopy := *cfg
 
-	// Fetch cluster config (authenticated) to auto-populate cluster name and namespace.
-	tok, err := tp.GetToken(cmd.Context())
-	if err != nil {
-		_, _ = fmt.Fprintf(opts.IO.ErrOut, "Warning: could not get token for cluster config: %v\n", err)
-	} else {
-		clusterCfg, err := portal.FetchClusterConfig(cfg.PortalURL, tok)
-		if err != nil {
-			_, _ = fmt.Fprintf(opts.IO.ErrOut, "Warning: could not fetch cluster config: %v\n", err)
-		} else {
-			if cfgCopy.ClusterName == "" && clusterCfg.ClusterName != "" {
-				cfgCopy.ClusterName = clusterCfg.ClusterName
-			}
-
-			if cfgCopy.Namespace == "" && clusterCfg.DefaultNamespace != "" {
-				if dns1123LabelRegexp.MatchString(clusterCfg.DefaultNamespace) {
-					cfgCopy.Namespace = clusterCfg.DefaultNamespace
-					_, _ = fmt.Fprintf(opts.IO.ErrOut, "Namespace: %s (from portal)\n", cfgCopy.Namespace)
-				} else {
-					_, _ = fmt.Fprintf(opts.IO.ErrOut,
-						"Warning: portal returned invalid namespace %q, ignoring\n", clusterCfg.DefaultNamespace)
-				}
-			}
-		}
-	}
-
-	if cfgCopy.Namespace == "" {
-		_, _ = fmt.Fprintf(opts.IO.ErrOut,
-			"Warning: namespace not configured; set KRCI_NAMESPACE or re-run login\n")
-	}
+	populateClusterConfig(cmd.Context(), tp, &cfgCopy, opts.IO.ErrOut, portal.FetchClusterConfig)
 
 	if err := config.Save(&cfgCopy); err != nil {
 		_, _ = fmt.Fprintf(opts.IO.ErrOut, "Warning: could not save config: %v\n", err)
 	}
 
 	return nil
+}
+
+// populateClusterConfig fetches cluster name and namespace from the portal
+// when they are not already provided via env vars or config file.
+func populateClusterConfig(
+	ctx context.Context, tp auth.TokenProvider, cfg *config.Config,
+	errOut io.Writer, fetch clusterFetchFunc,
+) {
+	if cfg.ClusterName != "" && cfg.Namespace != "" {
+		return
+	}
+
+	fetchClusterMetadata(ctx, tp, cfg, errOut, fetch)
+
+	if cfg.Namespace == "" {
+		_, _ = fmt.Fprintf(errOut,
+			"Warning: namespace not configured; set KRCI_NAMESPACE or re-run login\n")
+	}
+}
+
+func fetchClusterMetadata(
+	ctx context.Context, tp auth.TokenProvider, cfg *config.Config,
+	errOut io.Writer, fetch clusterFetchFunc,
+) {
+	tok, err := tp.GetToken(ctx)
+	if err != nil {
+		_, _ = fmt.Fprintf(errOut, "Warning: could not get token for cluster config: %v\n", err)
+		return
+	}
+
+	clusterCfg, err := fetch(cfg.PortalURL, tok)
+	if err != nil {
+		_, _ = fmt.Fprintf(errOut, "Warning: could not fetch cluster config: %v\n", err)
+		return
+	}
+
+	if cfg.ClusterName == "" && clusterCfg.ClusterName != "" {
+		cfg.ClusterName = clusterCfg.ClusterName
+	}
+
+	if cfg.Namespace == "" && clusterCfg.DefaultNamespace != "" {
+		if dns1123LabelRegexp.MatchString(clusterCfg.DefaultNamespace) {
+			cfg.Namespace = clusterCfg.DefaultNamespace
+			_, _ = fmt.Fprintf(errOut, "Namespace: %s (from portal)\n", cfg.Namespace)
+		} else {
+			_, _ = fmt.Fprintf(errOut,
+				"Warning: portal returned invalid namespace %q, ignoring\n", clusterCfg.DefaultNamespace)
+		}
+	}
 }
