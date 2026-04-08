@@ -169,24 +169,72 @@ Token storage: `~/.config/krci/tokens.enc` (AES-encrypted, key in OS keyring).
 
 ## Local Development
 
-When testing against a locally running portal (HTTP, no TLS), the CLI's HTTPS
-requirement blocks `FetchOIDCConfig` and `FetchClusterConfig`. Bypass it by
-supplying the OIDC issuer URL and cluster settings via environment variables:
+### Prerequisites
+
+1. A running KubeRocketCI portal backend (port 3001)
+2. The portal's `.env` configured with a valid `OIDC_ISSUER_URL` (e.g. your Keycloak realm)
+
+Start the portal:
 
 ```bash
-# 1. Login — provide issuer URL explicitly to skip OIDC discovery over HTTPS
-KRCI_ISSUER_URL=https://idp.example.com/realms/my-realm \
-  krci auth login --portal-url http://localhost:3001
-
-# 2. Run commands — provide cluster name and namespace that would normally
-#    be auto-discovered from the portal's protected config endpoint
-KRCI_CLUSTER_NAME=my-cluster KRCI_NAMESPACE=my-namespace \
-  krci project list
+cd krci-portal
+cp .env.example .env   # fill in OIDC_ISSUER_URL, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET
+pnpm dev
 ```
 
-> Port 3001 is the portal backend (Fastify). The Vite dev server on port 5173
-> only proxies `/api` — REST endpoints under `/rest/v1/` require hitting the
-> backend directly.
+The backend starts at `http://localhost:3001`. The Vite dev server (port 5173)
+only proxies `/api` — the CLI uses `/rest/v1/` endpoints, so it must talk to
+port 3001 directly.
+
+### Build the CLI
+
+```bash
+make build    # → dist/krci
+```
+
+### Step 1 — Login
+
+The portal runs over HTTP, so the CLI cannot auto-discover the OIDC issuer.
+Pass it explicitly via `KRCI_ISSUER_URL` (copy the value from the portal's
+`OIDC_ISSUER_URL` in `.env` or from its startup output):
+
+```bash
+KRCI_ISSUER_URL=https://idp.example.com/realms/my-realm \
+  ./dist/krci auth login --portal-url http://localhost:3001
+```
+
+A browser window opens for authentication. On success you'll see:
+
+```
+Logged in as user@example.com (User Name)
+Warning: could not fetch cluster config: portal URL must use HTTPS ...
+Warning: namespace not configured; set KRCI_NAMESPACE or re-run login
+```
+
+These warnings are expected — the CLI cannot fetch cluster metadata over HTTP.
+The portal URL and issuer are saved to `~/.config/krci/config.yaml`, so you
+won't need `--portal-url` on subsequent commands.
+
+### Step 2 — Run commands
+
+Supply the cluster name and namespace that would normally be auto-discovered.
+These are required on every command:
+
+```bash
+export KRCI_CLUSTER_NAME=my-cluster
+export KRCI_NAMESPACE=my-namespace
+```
+
+Then use the CLI normally:
+
+```bash
+./dist/krci project list
+./dist/krci deployment list
+./dist/krci pipelinerun list --project my-app --reason
+```
+
+> **Tip:** add the exports to a local `.envrc` (direnv) or a shell alias to
+> avoid repeating them.
 
 ## Prerequisites
 
