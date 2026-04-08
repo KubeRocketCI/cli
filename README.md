@@ -192,49 +192,33 @@ port 3001 directly.
 make build    # → dist/krci
 ```
 
-### Step 1 — Login
+### Login
 
-The portal runs over HTTP, so the CLI cannot auto-discover the OIDC issuer.
-Pass it explicitly via `KRCI_ISSUER_URL` (copy the value from the portal's
-`OIDC_ISSUER_URL` in `.env` or from its startup output):
+The portal runs over HTTP, so the CLI cannot auto-discover the OIDC issuer or
+cluster metadata. Supply all values upfront via environment variables (copy
+`OIDC_ISSUER_URL` from the portal's `.env` or its startup output):
 
 ```bash
 KRCI_ISSUER_URL=https://idp.example.com/realms/my-realm \
+KRCI_CLUSTER_NAME=my-cluster \
+KRCI_NAMESPACE=my-namespace \
   ./dist/krci auth login --portal-url http://localhost:3001
 ```
 
-A browser window opens for authentication. On success you'll see:
+A browser window opens for authentication. On success:
 
 ```
 Logged in as user@example.com (User Name)
-Warning: could not fetch cluster config: portal URL must use HTTPS ...
-Warning: namespace not configured; set KRCI_NAMESPACE or re-run login
 ```
 
-These warnings are expected — the CLI cannot fetch cluster metadata over HTTP.
-The portal URL and issuer are saved to `~/.config/krci/config.yaml`, so you
-won't need `--portal-url` on subsequent commands.
-
-### Step 2 — Run commands
-
-Supply the cluster name and namespace that would normally be auto-discovered.
-These are required on every command:
-
-```bash
-export KRCI_CLUSTER_NAME=my-cluster
-export KRCI_NAMESPACE=my-namespace
-```
-
-Then use the CLI normally:
+All values are saved to `~/.config/krci/config.yaml`, so subsequent commands
+need no flags or environment variables:
 
 ```bash
 ./dist/krci project list
 ./dist/krci deployment list
 ./dist/krci pipelinerun list --project my-app --reason
 ```
-
-> **Tip:** add the exports to a local `.envrc` (direnv) or a shell alias to
-> avoid repeating them.
 
 ## Prerequisites
 

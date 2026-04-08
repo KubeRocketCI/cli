@@ -89,8 +89,9 @@ func Resolve() (*Config, error) {
 	return &cfg, nil
 }
 
-// Save persists user-provided values to the config file.
-// Only writes non-empty values so defaults and env vars are not baked in.
+// Save persists resolved configuration values to the config file.
+// Non-empty values (including those resolved from env vars) are written
+// so they survive across sessions without requiring env vars again.
 func Save(cfg *Config) error {
 	configDir := cfg.ConfigDir
 	if err := os.MkdirAll(configDir, 0700); err != nil {
