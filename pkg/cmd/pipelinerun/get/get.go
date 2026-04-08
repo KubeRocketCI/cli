@@ -98,6 +98,10 @@ func getRun(ctx context.Context, opts *GetOptions) error {
 		return err
 	}
 
+	if opts.IncludeReason {
+		output.TruncateTaskLogs(result)
+	}
+
 	if output.ResolveFormat(opts.OutputFormat) == output.FormatJSON {
 		return output.PrintJSON(opts.IO.Out, result)
 	}

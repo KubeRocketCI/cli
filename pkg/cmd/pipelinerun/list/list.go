@@ -127,7 +127,10 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		return err
 	}
 
-	// JSON always returns the full struct.
+	if opts.IncludeReason {
+		output.TruncateTaskLogs(result)
+	}
+
 	if output.ResolveFormat(opts.OutputFormat) == output.FormatJSON {
 		return output.PrintJSON(opts.IO.Out, result)
 	}
