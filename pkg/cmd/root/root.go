@@ -24,6 +24,10 @@ func NewCmdRoot(f *cmdutil.Factory, v, commit, date string) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			if err := cmdutil.ValidateStringFlags(cmd); err != nil {
+				return err
+			}
+
 			// Warm the config cache after Cobra has parsed all flags.
 			// Subcommand RunE functions receive the cached result instantly.
 			_, err := f.Config()
