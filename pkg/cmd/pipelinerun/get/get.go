@@ -82,7 +82,7 @@ func getRun(ctx context.Context, opts *GetOptions) error {
 
 	svc := portal.NewPipelineRunService(client, cfg.PortalURL, cfg.ClusterName, cfg.Namespace)
 
-	result, err := svc.Get(ctx, opts.Name, portal.PipelineRunGetOptions{
+	result, err := svc.UnifiedGet(ctx, opts.Name, portal.PipelineRunGetOptions{
 		IncludeLogs:   opts.IncludeLogs,
 		IncludeReason: opts.IncludeReason,
 	})
