@@ -39,6 +39,7 @@ var (
 	greenStyle  = lipgloss.NewStyle().Foreground(lipgloss.Green)
 	yellowStyle = lipgloss.NewStyle().Foreground(lipgloss.Yellow)
 	redStyle    = lipgloss.NewStyle().Foreground(lipgloss.Red)
+	blueStyle   = lipgloss.NewStyle().Foreground(lipgloss.Blue)
 )
 
 // StatusColor returns the status string with color applied based on its value.
@@ -68,7 +69,7 @@ func PipelineStatusColor(status string) string {
 	case portal.StatusFailed, portal.StatusCancelled, portal.StatusTimeout:
 		return redStyle.Render(status)
 	case portal.StatusRunning:
-		return yellowStyle.Render(status)
+		return blueStyle.Render(status)
 	default:
 		return status
 	}

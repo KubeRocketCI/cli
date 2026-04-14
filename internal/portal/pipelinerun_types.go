@@ -35,6 +35,13 @@ const (
 	StatusRunning   = "Running"
 )
 
+// K8s condition status values.
+const (
+	conditionStatusTrue    = "True"
+	conditionStatusFalse   = "False"
+	conditionStatusUnknown = "Unknown"
+)
+
 func IsFailureStatus(status string) bool {
 	return status == StatusFailed || status == StatusTimeout
 }
@@ -92,7 +99,7 @@ func succeededCondition(t *restapi.TaskRun) *restapi.TaskRunCondition {
 
 func isFailed(t *restapi.TaskRun) bool {
 	c := succeededCondition(t)
-	return c != nil && c.Status == "False"
+	return c != nil && c.Status == conditionStatusFalse
 }
 
 func conditionStatus(t *restapi.TaskRun) string {
@@ -102,9 +109,9 @@ func conditionStatus(t *restapi.TaskRun) string {
 	}
 
 	switch c.Status {
-	case "True":
+	case conditionStatusTrue:
 		return displayStatus(resultStatusSuccess)
-	case "False":
+	case conditionStatusFalse:
 		return displayStatus(resultStatusFailure)
 	default:
 		return displayStatus(resultStatusUnknown)
