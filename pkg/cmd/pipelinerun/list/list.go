@@ -101,7 +101,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 
 	svc := portal.NewPipelineRunService(client, cfg.PortalURL, cfg.ClusterName, cfg.Namespace)
 
-	result, err := svc.UnifiedList(ctx, portal.PipelineRunListOptions{
+	result, err := svc.List(ctx, portal.PipelineRunListOptions{
 		Filter: portal.PipelineRunFilter{
 			Project:  opts.Project,
 			PRNumber: opts.PRNumber,

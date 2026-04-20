@@ -2,10 +2,12 @@ package portal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,6 +17,26 @@ import (
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/internal/ptr"
 )
+
+var pipelineRunResourceConfig = restapi.K8sListJSONBody{
+	ResourceConfig: struct {
+		ApiVersion    string             `json:"apiVersion"`
+		ClusterScoped *bool              `json:"clusterScoped,omitempty"`
+		Group         string             `json:"group"`
+		Kind          string             `json:"kind"`
+		Labels        *map[string]string `json:"labels,omitempty"`
+		PluralName    string             `json:"pluralName"`
+		SingularName  string             `json:"singularName"`
+		Version       string             `json:"version"`
+	}{
+		ApiVersion:   "tekton.dev/v1",
+		Group:        "tekton.dev",
+		Kind:         "PipelineRun",
+		PluralName:   "pipelineruns",
+		SingularName: "pipelinerun",
+		Version:      "v1",
+	},
+}
 
 // PipelineRunService provides access to pipeline run data via the portal's REST API.
 type PipelineRunService struct {
@@ -59,32 +81,14 @@ type PipelineRunFilter struct {
 	Status   string
 }
 
-var statusCELValue = map[string]string{
-	"succeeded": "1",
-	"failed":    "2",
-	"timeout":   "3",
-	"cancelled": "4",
-	"running":   "0",
-}
-
-var filterStatusToDisplay = map[string]string{
-	"succeeded": StatusSucceeded,
-	"failed":    StatusFailed,
-	"timeout":   StatusTimeout,
-	"cancelled": StatusCancelled,
-	"running":   StatusRunning,
-}
-
 // PipelineRunGetOptions controls expansion for Get.
 type PipelineRunGetOptions struct {
 	IncludeLogs   bool
 	IncludeReason bool
 }
 
-// Get returns a single pipeline run by name from Tekton Results.
-//
-// Deprecated: Use UnifiedGet instead to check both K8s and Tekton Results.
-func (s *PipelineRunService) Get(
+// getFromResults returns a single pipeline run by name from Tekton Results.
+func (s *PipelineRunService) getFromResults(
 	ctx context.Context, name string, opts PipelineRunGetOptions,
 ) (*PipelineRunListResult, error) {
 	filter := fmt.Sprintf("annotations[%q] == %q", annotationObjectName, name)
@@ -123,30 +127,41 @@ func (s *PipelineRunService) Get(
 	return result, nil
 }
 
-// UnifiedGet returns a single pipeline run by name, checking both K8s (for running pipelines)
-// and Tekton Results (for completed pipelines). K8s is checked first since it's faster and
-// will have the most recent state for running pipelines.
-func (s *PipelineRunService) UnifiedGet(
+// Get returns a single pipeline run by name, checking K8s first (the only source for
+// in-flight runs) and falling back to Tekton Results for completed pipelines.
+func (s *PipelineRunService) Get(
 	ctx context.Context, name string, opts PipelineRunGetOptions,
 ) (*PipelineRunListResult, error) {
-	// Try K8s first (faster, has running pipelines).
+	// K8s is the only source that includes running pipelines.
 	k8sResult, err := s.getLiveRun(ctx, name)
-	if err == nil && k8sResult != nil {
-		if k8sResult.PipelineRuns[0].Status == StatusRunning {
-			// Pipeline is still running: logs/reason are not available from Tekton Results yet.
-			return k8sResult, nil
+	if err != nil {
+		if !errors.Is(err, ErrNotFound) {
+			// Hard K8s error (auth, network, etc.): do not mask with a Tekton Results fallback.
+			return nil, err
 		}
-		// Pipeline completed but still visible in K8s. Try Tekton Results for full expansion.
-		if opts.IncludeLogs || opts.IncludeReason {
-			if tektonResult, tektonErr := s.Get(ctx, name, opts); tektonErr == nil {
-				return tektonResult, nil
-			}
-		}
+		// Run not in K8s; fall back to Tekton Results (has completed pipelines with full history).
+		return s.getFromResults(ctx, name, opts)
+	}
+
+	if k8sResult.PipelineRuns[0].Status == StatusRunning {
+		// Pipeline is still running: logs/reason are not available from Tekton Results yet.
 		return k8sResult, nil
 	}
 
-	// Fall back to Tekton Results (has completed pipelines with full history).
-	return s.Get(ctx, name, opts)
+	// Pipeline completed but still visible in K8s. Try Tekton Results for full expansion.
+	if opts.IncludeLogs || opts.IncludeReason {
+		tektonResult, tektonErr := s.getFromResults(ctx, name, opts)
+		if tektonErr == nil {
+			return tektonResult, nil
+		}
+
+		if !errors.Is(tektonErr, ErrNotFound) {
+			return nil, tektonErr
+		}
+		// ErrNotFound: run not yet indexed in Tekton Results; fall through to K8s result.
+	}
+
+	return k8sResult, nil
 }
 
 // getLiveRun fetches a single pipeline run from K8s by name.
@@ -174,10 +189,8 @@ type PipelineRunListOptions struct {
 	IncludeReason bool
 }
 
-// List returns pipeline runs matching the given filters.
-//
-// Deprecated: Use UnifiedList instead to include both running and completed pipeline runs.
-func (s *PipelineRunService) List(
+// listFromResults returns pipeline runs from Tekton Results matching the given filters.
+func (s *PipelineRunService) listFromResults(
 	ctx context.Context, opts PipelineRunListOptions,
 ) (*PipelineRunListResult, error) {
 	cel := buildCELFilter(opts.Filter)
@@ -220,20 +233,18 @@ func (s *PipelineRunService) List(
 	return result, nil
 }
 
-// UnifiedList returns both running (from K8s) and completed (from Tekton Results)
+// List returns both running (from K8s) and completed (from Tekton Results)
 // pipeline runs, merged and deduplicated. Same unified view as the portal UI.
-func (s *PipelineRunService) UnifiedList(
+func (s *PipelineRunService) List(
 	ctx context.Context, opts PipelineRunListOptions,
 ) (*PipelineRunListResult, error) {
-	// Fetch live pipeline runs from K8s and completed runs from Tekton Results in parallel
-	g, gctx := errgroup.WithContext(ctx)
+	g, ctx := errgroup.WithContext(ctx)
 
 	var liveRuns []PipelineRunInfo
 	var historyResult *PipelineRunListResult
 
-	// Always fetch live runs from K8s
 	g.Go(func() error {
-		runs, err := s.fetchLiveRuns(gctx, opts.Filter)
+		runs, err := s.fetchLiveRuns(ctx, opts.Filter)
 		if err != nil {
 			return err
 		}
@@ -241,14 +252,11 @@ func (s *PipelineRunService) UnifiedList(
 		return nil
 	})
 
-	// Only fetch from Tekton Results if not filtering exclusively for running status.
-	// Tekton Results only stores completed pipeline runs, so querying it for
-	// running status causes API errors.
-	fetchFromTektonResults := strings.ToLower(opts.Filter.Status) != "running"
-
-	if fetchFromTektonResults {
+	// Tekton Results only stores completed pipeline runs, so querying it while
+	// filtering for "running" causes API errors — skip that round trip entirely.
+	if !strings.EqualFold(opts.Filter.Status, StatusRunning) {
 		g.Go(func() error {
-			result, err := s.List(gctx, opts)
+			result, err := s.listFromResults(ctx, opts)
 			if err != nil {
 				return err
 			}
@@ -256,46 +264,24 @@ func (s *PipelineRunService) UnifiedList(
 			return nil
 		})
 	} else {
-		// No Tekton Results query needed - initialize empty result
-		historyResult = &PipelineRunListResult{
-			PipelineRuns: []PipelineRunInfo{},
-		}
+		historyResult = &PipelineRunListResult{}
 	}
 
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
 
-	// Build a set of live pipeline run names for deduplication
-	liveNameSet := make(map[string]bool, len(liveRuns))
-	for _, pr := range liveRuns {
-		liveNameSet[pr.Name] = true
-	}
-
-	// Filter out history items that exist in the live set (live wins)
-	filteredHistory := make([]PipelineRunInfo, 0, len(historyResult.PipelineRuns))
-	for _, pr := range historyResult.PipelineRuns {
-		if !liveNameSet[pr.Name] {
-			filteredHistory = append(filteredHistory, pr)
-		}
-	}
-
-	// Merge live + filtered history and sort by start time (newest first)
-	allRuns := make([]PipelineRunInfo, 0, len(liveRuns)+len(filteredHistory))
-	allRuns = append(allRuns, liveRuns...)
-	allRuns = append(allRuns, filteredHistory...)
-	sort.Slice(allRuns, func(i, j int) bool {
-		return allRuns[i].StartTime > allRuns[j].StartTime
-	})
+	allRuns := mergePipelineRuns(liveRuns, historyResult.PipelineRuns)
 
 	result := &PipelineRunListResult{
 		PipelineRuns: allRuns,
 	}
 
-	// Only carry over expansion data (logs/tasks) from Tekton Results if its first run
-	// is still the top result after merging. If a live K8s run displaced it, the
-	// expansion data belongs to a different run and must not be attached.
-	if len(allRuns) > 0 && !liveNameSet[allRuns[0].Name] {
+	// Only carry over expansion data (logs/tasks) if the run it was fetched for
+	// (historyResult.PipelineRuns[0]) is still the top result after merging. A live
+	// run may have sorted ahead of it, or a different history run may now be first.
+	if len(allRuns) > 0 && len(historyResult.PipelineRuns) > 0 &&
+		allRuns[0].Name == historyResult.PipelineRuns[0].Name {
 		result.Logs = historyResult.Logs
 		result.Tasks = historyResult.Tasks
 	}
@@ -303,34 +289,46 @@ func (s *PipelineRunService) UnifiedList(
 	return result, nil
 }
 
-// pipelineRunK8sListBody returns the K8sListJSONRequestBody for PipelineRun resources.
-func (s *PipelineRunService) pipelineRunK8sListBody() restapi.K8sListJSONRequestBody {
-	return restapi.K8sListJSONRequestBody{
-		ClusterName: s.clusterName,
-		Namespace:   &s.namespace,
-		ResourceConfig: struct {
-			ApiVersion    string             `json:"apiVersion"`
-			ClusterScoped *bool              `json:"clusterScoped,omitempty"`
-			Group         string             `json:"group"`
-			Kind          string             `json:"kind"`
-			Labels        *map[string]string `json:"labels,omitempty"`
-			PluralName    string             `json:"pluralName"`
-			SingularName  string             `json:"singularName"`
-			Version       string             `json:"version"`
-		}{
-			ApiVersion:   "tekton.dev/v1",
-			Group:        "tekton.dev",
-			Kind:         "PipelineRun",
-			PluralName:   "pipelineruns",
-			SingularName: "pipelinerun",
-			Version:      "v1",
-		},
+// mergePipelineRuns combines live (K8s) and history (Tekton Results) runs into a single
+// deduplicated slice sorted by StartTime descending. Live runs take precedence: any
+// history entry whose name is already covered by a live run is dropped.
+func mergePipelineRuns(live, history []PipelineRunInfo) []PipelineRunInfo {
+	liveNameSet := make(map[string]bool, len(live))
+	for _, pr := range live {
+		liveNameSet[pr.Name] = true
 	}
+
+	all := make([]PipelineRunInfo, 0, len(live)+len(history))
+	all = append(all, live...)
+
+	for _, pr := range history {
+		if !liveNameSet[pr.Name] {
+			all = append(all, pr)
+		}
+	}
+
+	// Parse once per entry: comparing as strings would mis-order sources with
+	// different precisions (Results emits nanoseconds, K8s emits seconds).
+	starts := make(map[string]time.Time, len(all))
+	for _, pr := range all {
+		// Parse errors leave a zero time, sinking malformed/empty entries to the bottom of the sort.
+		starts[pr.Name], _ = time.Parse(time.RFC3339Nano, pr.StartTime)
+	}
+
+	sort.Slice(all, func(i, j int) bool {
+		return starts[all[i].Name].After(starts[all[j].Name])
+	})
+
+	return all
 }
 
 // fetchLiveRuns fetches pipeline runs from the K8s API and applies client-side filtering.
 func (s *PipelineRunService) fetchLiveRuns(ctx context.Context, filter PipelineRunFilter) ([]PipelineRunInfo, error) {
-	resp, err := s.client.K8sListWithResponse(ctx, s.pipelineRunK8sListBody())
+	resp, err := s.client.K8sListWithResponse(ctx, restapi.K8sListJSONRequestBody{
+		ClusterName:    s.clusterName,
+		Namespace:      ptr.To(s.namespace),
+		ResourceConfig: pipelineRunResourceConfig.ResourceConfig,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("fetching live pipeline runs: %w", err)
 	}
@@ -377,7 +375,7 @@ func matchesFilter(info PipelineRunInfo, filter PipelineRunFilter) bool {
 		return false
 	}
 
-	if filter.PRNumber > 0 && info.PRNumber != fmt.Sprintf("%d", filter.PRNumber) {
+	if filter.PRNumber > 0 && info.PRNumber != strconv.Itoa(filter.PRNumber) {
 		return false
 	}
 
@@ -390,12 +388,12 @@ func matchesFilter(info PipelineRunInfo, filter PipelineRunFilter) bool {
 
 // matchesStatus checks if the actual status matches the filter status (case-insensitive).
 func matchesStatus(actualStatus, filterStatus string) bool {
-	expected, ok := filterStatusToDisplay[strings.ToLower(filterStatus)]
+	m, ok := statusMappings[strings.ToLower(filterStatus)]
 	if !ok {
 		return false
 	}
 
-	return actualStatus == expected
+	return actualStatus == m.display
 }
 
 // mapK8sPipelineRunInfo converts a K8s PipelineRun item to the display model.
@@ -404,54 +402,40 @@ func mapK8sPipelineRunInfo(item *restapi.K8sList_200_Items_Item) PipelineRunInfo
 		Name: item.Metadata.Name,
 	}
 
-	// Extract labels and annotations.
 	if item.Metadata.AdditionalProperties != nil {
 		if labels, ok := item.Metadata.AdditionalProperties["labels"].(map[string]any); ok {
-			info.Project = stringValue(labels[annotationCodebase])
-			info.Type = stringValue(labels[annotationPipelineType])
-			info.Branch = stringValue(labels[annotationGitBranch])
-			info.Author = stringValue(labels[annotationGitAuthor])
-			info.PRNumber = stringValue(labels[annotationGitChangeNumber])
-			info.TargetBranch = stringValue(labels[annotationGitTargetBranch])
+			info.Project = stringVal(labels, annotationCodebase)
+			info.Type = stringVal(labels, annotationPipelineType)
+			info.Branch = stringVal(labels, annotationGitBranch)
+			info.Author = stringVal(labels, annotationGitAuthor)
+			info.PRNumber = stringVal(labels, annotationGitChangeNumber)
+			info.TargetBranch = stringVal(labels, annotationGitTargetBranch)
 		}
 
 		if annotations, ok := item.Metadata.AdditionalProperties["annotations"].(map[string]any); ok {
-			info.PRURL = stringValue(annotations[annotationGitChangeURL])
-			info.CommitSHA = stringValue(annotations[annotationGitCommitSHA])
+			info.PRURL = stringVal(annotations, annotationGitChangeURL)
+			info.CommitSHA = stringVal(annotations, annotationGitCommitSHA)
 		}
 	}
 
-	// Extract pipeline reference from spec (independent of status).
+	// pipelineRef lives under spec, not status, so it is available even before the reconciler runs.
 	if item.Spec != nil {
 		if pipelineRef, ok := (*item.Spec)["pipelineRef"].(map[string]any); ok {
-			info.Pipeline = stringValue(pipelineRef["name"])
+			info.Pipeline = stringVal(pipelineRef, "name")
 		}
 	}
 
-	// Extract status, start time, and duration.
 	if item.Status != nil {
 		status := *item.Status
+		info.StartTime = stringVal(status, "startTime")
 
-		// Use status.startTime (actual pipeline start time); fall back to creationTimestamp.
-		if startTime := stringValue(status["startTime"]); startTime != "" {
-			info.StartTime = startTime
-		} else if item.Metadata.AdditionalProperties != nil {
-			if creationTimestamp, ok := item.Metadata.AdditionalProperties["creationTimestamp"].(string); ok {
-				info.StartTime = creationTimestamp
-			}
-		}
-
-		// Determine status from conditions.
 		if conditions, ok := status["conditions"].([]any); ok && len(conditions) > 0 {
 			if cond, ok := conditions[0].(map[string]any); ok {
-				condStatus := stringValue(cond["status"])
-				condReason := stringValue(cond["reason"])
-
-				switch condStatus {
+				switch stringVal(cond, "status") {
 				case conditionStatusTrue:
 					info.Status = StatusSucceeded
 				case conditionStatusFalse:
-					switch condReason {
+					switch stringVal(cond, "reason") {
 					case "PipelineRunTimeout":
 						info.Status = StatusTimeout
 					case "PipelineRunCancelled", "Cancelled":
@@ -460,25 +444,22 @@ func mapK8sPipelineRunInfo(item *restapi.K8sList_200_Items_Item) PipelineRunInfo
 						info.Status = StatusFailed
 					}
 				default:
-					// Unknown or "Unknown" condition status means the pipeline is still running.
 					info.Status = StatusRunning
 				}
 			}
 		}
 
-		// Compute duration using info.StartTime (which already encodes the correct fallback).
-		completionTimeStr := stringValue(status["completionTime"])
+		completionTimeStr := stringVal(status, "completionTime")
 		if info.StartTime != "" {
 			if completionTimeStr != "" {
-				start, err1 := time.Parse(time.RFC3339, info.StartTime)
-				end, err2 := time.Parse(time.RFC3339, completionTimeStr)
-				if err1 == nil && err2 == nil {
+				start, startErr := time.Parse(time.RFC3339, info.StartTime)
+				end, endErr := time.Parse(time.RFC3339, completionTimeStr)
+				if startErr == nil && endErr == nil {
 					if d := end.Sub(start); d > 0 {
 						info.Duration = formatDuration(d)
 					}
 				}
 			} else if info.Status == StatusRunning {
-				// For running pipelines, show elapsed time.
 				if start, err := time.Parse(time.RFC3339, info.StartTime); err == nil {
 					if d := time.Since(start); d > 0 {
 						info.Duration = formatDuration(d)
@@ -488,15 +469,15 @@ func mapK8sPipelineRunInfo(item *restapi.K8sList_200_Items_Item) PipelineRunInfo
 		}
 	}
 
-	return info
-}
-
-// stringValue extracts a string from an any, returning empty string if not a string.
-func stringValue(v any) string {
-	if s, ok := v.(string); ok {
-		return s
+	// Fall back to creationTimestamp when status.startTime is absent: covers both
+	// "no status yet" and "status present but no startTime".
+	if info.StartTime == "" && item.Metadata.AdditionalProperties != nil {
+		if creationTimestamp, ok := item.Metadata.AdditionalProperties["creationTimestamp"].(string); ok {
+			info.StartTime = creationTimestamp
+		}
 	}
-	return ""
+
+	return info
 }
 
 // fetchExpansion fetches optional task tree or logs for the given pipeline run result.
@@ -628,12 +609,12 @@ func (s *PipelineRunService) fetchReason(
 			logs string
 		}
 
-		g, gctx := errgroup.WithContext(ctx)
+		g, ctx := errgroup.WithContext(ctx)
 		results := make([]taskLogs, len(failedTaskRuns))
 
 		for i, ft := range failedTaskRuns {
 			g.Go(func() error {
-				logResp, err := s.client.TektonResultsGetTaskRunLogsWithResponse(gctx,
+				logResp, err := s.client.TektonResultsGetTaskRunLogsWithResponse(ctx,
 					resultUUID,
 					&restapi.TektonResultsGetTaskRunLogsParams{
 						Namespace:   s.namespace,
@@ -736,6 +717,18 @@ func mapPipelineRunInfo(r *restapi.TektonResult) PipelineRunInfo {
 		status = displayStatus(string(r.Summary.Status))
 	}
 
+	// Prefer summary.start_time (actual pipeline start) over create_time (when the
+	// record was stored in Tekton Results, which is near completion). Using
+	// create_time here inverts the order of mixed-source lists, since live K8s runs
+	// use status.startTime and would sort alongside Results entries tagged with
+	// completion timestamps.
+	startTime := r.CreateTime
+	if r.Summary != nil {
+		if s := ptr.Deref(r.Summary.StartTime, ""); s != "" {
+			startTime = s
+		}
+	}
+
 	return PipelineRunInfo{
 		Name:         name,
 		Status:       status,
@@ -746,14 +739,14 @@ func mapPipelineRunInfo(r *restapi.TektonResult) PipelineRunInfo {
 		PRURL:        resultAnnotation(r, annotationGitChangeURL),
 		Author:       resultAnnotation(r, annotationGitAuthor),
 		Type:         resultAnnotation(r, annotationPipelineType),
-		StartTime:    r.CreateTime,
-		Duration:     computeDuration(r),
+		StartTime:    startTime,
+		Duration:     computeDuration(r, startTime),
 		TargetBranch: resultAnnotation(r, annotationGitTargetBranch),
 		CommitSHA:    resultAnnotation(r, annotationGitCommitSHA),
 	}
 }
 
-func computeDuration(r *restapi.TektonResult) string {
+func computeDuration(r *restapi.TektonResult, startStr string) string {
 	if r.Summary == nil || string(r.Summary.Status) == resultStatusUnknown {
 		return ""
 	}
@@ -763,11 +756,11 @@ func computeDuration(r *restapi.TektonResult) string {
 		endStr = r.UpdateTime
 	}
 
-	if endStr == "" || r.CreateTime == "" {
+	if endStr == "" || startStr == "" {
 		return ""
 	}
 
-	start, err := time.Parse(time.RFC3339, r.CreateTime)
+	start, err := time.Parse(time.RFC3339, startStr)
 	if err != nil {
 		return ""
 	}
@@ -805,11 +798,11 @@ func buildCELFilter(f PipelineRunFilter) string {
 	}
 
 	if f.PRNumber > 0 {
-		parts = append(parts, fmt.Sprintf("annotations[%q] == %q", annotationGitChangeNumber, fmt.Sprintf("%d", f.PRNumber)))
+		parts = append(parts, fmt.Sprintf("annotations[%q] == %q", annotationGitChangeNumber, strconv.Itoa(f.PRNumber)))
 	}
 
-	if v, ok := statusCELValue[strings.ToLower(f.Status)]; ok {
-		parts = append(parts, fmt.Sprintf("summary.status == %s", v))
+	if m, ok := statusMappings[strings.ToLower(f.Status)]; ok {
+		parts = append(parts, fmt.Sprintf("summary.status == %s", m.cel))
 	}
 
 	return strings.Join(parts, " && ")
