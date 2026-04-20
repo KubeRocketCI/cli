@@ -37,9 +37,8 @@ const (
 
 // K8s condition status values.
 const (
-	conditionStatusTrue    = "True"
-	conditionStatusFalse   = "False"
-	conditionStatusUnknown = "Unknown"
+	conditionStatusTrue  = "True"
+	conditionStatusFalse = "False"
 )
 
 func IsFailureStatus(status string) bool {
@@ -52,6 +51,21 @@ var statusDisplay = map[string]string{
 	resultStatusTimeout:   StatusTimeout,
 	resultStatusCancelled: StatusCancelled,
 	resultStatusUnknown:   StatusRunning,
+}
+
+// statusMapping pairs the display label and Tekton Results CEL numeric value
+// for each user-facing status filter keyword.
+type statusMapping struct {
+	display string
+	cel     string
+}
+
+var statusMappings = map[string]statusMapping{
+	"succeeded": {display: StatusSucceeded, cel: "1"},
+	"failed":    {display: StatusFailed, cel: "2"},
+	"timeout":   {display: StatusTimeout, cel: "3"},
+	"cancelled": {display: StatusCancelled, cel: "4"},
+	"running":   {display: StatusRunning, cel: "0"},
 }
 
 func displayStatus(resultStatus string) string {
