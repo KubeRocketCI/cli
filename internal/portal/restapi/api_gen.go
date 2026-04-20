@@ -22,6 +22,63 @@ const (
 	BearerAuthScopes = "bearerAuth.Scopes"
 )
 
+// Defines values for SonarGateProjectStatusStatus.
+const (
+	SonarGateProjectStatusStatusERROR SonarGateProjectStatusStatus = "ERROR"
+	SonarGateProjectStatusStatusNONE  SonarGateProjectStatusStatus = "NONE"
+	SonarGateProjectStatusStatusOK    SonarGateProjectStatusStatus = "OK"
+	SonarGateProjectStatusStatusWARN  SonarGateProjectStatusStatus = "WARN"
+)
+
+// Defines values for SonarGateConditionStatus.
+const (
+	SonarGateConditionStatusERROR SonarGateConditionStatus = "ERROR"
+	SonarGateConditionStatusNONE  SonarGateConditionStatus = "NONE"
+	SonarGateConditionStatusOK    SonarGateConditionStatus = "OK"
+	SonarGateConditionStatusWARN  SonarGateConditionStatus = "WARN"
+)
+
+// Defines values for SonarIssueSeverity.
+const (
+	BLOCKER  SonarIssueSeverity = "BLOCKER"
+	CRITICAL SonarIssueSeverity = "CRITICAL"
+	INFO     SonarIssueSeverity = "INFO"
+	MAJOR    SonarIssueSeverity = "MAJOR"
+	MINOR    SonarIssueSeverity = "MINOR"
+)
+
+// Defines values for SonarIssueStatus.
+const (
+	CLOSED    SonarIssueStatus = "CLOSED"
+	CONFIRMED SonarIssueStatus = "CONFIRMED"
+	OPEN      SonarIssueStatus = "OPEN"
+	REOPENED  SonarIssueStatus = "REOPENED"
+	RESOLVED  SonarIssueStatus = "RESOLVED"
+)
+
+// Defines values for SonarIssueType.
+const (
+	BUG           SonarIssueType = "BUG"
+	CODESMELL     SonarIssueType = "CODE_SMELL"
+	VULNERABILITY SonarIssueType = "VULNERABILITY"
+)
+
+// Defines values for SonarProjectQualityGateStatus.
+const (
+	SonarProjectQualityGateStatusERROR SonarProjectQualityGateStatus = "ERROR"
+	SonarProjectQualityGateStatusNONE  SonarProjectQualityGateStatus = "NONE"
+	SonarProjectQualityGateStatusOK    SonarProjectQualityGateStatus = "OK"
+	SonarProjectQualityGateStatusWARN  SonarProjectQualityGateStatus = "WARN"
+)
+
+// Defines values for SonarProjectDetailQualityGateStatus.
+const (
+	SonarProjectDetailQualityGateStatusERROR SonarProjectDetailQualityGateStatus = "ERROR"
+	SonarProjectDetailQualityGateStatusNONE  SonarProjectDetailQualityGateStatus = "NONE"
+	SonarProjectDetailQualityGateStatusOK    SonarProjectDetailQualityGateStatus = "OK"
+	SonarProjectDetailQualityGateStatusWARN  SonarProjectDetailQualityGateStatus = "WARN"
+)
+
 // Defines values for TektonResultSummaryStatus.
 const (
 	CANCELLED TektonResultSummaryStatus = "CANCELLED"
@@ -31,10 +88,148 @@ const (
 	UNKNOWN   TektonResultSummaryStatus = "UNKNOWN"
 )
 
+// Defines values for SonarIssuesParamsResolved.
+const (
+	SonarIssuesParamsResolvedFalse SonarIssuesParamsResolved = "false"
+	SonarIssuesParamsResolvedTrue  SonarIssuesParamsResolved = "true"
+)
+
+// Defines values for SonarIssuesParamsAsc.
+const (
+	SonarIssuesParamsAscFalse SonarIssuesParamsAsc = "false"
+	SonarIssuesParamsAscTrue  SonarIssuesParamsAsc = "true"
+)
+
 // PipelineRunResultsResponse defines model for PipelineRunResultsResponse.
 type PipelineRunResultsResponse struct {
 	NextPageToken *string        `json:"nextPageToken,omitempty"`
 	Results       []TektonResult `json:"results"`
+}
+
+// SonarGate defines model for SonarGate.
+type SonarGate struct {
+	ProjectStatus struct {
+		Conditions        *[]SonarGateCondition        `json:"conditions,omitempty"`
+		IgnoredConditions *bool                        `json:"ignoredConditions,omitempty"`
+		Status            SonarGateProjectStatusStatus `json:"status"`
+	} `json:"projectStatus"`
+}
+
+// SonarGateProjectStatusStatus defines model for SonarGate.ProjectStatus.Status.
+type SonarGateProjectStatusStatus string
+
+// SonarGateCondition defines model for SonarGateCondition.
+type SonarGateCondition struct {
+	ActualValue    *string                  `json:"actualValue,omitempty"`
+	Comparator     *string                  `json:"comparator,omitempty"`
+	ErrorThreshold *string                  `json:"errorThreshold,omitempty"`
+	MetricKey      string                   `json:"metricKey"`
+	Status         SonarGateConditionStatus `json:"status"`
+}
+
+// SonarGateConditionStatus defines model for SonarGateCondition.Status.
+type SonarGateConditionStatus string
+
+// SonarIssue defines model for SonarIssue.
+type SonarIssue struct {
+	Author       *string            `json:"author,omitempty"`
+	Component    string             `json:"component"`
+	CreationDate string             `json:"creationDate"`
+	Debt         *string            `json:"debt,omitempty"`
+	Effort       *string            `json:"effort,omitempty"`
+	Key          string             `json:"key"`
+	Line         *int               `json:"line,omitempty"`
+	Message      string             `json:"message"`
+	Project      string             `json:"project"`
+	Rule         string             `json:"rule"`
+	Severity     SonarIssueSeverity `json:"severity"`
+	Status       SonarIssueStatus   `json:"status"`
+	Tags         *[]string          `json:"tags,omitempty"`
+	Type         SonarIssueType     `json:"type"`
+	UpdateDate   *string            `json:"updateDate,omitempty"`
+}
+
+// SonarIssueSeverity defines model for SonarIssue.Severity.
+type SonarIssueSeverity string
+
+// SonarIssueStatus defines model for SonarIssue.Status.
+type SonarIssueStatus string
+
+// SonarIssueType defines model for SonarIssue.Type.
+type SonarIssueType string
+
+// SonarIssueComponent defines model for SonarIssueComponent.
+type SonarIssueComponent struct {
+	Enabled   *bool   `json:"enabled,omitempty"`
+	Key       string  `json:"key"`
+	LongName  *string `json:"longName,omitempty"`
+	Name      *string `json:"name,omitempty"`
+	Path      *string `json:"path,omitempty"`
+	Qualifier *string `json:"qualifier,omitempty"`
+}
+
+// SonarIssueList defines model for SonarIssueList.
+type SonarIssueList struct {
+	Components *[]SonarIssueComponent `json:"components,omitempty"`
+	Issues     []SonarIssue           `json:"issues"`
+	P          int                    `json:"p"`
+	Paging     SonarPaging            `json:"paging"`
+	Ps         int                    `json:"ps"`
+	Rules      *[]SonarIssueRule      `json:"rules,omitempty"`
+	Total      int                    `json:"total"`
+}
+
+// SonarIssueRule defines model for SonarIssueRule.
+type SonarIssueRule struct {
+	Key      string  `json:"key"`
+	Lang     *string `json:"lang,omitempty"`
+	LangName *string `json:"langName,omitempty"`
+	Name     *string `json:"name,omitempty"`
+	Status   *string `json:"status,omitempty"`
+}
+
+// SonarPaging defines model for SonarPaging.
+type SonarPaging struct {
+	PageIndex int `json:"pageIndex"`
+	PageSize  int `json:"pageSize"`
+	Total     int `json:"total"`
+}
+
+// SonarProject defines model for SonarProject.
+type SonarProject struct {
+	Key               string                         `json:"key"`
+	LastAnalysisDate  *string                        `json:"lastAnalysisDate,omitempty"`
+	Managed           *bool                          `json:"managed,omitempty"`
+	Name              string                         `json:"name"`
+	Qualifier         *string                        `json:"qualifier,omitempty"`
+	QualityGateStatus *SonarProjectQualityGateStatus `json:"qualityGateStatus,omitempty"`
+	Revision          *string                        `json:"revision,omitempty"`
+	Visibility        *string                        `json:"visibility,omitempty"`
+}
+
+// SonarProjectQualityGateStatus defines model for SonarProject.QualityGateStatus.
+type SonarProjectQualityGateStatus string
+
+// SonarProjectDetail defines model for SonarProjectDetail.
+type SonarProjectDetail struct {
+	Key               string                               `json:"key"`
+	LastAnalysisDate  *string                              `json:"lastAnalysisDate,omitempty"`
+	Managed           *bool                                `json:"managed,omitempty"`
+	Measures          *map[string]string                   `json:"measures,omitempty"`
+	Name              string                               `json:"name"`
+	Qualifier         *string                              `json:"qualifier,omitempty"`
+	QualityGateStatus *SonarProjectDetailQualityGateStatus `json:"qualityGateStatus,omitempty"`
+	Revision          *string                              `json:"revision,omitempty"`
+	Visibility        *string                              `json:"visibility,omitempty"`
+}
+
+// SonarProjectDetailQualityGateStatus defines model for SonarProjectDetail.QualityGateStatus.
+type SonarProjectDetailQualityGateStatus string
+
+// SonarProjectList defines model for SonarProjectList.
+type SonarProjectList struct {
+	Paging   SonarPaging    `json:"paging"`
+	Projects []SonarProject `json:"projects"`
 }
 
 // StepTerminated defines model for StepTerminated.
@@ -287,6 +482,45 @@ type K8sListJSONBody struct {
 	} `json:"resourceConfig"`
 }
 
+// SonarGateParams defines parameters for SonarGate.
+type SonarGateParams struct {
+	ProjectKey  string  `form:"projectKey" json:"projectKey"`
+	PullRequest *string `form:"pullRequest,omitempty" json:"pullRequest,omitempty"`
+}
+
+// SonarGetParams defines parameters for SonarGet.
+type SonarGetParams struct {
+	ProjectKey  string  `form:"projectKey" json:"projectKey"`
+	PullRequest *string `form:"pullRequest,omitempty" json:"pullRequest,omitempty"`
+}
+
+// SonarIssuesParams defines parameters for SonarIssues.
+type SonarIssuesParams struct {
+	ProjectKey  string                     `form:"projectKey" json:"projectKey"`
+	PullRequest *string                    `form:"pullRequest,omitempty" json:"pullRequest,omitempty"`
+	Types       *string                    `form:"types,omitempty" json:"types,omitempty"`
+	Severities  *string                    `form:"severities,omitempty" json:"severities,omitempty"`
+	Statuses    *string                    `form:"statuses,omitempty" json:"statuses,omitempty"`
+	Resolved    *SonarIssuesParamsResolved `form:"resolved,omitempty" json:"resolved,omitempty"`
+	S           *string                    `form:"s,omitempty" json:"s,omitempty"`
+	Asc         *SonarIssuesParamsAsc      `form:"asc,omitempty" json:"asc,omitempty"`
+	P           *int                       `form:"p,omitempty" json:"p,omitempty"`
+	Ps          *int                       `form:"ps,omitempty" json:"ps,omitempty"`
+}
+
+// SonarIssuesParamsResolved defines parameters for SonarIssues.
+type SonarIssuesParamsResolved string
+
+// SonarIssuesParamsAsc defines parameters for SonarIssues.
+type SonarIssuesParamsAsc string
+
+// SonarListParams defines parameters for SonarList.
+type SonarListParams struct {
+	Page       *int    `form:"page,omitempty" json:"page,omitempty"`
+	PageSize   *int    `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+	SearchTerm *string `form:"searchTerm,omitempty" json:"searchTerm,omitempty"`
+}
+
 // TektonResultsGetTaskRunLogsParams defines parameters for TektonResultsGetTaskRunLogs.
 type TektonResultsGetTaskRunLogsParams struct {
 	Namespace   string  `form:"namespace" json:"namespace"`
@@ -398,6 +632,18 @@ type ClientInterface interface {
 
 	K8sList(ctx context.Context, body K8sListJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// SonarGate request
+	SonarGate(ctx context.Context, params *SonarGateParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SonarGet request
+	SonarGet(ctx context.Context, params *SonarGetParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SonarIssues request
+	SonarIssues(ctx context.Context, params *SonarIssuesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SonarList request
+	SonarList(ctx context.Context, params *SonarListParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// TektonResultsGetTaskRunLogs request
 	TektonResultsGetTaskRunLogs(ctx context.Context, resultUid openapi_types.UUID, params *TektonResultsGetTaskRunLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
@@ -500,6 +746,54 @@ func (c *Client) K8sListWithBody(ctx context.Context, contentType string, body i
 
 func (c *Client) K8sList(ctx context.Context, body K8sListJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewK8sListRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SonarGate(ctx context.Context, params *SonarGateParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSonarGateRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SonarGet(ctx context.Context, params *SonarGetParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSonarGetRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SonarIssues(ctx context.Context, params *SonarIssuesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSonarIssuesRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SonarList(ctx context.Context, params *SonarListParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSonarListRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -865,6 +1159,398 @@ func NewK8sListRequestWithBody(server string, contentType string, body io.Reader
 	return req, nil
 }
 
+// NewSonarGateRequest generates requests for SonarGate
+func NewSonarGateRequest(server string, params *SonarGateParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sonar/gate")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "projectKey", runtime.ParamLocationQuery, params.ProjectKey); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		if params.PullRequest != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "pullRequest", runtime.ParamLocationQuery, *params.PullRequest); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSonarGetRequest generates requests for SonarGet
+func NewSonarGetRequest(server string, params *SonarGetParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sonar/get")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "projectKey", runtime.ParamLocationQuery, params.ProjectKey); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		if params.PullRequest != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "pullRequest", runtime.ParamLocationQuery, *params.PullRequest); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSonarIssuesRequest generates requests for SonarIssues
+func NewSonarIssuesRequest(server string, params *SonarIssuesParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sonar/issues")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "projectKey", runtime.ParamLocationQuery, params.ProjectKey); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		if params.PullRequest != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "pullRequest", runtime.ParamLocationQuery, *params.PullRequest); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Types != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "types", runtime.ParamLocationQuery, *params.Types); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Severities != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "severities", runtime.ParamLocationQuery, *params.Severities); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Statuses != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "statuses", runtime.ParamLocationQuery, *params.Statuses); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Resolved != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "resolved", runtime.ParamLocationQuery, *params.Resolved); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.S != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "s", runtime.ParamLocationQuery, *params.S); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Asc != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "asc", runtime.ParamLocationQuery, *params.Asc); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.P != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "p", runtime.ParamLocationQuery, *params.P); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Ps != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "ps", runtime.ParamLocationQuery, *params.Ps); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSonarListRequest generates requests for SonarList
+func NewSonarListRequest(server string, params *SonarListParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sonar/list")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Page != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "page", runtime.ParamLocationQuery, *params.Page); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.PageSize != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "pageSize", runtime.ParamLocationQuery, *params.PageSize); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.SearchTerm != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "searchTerm", runtime.ParamLocationQuery, *params.SearchTerm); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewTektonResultsGetTaskRunLogsRequest generates requests for TektonResultsGetTaskRunLogs
 func NewTektonResultsGetTaskRunLogsRequest(server string, resultUid openapi_types.UUID, params *TektonResultsGetTaskRunLogsParams) (*http.Request, error) {
 	var err error
@@ -1012,6 +1698,18 @@ type ClientWithResponsesInterface interface {
 	K8sListWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*K8sListResponse, error)
 
 	K8sListWithResponse(ctx context.Context, body K8sListJSONRequestBody, reqEditors ...RequestEditorFn) (*K8sListResponse, error)
+
+	// SonarGateWithResponse request
+	SonarGateWithResponse(ctx context.Context, params *SonarGateParams, reqEditors ...RequestEditorFn) (*SonarGateResponse, error)
+
+	// SonarGetWithResponse request
+	SonarGetWithResponse(ctx context.Context, params *SonarGetParams, reqEditors ...RequestEditorFn) (*SonarGetResponse, error)
+
+	// SonarIssuesWithResponse request
+	SonarIssuesWithResponse(ctx context.Context, params *SonarIssuesParams, reqEditors ...RequestEditorFn) (*SonarIssuesResponse, error)
+
+	// SonarListWithResponse request
+	SonarListWithResponse(ctx context.Context, params *SonarListParams, reqEditors ...RequestEditorFn) (*SonarListResponse, error)
 
 	// TektonResultsGetTaskRunLogsWithResponse request
 	TektonResultsGetTaskRunLogsWithResponse(ctx context.Context, resultUid openapi_types.UUID, params *TektonResultsGetTaskRunLogsParams, reqEditors ...RequestEditorFn) (*TektonResultsGetTaskRunLogsResponse, error)
@@ -1239,6 +1937,114 @@ func (r K8sListResponse) StatusCode() int {
 	return 0
 }
 
+type SonarGateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SonarGate
+	JSON400      *ErrorBADREQUEST
+	JSON401      *ErrorUNAUTHORIZED
+	JSON403      *ErrorFORBIDDEN
+	JSON404      *ErrorNOTFOUND
+	JSON500      *ErrorINTERNALSERVERERROR
+}
+
+// Status returns HTTPResponse.Status
+func (r SonarGateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SonarGateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type SonarGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SonarProjectDetail
+	JSON400      *ErrorBADREQUEST
+	JSON401      *ErrorUNAUTHORIZED
+	JSON403      *ErrorFORBIDDEN
+	JSON404      *ErrorNOTFOUND
+	JSON500      *ErrorINTERNALSERVERERROR
+}
+
+// Status returns HTTPResponse.Status
+func (r SonarGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SonarGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type SonarIssuesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SonarIssueList
+	JSON400      *ErrorBADREQUEST
+	JSON401      *ErrorUNAUTHORIZED
+	JSON403      *ErrorFORBIDDEN
+	JSON404      *ErrorNOTFOUND
+	JSON500      *ErrorINTERNALSERVERERROR
+}
+
+// Status returns HTTPResponse.Status
+func (r SonarIssuesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SonarIssuesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type SonarListResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SonarProjectList
+	JSON400      *ErrorBADREQUEST
+	JSON401      *ErrorUNAUTHORIZED
+	JSON403      *ErrorFORBIDDEN
+	JSON404      *ErrorNOTFOUND
+	JSON500      *ErrorINTERNALSERVERERROR
+}
+
+// Status returns HTTPResponse.Status
+func (r SonarListResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SonarListResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type TektonResultsGetTaskRunLogsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1350,6 +2156,42 @@ func (c *ClientWithResponses) K8sListWithResponse(ctx context.Context, body K8sL
 		return nil, err
 	}
 	return ParseK8sListResponse(rsp)
+}
+
+// SonarGateWithResponse request returning *SonarGateResponse
+func (c *ClientWithResponses) SonarGateWithResponse(ctx context.Context, params *SonarGateParams, reqEditors ...RequestEditorFn) (*SonarGateResponse, error) {
+	rsp, err := c.SonarGate(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSonarGateResponse(rsp)
+}
+
+// SonarGetWithResponse request returning *SonarGetResponse
+func (c *ClientWithResponses) SonarGetWithResponse(ctx context.Context, params *SonarGetParams, reqEditors ...RequestEditorFn) (*SonarGetResponse, error) {
+	rsp, err := c.SonarGet(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSonarGetResponse(rsp)
+}
+
+// SonarIssuesWithResponse request returning *SonarIssuesResponse
+func (c *ClientWithResponses) SonarIssuesWithResponse(ctx context.Context, params *SonarIssuesParams, reqEditors ...RequestEditorFn) (*SonarIssuesResponse, error) {
+	rsp, err := c.SonarIssues(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSonarIssuesResponse(rsp)
+}
+
+// SonarListWithResponse request returning *SonarListResponse
+func (c *ClientWithResponses) SonarListWithResponse(ctx context.Context, params *SonarListParams, reqEditors ...RequestEditorFn) (*SonarListResponse, error) {
+	rsp, err := c.SonarList(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSonarListResponse(rsp)
 }
 
 // TektonResultsGetTaskRunLogsWithResponse request returning *TektonResultsGetTaskRunLogsResponse
@@ -1740,6 +2582,250 @@ func ParseK8sListResponse(rsp *http.Response) (*K8sListResponse, error) {
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSonarGateResponse parses an HTTP response from a SonarGateWithResponse call
+func ParseSonarGateResponse(rsp *http.Response) (*SonarGateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SonarGateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SonarGate
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorBADREQUEST
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorUNAUTHORIZED
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorFORBIDDEN
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorNOTFOUND
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSonarGetResponse parses an HTTP response from a SonarGetWithResponse call
+func ParseSonarGetResponse(rsp *http.Response) (*SonarGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SonarGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SonarProjectDetail
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorBADREQUEST
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorUNAUTHORIZED
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorFORBIDDEN
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorNOTFOUND
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSonarIssuesResponse parses an HTTP response from a SonarIssuesWithResponse call
+func ParseSonarIssuesResponse(rsp *http.Response) (*SonarIssuesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SonarIssuesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SonarIssueList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorBADREQUEST
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorUNAUTHORIZED
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorFORBIDDEN
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorNOTFOUND
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSonarListResponse parses an HTTP response from a SonarListWithResponse call
+func ParseSonarListResponse(rsp *http.Response) (*SonarListResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SonarListResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SonarProjectList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorBADREQUEST
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorUNAUTHORIZED
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorFORBIDDEN
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorNOTFOUND
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorINTERNALSERVERERROR

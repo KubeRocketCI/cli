@@ -831,6 +831,198 @@
         }
       }
     },
+    "/v1/sonar/list": {
+      "get": {
+        "operationId": "sonar-list",
+        "tags": [
+          "sonar"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          {
+            "in": "query",
+            "name": "searchTerm",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SonarProjectList"
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid input data", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/error.BAD_REQUEST" } } } },
+          "401": { "description": "Authorization not provided", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/error.UNAUTHORIZED" } } } },
+          "403": { "description": "Insufficient access", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/error.FORBIDDEN" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/error.NOT_FOUND" } } } },
+          "500": { "description": "Internal server error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/error.INTERNAL_SERVER_ERROR" } } } }
+        }
+      }
+    },
+    "/v1/sonar/get": {
+      "get": {
+        "operationId": "sonar-get",
+        "tags": [
+          "sonar"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "projectKey",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "pullRequest",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SonarProjectDetail"
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid input data", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/error.BAD_REQUEST" } } } },
+          "401": { "description": "Authorization not provided", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/error.UNAUTHORIZED" } } } },
+          "403": { "description": "Insufficient access", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/error.FORBIDDEN" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/error.NOT_FOUND" } } } },
+          "500": { "description": "Internal server error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/error.INTERNAL_SERVER_ERROR" } } } }
+        }
+      }
+    },
+    "/v1/sonar/gate": {
+      "get": {
+        "operationId": "sonar-gate",
+        "tags": [
+          "sonar"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "projectKey",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "pullRequest",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SonarGate"
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid input data", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/error.BAD_REQUEST" } } } },
+          "401": { "description": "Authorization not provided", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/error.UNAUTHORIZED" } } } },
+          "403": { "description": "Insufficient access", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/error.FORBIDDEN" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/error.NOT_FOUND" } } } },
+          "500": { "description": "Internal server error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/error.INTERNAL_SERVER_ERROR" } } } }
+        }
+      }
+    },
+    "/v1/sonar/issues": {
+      "get": {
+        "operationId": "sonar-issues",
+        "tags": [
+          "sonar"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          { "in": "query", "name": "projectKey", "schema": { "type": "string" }, "required": true },
+          { "in": "query", "name": "pullRequest", "schema": { "type": "string" } },
+          { "in": "query", "name": "types", "schema": { "type": "string" } },
+          { "in": "query", "name": "severities", "schema": { "type": "string" } },
+          { "in": "query", "name": "statuses", "schema": { "type": "string" } },
+          { "in": "query", "name": "resolved", "schema": { "type": "string", "enum": ["true", "false"] } },
+          { "in": "query", "name": "s", "schema": { "type": "string" } },
+          { "in": "query", "name": "asc", "schema": { "type": "string", "enum": ["true", "false"] } },
+          { "in": "query", "name": "p", "schema": { "type": "integer", "minimum": 1 } },
+          { "in": "query", "name": "ps", "schema": { "type": "integer", "minimum": 1, "maximum": 500 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SonarIssueList"
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid input data", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/error.BAD_REQUEST" } } } },
+          "401": { "description": "Authorization not provided", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/error.UNAUTHORIZED" } } } },
+          "403": { "description": "Insufficient access", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/error.FORBIDDEN" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/error.NOT_FOUND" } } } },
+          "500": { "description": "Internal server error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/error.INTERNAL_SERVER_ERROR" } } } }
+        }
+      }
+    },
     "/v1/pipeline-runs": {
       "get": {
         "operationId": "tektonResults-getPipelineRunResults",
@@ -1525,6 +1717,217 @@
           "name",
           "create_time",
           "update_time"
+        ]
+      },
+      "SonarPaging": {
+        "type": "object",
+        "properties": {
+          "pageIndex": { "type": "integer" },
+          "pageSize": { "type": "integer" },
+          "total": { "type": "integer" }
+        },
+        "required": [
+          "pageIndex",
+          "pageSize",
+          "total"
+        ]
+      },
+      "SonarProject": {
+        "type": "object",
+        "properties": {
+          "key": { "type": "string" },
+          "name": { "type": "string" },
+          "qualifier": { "type": "string" },
+          "visibility": { "type": "string" },
+          "lastAnalysisDate": { "type": "string" },
+          "revision": { "type": "string" },
+          "managed": { "type": "boolean" },
+          "qualityGateStatus": {
+            "type": "string",
+            "enum": ["OK", "WARN", "ERROR", "NONE"]
+          }
+        },
+        "required": [
+          "key",
+          "name"
+        ]
+      },
+      "SonarProjectList": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/SonarProject" }
+          },
+          "paging": { "$ref": "#/components/schemas/SonarPaging" }
+        },
+        "required": [
+          "projects",
+          "paging"
+        ]
+      },
+      "SonarProjectDetail": {
+        "type": "object",
+        "properties": {
+          "key": { "type": "string" },
+          "name": { "type": "string" },
+          "qualifier": { "type": "string" },
+          "visibility": { "type": "string" },
+          "lastAnalysisDate": { "type": "string" },
+          "revision": { "type": "string" },
+          "managed": { "type": "boolean" },
+          "qualityGateStatus": {
+            "type": "string",
+            "enum": ["OK", "WARN", "ERROR", "NONE"]
+          },
+          "measures": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          }
+        },
+        "required": [
+          "key",
+          "name"
+        ]
+      },
+      "SonarGateCondition": {
+        "type": "object",
+        "properties": {
+          "metricKey": { "type": "string" },
+          "comparator": { "type": "string" },
+          "errorThreshold": { "type": "string" },
+          "actualValue": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["OK", "WARN", "ERROR", "NONE"]
+          }
+        },
+        "required": [
+          "metricKey",
+          "status"
+        ]
+      },
+      "SonarGate": {
+        "type": "object",
+        "properties": {
+          "projectStatus": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["OK", "WARN", "ERROR", "NONE"]
+              },
+              "conditions": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/SonarGateCondition" }
+              },
+              "ignoredConditions": { "type": "boolean" }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "projectStatus"
+        ]
+      },
+      "SonarIssueComponent": {
+        "type": "object",
+        "properties": {
+          "key": { "type": "string" },
+          "enabled": { "type": "boolean" },
+          "qualifier": { "type": "string" },
+          "name": { "type": "string" },
+          "longName": { "type": "string" },
+          "path": { "type": "string" }
+        },
+        "required": [
+          "key"
+        ]
+      },
+      "SonarIssueRule": {
+        "type": "object",
+        "properties": {
+          "key": { "type": "string" },
+          "name": { "type": "string" },
+          "lang": { "type": "string" },
+          "status": { "type": "string" },
+          "langName": { "type": "string" }
+        },
+        "required": [
+          "key"
+        ]
+      },
+      "SonarIssue": {
+        "type": "object",
+        "properties": {
+          "key": { "type": "string" },
+          "rule": { "type": "string" },
+          "severity": {
+            "type": "string",
+            "enum": ["BLOCKER", "CRITICAL", "MAJOR", "MINOR", "INFO"]
+          },
+          "type": {
+            "type": "string",
+            "enum": ["BUG", "VULNERABILITY", "CODE_SMELL"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["OPEN", "CONFIRMED", "REOPENED", "RESOLVED", "CLOSED"]
+          },
+          "component": { "type": "string" },
+          "project": { "type": "string" },
+          "line": { "type": "integer" },
+          "message": { "type": "string" },
+          "effort": { "type": "string" },
+          "debt": { "type": "string" },
+          "author": { "type": "string" },
+          "creationDate": { "type": "string" },
+          "updateDate": { "type": "string" },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": [
+          "key",
+          "rule",
+          "severity",
+          "type",
+          "status",
+          "component",
+          "project",
+          "message",
+          "creationDate"
+        ]
+      },
+      "SonarIssueList": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer" },
+          "p": { "type": "integer" },
+          "ps": { "type": "integer" },
+          "paging": { "$ref": "#/components/schemas/SonarPaging" },
+          "issues": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/SonarIssue" }
+          },
+          "components": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/SonarIssueComponent" }
+          },
+          "rules": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/SonarIssueRule" }
+          }
+        },
+        "required": [
+          "total",
+          "p",
+          "ps",
+          "paging",
+          "issues"
         ]
       },
       "TektonResultSummary": {

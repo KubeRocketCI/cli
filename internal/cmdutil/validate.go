@@ -2,6 +2,7 @@ package cmdutil
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -38,4 +39,18 @@ func ValidateStringFlags(cmd *cobra.Command) error {
 	}
 
 	return nil
+}
+
+// DNS-1123 label: lowercase alphanumerics and '-', must start and end with an
+// alphanumeric, 1..63 chars. Used for Kubernetes namespaces, KubeRocketCI
+// codebase names, and SonarQube projectKeys (which by Portal convention equal
+// the codebase name). Single source of truth for the whole CLI.
+var dns1123LabelRegexp = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+
+// DNS1123SubdomainMaxLength is the maximum length of a DNS-1123 subdomain.
+const DNS1123SubdomainMaxLength = 253
+
+// IsValidDNS1123Label reports whether s matches the DNS-1123 label shape.
+func IsValidDNS1123Label(s string) bool {
+	return dns1123LabelRegexp.MatchString(s)
 }

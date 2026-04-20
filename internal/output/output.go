@@ -40,6 +40,7 @@ var (
 	yellowStyle = lipgloss.NewStyle().Foreground(lipgloss.Yellow)
 	redStyle    = lipgloss.NewStyle().Foreground(lipgloss.Red)
 	blueStyle   = lipgloss.NewStyle().Foreground(lipgloss.Blue)
+	grayStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 )
 
 // StatusColor returns the status string with color applied based on its value.
@@ -92,8 +93,13 @@ func FormatRelativeTime(rfc3339 string) string {
 		return rfc3339
 	}
 
-	now := time.Now()
-	d := now.Sub(t)
+	return RelativeTime(t)
+}
+
+// RelativeTime renders t as a short "Xm ago"/"Xh ago"/"Xd ago" string, or a
+// Jan-Mon date for anything older than a week.
+func RelativeTime(t time.Time) string {
+	d := time.Since(t)
 
 	switch {
 	case d < time.Minute:
@@ -184,6 +190,56 @@ func PrintJSON(w io.Writer, v any) error {
 	enc.SetIndent("", "  ")
 
 	return enc.Encode(v)
+}
+
+// JSONEnvelope wraps a success payload with the shared schemaVersion/data contract.
+// Used by commands that need a stable JSON output shape (e.g. `krci sonar *`).
+type JSONEnvelope struct {
+	SchemaVersion string `json:"schemaVersion"`
+	Data          any    `json:"data"`
+}
+
+// JSONErrorEnvelope wraps an error message with the shared schemaVersion/error contract.
+type JSONErrorEnvelope struct {
+	SchemaVersion string        `json:"schemaVersion"`
+	Error         JSONErrorBody `json:"error"`
+}
+
+// JSONErrorBody carries the human-readable error message.
+type JSONErrorBody struct {
+	Message string `json:"message"`
+}
+
+// PrintJSONEnvelope writes `{"schemaVersion":"<v>","data":<payload>}` to w.
+func PrintJSONEnvelope(w io.Writer, schemaVersion string, payload any) error {
+	return PrintJSON(w, JSONEnvelope{SchemaVersion: schemaVersion, Data: payload})
+}
+
+// PrintJSONErrorEnvelope writes `{"schemaVersion":"<v>","error":{"message":"<err>"}}` to w.
+func PrintJSONErrorEnvelope(w io.Writer, schemaVersion string, err error) error {
+	return PrintJSON(w, JSONErrorEnvelope{
+		SchemaVersion: schemaVersion,
+		Error:         JSONErrorBody{Message: err.Error()},
+	})
+}
+
+// SonarGateStatusColor colorizes a SonarQube quality-gate / issue status value.
+// Unknown values pass through unstyled.
+func SonarGateStatusColor(status portal.QualityGateStatus) string {
+	s := string(status)
+
+	switch status {
+	case portal.QualityGateOK:
+		return greenStyle.Render(s)
+	case portal.QualityGateWarn:
+		return yellowStyle.Render(s)
+	case portal.QualityGateError:
+		return redStyle.Render(s)
+	case portal.QualityGateNone:
+		return grayStyle.Render(s)
+	default:
+		return s
+	}
 }
 
 // ResolveFormat returns the explicit format if provided, otherwise defaults to table.
