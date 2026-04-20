@@ -19,6 +19,7 @@ Portal-only: CLI talks exclusively to the portal tRPC API (Bearer idToken). No d
 - `internal/portal/` — tRPC client, project/deployment services, config
 - `internal/auth/` — OIDC token provider (login, refresh, env-var override)
 - `internal/cmdutil/Factory` — lazy-init: IOStreams, Config, TokenProvider, PortalClient
+- `internal/cmdutil/validate.go` — shared validators
 - `internal/config/` — Viper-based config: flags > env vars > config file > defaults
 - `pkg/cmd/<group>/<verb>/` — commands export `NewCmd<Verb>(f, runF)`. Follow existing as examples.
 

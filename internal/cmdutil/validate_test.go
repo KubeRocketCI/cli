@@ -1,6 +1,7 @@
 package cmdutil
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -63,6 +64,36 @@ func TestValidateStringFlags(t *testing.T) {
 				assert.Equal(t, tt.wantErr, err.Error())
 			} else {
 				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestIsValidDNS1123Label(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   string
+		want bool
+	}{
+		{"single char", "a", true},
+		{"simple label", "payments-api", true},
+		{"digits allowed", "service-123", true},
+		{"63 chars at limit", strings.Repeat("a", 63), true},
+
+		{"empty rejected", "", false},
+		{"uppercase rejected", "UPPER", false},
+		{"underscore rejected", "has_underscore", false},
+		{"leading dash rejected", "-leading", false},
+		{"trailing dash rejected", "trailing-", false},
+		{"64 chars over limit", strings.Repeat("a", 64), false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsValidDNS1123Label(tc.in); got != tc.want {
+				t.Errorf("IsValidDNS1123Label(%q) = %v, want %v", tc.in, got, tc.want)
 			}
 		})
 	}

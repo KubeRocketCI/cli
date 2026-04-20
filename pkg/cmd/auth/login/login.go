@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"regexp"
 
 	"github.com/spf13/cobra"
 
@@ -16,9 +15,6 @@ import (
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/portal"
 )
-
-// dns1123LabelRegexp validates a Kubernetes namespace name.
-var dns1123LabelRegexp = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 
 // clusterFetchFunc fetches cluster configuration from a portal URL using a bearer token.
 type clusterFetchFunc func(portalURL, token string) (*portal.ClusterConfig, error)
@@ -160,7 +156,7 @@ func fetchClusterMetadata(
 	}
 
 	if cfg.Namespace == "" && clusterCfg.DefaultNamespace != "" {
-		if dns1123LabelRegexp.MatchString(clusterCfg.DefaultNamespace) {
+		if cmdutil.IsValidDNS1123Label(clusterCfg.DefaultNamespace) {
 			cfg.Namespace = clusterCfg.DefaultNamespace
 			_, _ = fmt.Fprintf(errOut, "Namespace: %s (from portal)\n", cfg.Namespace)
 		} else {
