@@ -402,20 +402,18 @@ func mapK8sPipelineRunInfo(item *restapi.K8sList_200_Items_Item) PipelineRunInfo
 		Name: item.Metadata.Name,
 	}
 
-	if item.Metadata.AdditionalProperties != nil {
-		if labels, ok := item.Metadata.AdditionalProperties["labels"].(map[string]any); ok {
-			info.Project = stringVal(labels, annotationCodebase)
-			info.Type = stringVal(labels, annotationPipelineType)
-			info.Branch = stringVal(labels, annotationGitBranch)
-			info.Author = stringVal(labels, annotationGitAuthor)
-			info.PRNumber = stringVal(labels, annotationGitChangeNumber)
-			info.TargetBranch = stringVal(labels, annotationGitTargetBranch)
-		}
+	if labels := ptr.Deref(item.Metadata.Labels, nil); labels != nil {
+		info.Project = labels[annotationCodebase]
+		info.Type = labels[annotationPipelineType]
+		info.Branch = labels[annotationGitBranch]
+		info.Author = labels[annotationGitAuthor]
+		info.PRNumber = labels[annotationGitChangeNumber]
+		info.TargetBranch = labels[annotationGitTargetBranch]
+	}
 
-		if annotations, ok := item.Metadata.AdditionalProperties["annotations"].(map[string]any); ok {
-			info.PRURL = stringVal(annotations, annotationGitChangeURL)
-			info.CommitSHA = stringVal(annotations, annotationGitCommitSHA)
-		}
+	if annotations := ptr.Deref(item.Metadata.Annotations, nil); annotations != nil {
+		info.PRURL = annotations[annotationGitChangeURL]
+		info.CommitSHA = annotations[annotationGitCommitSHA]
 	}
 
 	// pipelineRef lives under spec, not status, so it is available even before the reconciler runs.
@@ -471,10 +469,8 @@ func mapK8sPipelineRunInfo(item *restapi.K8sList_200_Items_Item) PipelineRunInfo
 
 	// Fall back to creationTimestamp when status.startTime is absent: covers both
 	// "no status yet" and "status present but no startTime".
-	if info.StartTime == "" && item.Metadata.AdditionalProperties != nil {
-		if creationTimestamp, ok := item.Metadata.AdditionalProperties["creationTimestamp"].(string); ok {
-			info.StartTime = creationTimestamp
-		}
+	if info.StartTime == "" {
+		info.StartTime = ptr.Deref(item.Metadata.CreationTimestamp, "")
 	}
 
 	return info

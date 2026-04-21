@@ -35,3 +35,23 @@ The Factory validates all required backend configuration before creating PortalC
 ### Public OIDC issuer
 
 Issuer URL comes from portal `config.get` (unauthenticated) — public metadata per OIDC Discovery.
+
+## Portal API client (OpenAPI)
+
+`internal/portal/restapi/api_gen.go` is generated from `internal/portal/openapi/spec.json`
+via `make generate`. Both files are vendored artifacts.
+
+**Never hand-edit `spec.json` or `api_gen.go`.** The spec's upstream source of truth
+is `krci-portal/packages/trpc/api/openapi.json`, produced from the portal's tRPC
+Zod schemas by `pnpm --filter @my-project/trpc run generate:openapi`.
+
+Required workflow when the API surface needs to change:
+
+1. Update the Zod schema / procedure in `krci-portal/packages/trpc/src/...`.
+2. Run `pnpm --filter @my-project/trpc run generate:openapi` in the portal repo.
+3. Copy `krci-portal/packages/trpc/api/openapi.json` over `internal/portal/openapi/spec.json`.
+4. Run `make generate` in the CLI to refresh `api_gen.go`.
+5. Update Go call sites and run `make ci`.
+
+Editing `spec.json` directly is a convention-level bug: the next upstream refresh
+silently reverts the change and breaks the CLI.

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
+	"github.com/KubeRocketCI/cli/internal/ptr"
 )
 
 // --- matchesFilter ---
@@ -173,16 +174,18 @@ func TestMatchesStatus(t *testing.T) {
 func TestMapK8sPipelineRunInfo(t *testing.T) {
 	t.Parallel()
 
-	makeItem := func(name string, labels, annotations map[string]any, spec map[string]any, status map[string]any) *restapi.K8sList_200_Items_Item {
+	makeItem := func(name string, labels, annotations map[string]string, spec map[string]any, status map[string]any) *restapi.K8sList_200_Items_Item {
 		item := &restapi.K8sList_200_Items_Item{
 			Metadata: restapi.K8sList_200_Items_Metadata{
-				Name: name,
-				AdditionalProperties: map[string]any{
-					"labels":            labels,
-					"annotations":       annotations,
-					"creationTimestamp": "2024-01-01T10:00:00Z",
-				},
+				Name:              name,
+				CreationTimestamp: ptr.To("2024-01-01T10:00:00Z"),
 			},
+		}
+		if labels != nil {
+			item.Metadata.Labels = &labels
+		}
+		if annotations != nil {
+			item.Metadata.Annotations = &annotations
 		}
 		if spec != nil {
 			item.Spec = &spec
@@ -284,7 +287,7 @@ func TestMapK8sPipelineRunInfo(t *testing.T) {
 		{
 			name: "labels extracted correctly",
 			item: makeItem("run-9",
-				map[string]any{
+				map[string]string{
 					annotationCodebase:        "my-app",
 					annotationPipelineType:    "review",
 					annotationGitBranch:       "main",
@@ -292,7 +295,7 @@ func TestMapK8sPipelineRunInfo(t *testing.T) {
 					annotationGitChangeNumber: "7",
 					annotationGitTargetBranch: "main",
 				},
-				map[string]any{
+				map[string]string{
 					annotationGitChangeURL: "https://github.com/org/repo/pull/7",
 					annotationGitCommitSHA: "abc123",
 				},
@@ -321,23 +324,23 @@ func TestMapK8sPipelineRunInfo(t *testing.T) {
 func TestMapK8sPipelineRunInfo_Labels(t *testing.T) {
 	t.Parallel()
 
+	labels := map[string]string{
+		annotationCodebase:        "my-app",
+		annotationPipelineType:    "review",
+		annotationGitBranch:       "feature-x",
+		annotationGitAuthor:       "bob",
+		annotationGitChangeNumber: "99",
+		annotationGitTargetBranch: "main",
+	}
+	annotations := map[string]string{
+		annotationGitChangeURL: "https://github.com/org/repo/pull/99",
+		annotationGitCommitSHA: "deadbeef",
+	}
 	item := &restapi.K8sList_200_Items_Item{
 		Metadata: restapi.K8sList_200_Items_Metadata{
-			Name: "run-labels",
-			AdditionalProperties: map[string]any{
-				"labels": map[string]any{
-					annotationCodebase:        "my-app",
-					annotationPipelineType:    "review",
-					annotationGitBranch:       "feature-x",
-					annotationGitAuthor:       "bob",
-					annotationGitChangeNumber: "99",
-					annotationGitTargetBranch: "main",
-				},
-				"annotations": map[string]any{
-					annotationGitChangeURL: "https://github.com/org/repo/pull/99",
-					annotationGitCommitSHA: "deadbeef",
-				},
-			},
+			Name:        "run-labels",
+			Labels:      &labels,
+			Annotations: &annotations,
 		},
 		Spec: func() *map[string]any {
 			m := map[string]any{"pipelineRef": map[string]any{"name": "review-pipeline"}}
