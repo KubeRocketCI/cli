@@ -192,10 +192,15 @@ type PipelineRunListOptions struct {
 }
 
 // listFromResults returns pipeline runs from Tekton Results matching the given filters.
+//
+// This does NOT fetch logs/tasks expansion: the Tekton Results backend returns records
+// in internal UID order rather than time order, so resp.Results[0] is not reliably the
+// most recent run. List() picks the true top run after merging with live K8s runs and
+// fetches expansion for that run by name.
 func (s *PipelineRunService) listFromResults(
-	ctx context.Context, opts PipelineRunListOptions,
-) (*PipelineRunListResult, error) {
-	cel := buildCELFilter(opts.Filter)
+	ctx context.Context, filter PipelineRunFilter,
+) ([]PipelineRunInfo, error) {
+	cel := buildCELFilter(filter)
 	pageSize := float32(10)
 
 	resp, err := s.client.TektonResultsGetPipelineRunResultsWithResponse(ctx,
@@ -213,26 +218,18 @@ func (s *PipelineRunService) listFromResults(
 	}
 
 	if resp.JSON200 == nil {
-		return &PipelineRunListResult{}, nil
+		return nil, nil
 	}
 
-	result := &PipelineRunListResult{
-		PipelineRuns: make([]PipelineRunInfo, 0, len(resp.JSON200.Results)),
-	}
+	runs := make([]PipelineRunInfo, 0, len(resp.JSON200.Results))
 
 	for i := range resp.JSON200.Results {
 		info := mapPipelineRunInfo(&resp.JSON200.Results[i])
 		info.PortalURL = s.pipelineRunPortalURL(info.Name)
-		result.PipelineRuns = append(result.PipelineRuns, info)
+		runs = append(runs, info)
 	}
 
-	if len(resp.JSON200.Results) > 0 {
-		if err := s.fetchExpansion(ctx, &resp.JSON200.Results[0], result, opts.IncludeLogs, opts.IncludeReason); err != nil {
-			return nil, err
-		}
-	}
-
-	return result, nil
+	return runs, nil
 }
 
 // List returns both running (from K8s) and completed (from Tekton Results)
@@ -240,13 +237,14 @@ func (s *PipelineRunService) listFromResults(
 func (s *PipelineRunService) List(
 	ctx context.Context, opts PipelineRunListOptions,
 ) (*PipelineRunListResult, error) {
-	g, ctx := errgroup.WithContext(ctx)
+	// The errgroup derives its own ctx that is cancelled once Wait() returns, so
+	// subsequent calls that need to outlive the fan-out must use the parent ctx.
+	g, fetchCtx := errgroup.WithContext(ctx)
 
-	var liveRuns []PipelineRunInfo
-	var historyResult *PipelineRunListResult
+	var liveRuns, historyRuns []PipelineRunInfo
 
 	g.Go(func() error {
-		runs, err := s.fetchLiveRuns(ctx, opts.Filter)
+		runs, err := s.fetchLiveRuns(fetchCtx, opts.Filter)
 		if err != nil {
 			return err
 		}
@@ -258,37 +256,64 @@ func (s *PipelineRunService) List(
 	// filtering for "running" causes API errors — skip that round trip entirely.
 	if !strings.EqualFold(opts.Filter.Status, StatusRunning) {
 		g.Go(func() error {
-			result, err := s.listFromResults(ctx, opts)
+			runs, err := s.listFromResults(fetchCtx, opts.Filter)
 			if err != nil {
 				return err
 			}
-			historyResult = result
+			historyRuns = runs
 			return nil
 		})
-	} else {
-		historyResult = &PipelineRunListResult{}
 	}
 
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
 
-	allRuns := mergePipelineRuns(liveRuns, historyResult.PipelineRuns)
+	allRuns := mergePipelineRuns(liveRuns, historyRuns)
 
 	result := &PipelineRunListResult{
 		PipelineRuns: allRuns,
 	}
 
-	// Only carry over expansion data (logs/tasks) if the run it was fetched for
-	// (historyResult.PipelineRuns[0]) is still the top result after merging. A live
-	// run may have sorted ahead of it, or a different history run may now be first.
-	if len(allRuns) > 0 && len(historyResult.PipelineRuns) > 0 &&
-		allRuns[0].Name == historyResult.PipelineRuns[0].Name {
-		result.Logs = historyResult.Logs
-		result.Tasks = historyResult.Tasks
+	// Fetch logs/tasks for the true top run after merging. We cannot do this inside
+	// listFromResults because the Tekton Results backend returns records in internal
+	// UID order, not time order — so resp.Results[0] is frequently an arbitrary old
+	// run. A targeted name lookup via getFromResults guarantees the correct record.
+	if (opts.IncludeLogs || opts.IncludeReason) && len(allRuns) > 0 {
+		if err := s.attachTopRunExpansion(ctx, result, opts); err != nil {
+			return nil, err
+		}
 	}
 
 	return result, nil
+}
+
+// attachTopRunExpansion fetches logs/tasks for result.PipelineRuns[0] and copies
+// them onto result. Runs still executing (no Tekton Results record yet) and runs
+// not yet indexed (ErrNotFound) are handled silently: the caller surfaces a
+// "task data not available" hint based on the empty Tasks slice.
+func (s *PipelineRunService) attachTopRunExpansion(
+	ctx context.Context, result *PipelineRunListResult, opts PipelineRunListOptions,
+) error {
+	top := result.PipelineRuns[0]
+	if top.Status == StatusRunning {
+		return nil
+	}
+
+	expanded, err := s.getFromResults(ctx, top.Name, PipelineRunGetOptions{
+		IncludeLogs:   opts.IncludeLogs,
+		IncludeReason: opts.IncludeReason,
+	})
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	result.Logs = expanded.Logs
+	result.Tasks = expanded.Tasks
+	return nil
 }
 
 // mergePipelineRuns combines live (K8s) and history (Tekton Results) runs into a single
