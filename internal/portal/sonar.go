@@ -123,10 +123,12 @@ type SonarListParams struct {
 // Types / Severities / Statuses are the already-validated enum values; the
 // service joins them with commas when building the restapi query string.
 // Resolved and Asc are `*bool`: nil means "let SonarQube apply its default",
-// non-nil forwards the explicit value.
+// non-nil forwards the explicit value. PullRequest / Branch follow the same
+// mutex rule as SonarScope.
 type SonarIssuesParams struct {
 	ProjectKey  string
 	PullRequest string
+	Branch      string
 	Types       []string
 	Severities  []string
 	Statuses    []string
@@ -177,13 +179,35 @@ func (s *SonarService) List(ctx context.Context, params SonarListParams) (*Sonar
 	return mapSonarProjectList(resp.JSON200), nil
 }
 
-// Get calls `GET /rest/v1/sonar/get`. When both project and pullRequest are set
-// and upstream returns 404, the returned error message says "pull request <id> not found".
-func (s *SonarService) Get(ctx context.Context, project, pullRequest string) (*SonarProjectDetail, error) {
-	p := &restapi.SonarGetParams{ProjectKey: project}
-	if pullRequest != "" {
-		p.PullRequest = ptr.To(pullRequest)
+// SonarScope narrows a Sonar query to a pull request OR a branch. The two
+// fields are mutually exclusive at the SonarQube API layer; callers validate
+// that invariant before handing the struct to the service.
+type SonarScope struct {
+	PullRequest string
+	Branch      string
+}
+
+// scopeQueryParams maps SonarScope to the (pullRequest, branch) pointer pair
+// that every generated sonar params struct exposes. Empty scope fields are
+// forwarded as nil so the portal omits the query parameter entirely.
+func scopeQueryParams(s SonarScope) (pullRequest, branch *string) {
+	if s.PullRequest != "" {
+		pullRequest = ptr.To(s.PullRequest)
 	}
+
+	if s.Branch != "" {
+		branch = ptr.To(s.Branch)
+	}
+
+	return pullRequest, branch
+}
+
+// Get calls `GET /rest/v1/sonar/get`. When a scope is supplied and upstream
+// returns 404, the returned error message distinguishes between
+// "pull request <id> not found" and "branch <name> not found".
+func (s *SonarService) Get(ctx context.Context, project string, scope SonarScope) (*SonarProjectDetail, error) {
+	p := &restapi.SonarGetParams{ProjectKey: project}
+	p.PullRequest, p.Branch = scopeQueryParams(scope)
 
 	resp, err := s.client.SonarGetWithResponse(ctx, p)
 	if err != nil {
@@ -191,7 +215,7 @@ func (s *SonarService) Get(ctx context.Context, project, pullRequest string) (*S
 	}
 
 	if err := checkResponse(resp.StatusCode(), resp.Body); err != nil {
-		return nil, sonarNotFoundErr(err, project, pullRequest)
+		return nil, sonarNotFoundErr(err, project, scope)
 	}
 
 	if resp.JSON200 == nil {
@@ -202,11 +226,9 @@ func (s *SonarService) Get(ctx context.Context, project, pullRequest string) (*S
 }
 
 // Gate calls `GET /rest/v1/sonar/gate`.
-func (s *SonarService) Gate(ctx context.Context, project, pullRequest string) (*SonarGate, error) {
+func (s *SonarService) Gate(ctx context.Context, project string, scope SonarScope) (*SonarGate, error) {
 	p := &restapi.SonarGateParams{ProjectKey: project}
-	if pullRequest != "" {
-		p.PullRequest = ptr.To(pullRequest)
-	}
+	p.PullRequest, p.Branch = scopeQueryParams(scope)
 
 	resp, err := s.client.SonarGateWithResponse(ctx, p)
 	if err != nil {
@@ -214,7 +236,7 @@ func (s *SonarService) Gate(ctx context.Context, project, pullRequest string) (*
 	}
 
 	if err := checkResponse(resp.StatusCode(), resp.Body); err != nil {
-		return nil, sonarNotFoundErr(err, project, pullRequest)
+		return nil, sonarNotFoundErr(err, project, scope)
 	}
 
 	if resp.JSON200 == nil {
@@ -226,11 +248,10 @@ func (s *SonarService) Gate(ctx context.Context, project, pullRequest string) (*
 
 // Issues calls `GET /rest/v1/sonar/issues`.
 func (s *SonarService) Issues(ctx context.Context, params SonarIssuesParams) (*SonarIssueList, error) {
+	scope := SonarScope{PullRequest: params.PullRequest, Branch: params.Branch}
 	p := &restapi.SonarIssuesParams{ProjectKey: params.ProjectKey}
+	p.PullRequest, p.Branch = scopeQueryParams(scope)
 
-	if params.PullRequest != "" {
-		p.PullRequest = ptr.To(params.PullRequest)
-	}
 	if len(params.Types) > 0 {
 		p.Types = ptr.To(strings.Join(params.Types, ","))
 	}
@@ -270,7 +291,7 @@ func (s *SonarService) Issues(ctx context.Context, params SonarIssuesParams) (*S
 	}
 
 	if err := checkResponse(resp.StatusCode(), resp.Body); err != nil {
-		return nil, sonarNotFoundErr(err, params.ProjectKey, params.PullRequest)
+		return nil, sonarNotFoundErr(err, params.ProjectKey, scope)
 	}
 
 	if resp.JSON200 == nil {
@@ -280,16 +301,20 @@ func (s *SonarService) Issues(ctx context.Context, params SonarIssuesParams) (*S
 	return mapSonarIssueList(resp.JSON200), nil
 }
 
-// sonarNotFoundErr disambiguates "project not found" from "pull request not found"
-// when upstream returns 404. The returned error wraps ErrNotFound so callers
-// can still match with errors.Is.
-func sonarNotFoundErr(err error, project, pullRequest string) error {
+// sonarNotFoundErr disambiguates "project not found" from scope-specific
+// 404s (pull request vs. branch) when upstream returns 404. The returned
+// error wraps ErrNotFound so callers can still match with errors.Is.
+func sonarNotFoundErr(err error, project string, scope SonarScope) error {
 	if !errors.Is(err, ErrNotFound) {
 		return err
 	}
 
-	if pullRequest != "" {
-		return fmt.Errorf("pull request %s not found: %w", pullRequest, ErrNotFound)
+	if scope.PullRequest != "" {
+		return fmt.Errorf("pull request %s not found: %w", scope.PullRequest, ErrNotFound)
+	}
+
+	if scope.Branch != "" {
+		return fmt.Errorf("branch %s not found: %w", scope.Branch, ErrNotFound)
 	}
 
 	return fmt.Errorf("project %s not found: %w", project, ErrNotFound)

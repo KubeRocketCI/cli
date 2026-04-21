@@ -22,6 +22,7 @@ type GateOptions struct {
 	RestClient   func() (*restapi.ClientWithResponses, error)
 	Project      string
 	PullRequest  string
+	Branch       string
 	OutputFormat string
 }
 
@@ -41,7 +42,10 @@ func NewCmdGate(f *cmdutil.Factory, runF func(*GateOptions) error) *cobra.Comman
   krci sonar gate payments-api
 
   # Pull-request gate check
-  krci sonar gate payments-api --pull-request 123
+  krci sonar gate payments-api --pr 123
+
+  # Branch gate check (mirrors Sonar's ?branch= URL param)
+  krci sonar gate payments-api --branch main
 
   # CI guardrail
   if [ "$(krci sonar gate payments-api -o json | jq -r '.data.projectStatus.status')" = "ERROR" ]; then
@@ -50,7 +54,9 @@ func NewCmdGate(f *cmdutil.Factory, runF func(*GateOptions) error) *cobra.Comman
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Project = args[0]
 
-			if err := sonarinternal.ValidateProjectCommand(cmd, opts.OutputFormat, opts.Project, opts.PullRequest); err != nil {
+			if err := sonarinternal.ValidateProjectCommand(
+				cmd, opts.OutputFormat, opts.Project, opts.PullRequest, opts.Branch,
+			); err != nil {
 				return err
 			}
 
@@ -62,7 +68,10 @@ func NewCmdGate(f *cmdutil.Factory, runF func(*GateOptions) error) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.PullRequest, "pull-request", "", "SonarQube pull-request id to scope the view")
+	cmd.Flags().StringVar(&opts.PullRequest, "pr", "",
+		"SonarQube pull-request id (mutually exclusive with --branch)")
+	cmd.Flags().StringVar(&opts.Branch, "branch", "",
+		"SonarQube branch name (mutually exclusive with --pr)")
 	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "",
 		"Output format: table, json (default: table)")
 
@@ -77,7 +86,10 @@ func gateRun(ctx context.Context, opts *GateOptions) error {
 
 	svc := portal.NewSonarService(client)
 
-	g, err := svc.Gate(ctx, opts.Project, opts.PullRequest)
+	g, err := svc.Gate(ctx, opts.Project, portal.SonarScope{
+		PullRequest: opts.PullRequest,
+		Branch:      opts.Branch,
+	})
 	if err != nil {
 		return sonarinternal.HandleError(opts.IO, opts.OutputFormat, err)
 	}

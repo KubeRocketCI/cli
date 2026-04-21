@@ -25,6 +25,7 @@ type GetOptions struct {
 	RestClient   func() (*restapi.ClientWithResponses, error)
 	Project      string
 	PullRequest  string
+	Branch       string
 	OutputFormat string
 }
 
@@ -44,14 +45,19 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
   krci sonar get payments-api
 
   # Scope to a pull request
-  krci sonar get payments-api --pull-request 123
+  krci sonar get payments-api --pr 123
+
+  # Scope to a named branch (mirrors Sonar's ?branch= URL param)
+  krci sonar get payments-api --branch main
 
   # Scripting — pull a single metric
   krci sonar get payments-api -o json | jq -r '.data.measures.coverage'`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Project = args[0]
 
-			if err := sonarinternal.ValidateProjectCommand(cmd, opts.OutputFormat, opts.Project, opts.PullRequest); err != nil {
+			if err := sonarinternal.ValidateProjectCommand(
+				cmd, opts.OutputFormat, opts.Project, opts.PullRequest, opts.Branch,
+			); err != nil {
 				return err
 			}
 
@@ -63,7 +69,10 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.PullRequest, "pull-request", "", "SonarQube pull-request id to scope the view")
+	cmd.Flags().StringVar(&opts.PullRequest, "pr", "",
+		"SonarQube pull-request id (mutually exclusive with --branch)")
+	cmd.Flags().StringVar(&opts.Branch, "branch", "",
+		"SonarQube branch name (mutually exclusive with --pr)")
 	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "",
 		"Output format: table, json (default: table)")
 
@@ -78,7 +87,10 @@ func getRun(ctx context.Context, opts *GetOptions) error {
 
 	svc := portal.NewSonarService(client)
 
-	detail, err := svc.Get(ctx, opts.Project, opts.PullRequest)
+	detail, err := svc.Get(ctx, opts.Project, portal.SonarScope{
+		PullRequest: opts.PullRequest,
+		Branch:      opts.Branch,
+	})
 	if err != nil {
 		return sonarinternal.HandleError(opts.IO, opts.OutputFormat, err)
 	}

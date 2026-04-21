@@ -30,6 +30,7 @@ type IssuesOptions struct {
 	RestClient   func() (*restapi.ClientWithResponses, error)
 	Project      string
 	PullRequest  string
+	Branch       string
 	Types        []string
 	Severities   []string
 	Statuses     []string
@@ -71,11 +72,16 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*IssuesOptions) error) *cobra.Co
   krci sonar issues payments-api --type BUG,VULNERABILITY --resolved --sort SEVERITY --asc
 
   # Pull-request scope
-  krci sonar issues payments-api --pull-request 123 --severity BLOCKER`,
+  krci sonar issues payments-api --pr 123 --severity BLOCKER
+
+  # Branch scope (mirrors Sonar's ?branch= URL param)
+  krci sonar issues payments-api --branch main --severity BLOCKER`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Project = args[0]
 
-			if err := sonarinternal.ValidateProjectCommand(cmd, opts.OutputFormat, opts.Project, opts.PullRequest); err != nil {
+			if err := sonarinternal.ValidateProjectCommand(
+				cmd, opts.OutputFormat, opts.Project, opts.PullRequest, opts.Branch,
+			); err != nil {
 				return err
 			}
 
@@ -105,6 +111,7 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*IssuesOptions) error) *cobra.Co
 			p := portal.SonarIssuesParams{
 				ProjectKey:  opts.Project,
 				PullRequest: opts.PullRequest,
+				Branch:      opts.Branch,
 				Types:       types,
 				Severities:  severities,
 				Statuses:    statuses,
@@ -134,7 +141,10 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*IssuesOptions) error) *cobra.Co
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.PullRequest, "pull-request", "", "SonarQube pull-request id to scope the view")
+	cmd.Flags().StringVar(&opts.PullRequest, "pr", "",
+		"SonarQube pull-request id (mutually exclusive with --branch)")
+	cmd.Flags().StringVar(&opts.Branch, "branch", "",
+		"SonarQube branch name (mutually exclusive with --pr)")
 	cmd.Flags().StringSliceVar(&opts.Types, "type", nil,
 		"Issue types (csv or repeatable): BUG,VULNERABILITY,CODE_SMELL")
 	cmd.Flags().StringSliceVar(&opts.Severities, "severity", nil,
@@ -166,11 +176,11 @@ func issuesRun(ctx context.Context, opts *IssuesOptions) error {
 	}
 
 	return sonarinternal.Render(opts.IO, opts.OutputFormat, result, func(w io.Writer, isTTY bool) error {
-		return renderTable(w, isTTY, opts.Project, opts.PullRequest, result)
+		return renderTable(w, isTTY, opts.Project, opts.PullRequest, opts.Branch, result)
 	})
 }
 
-func renderTable(w io.Writer, isTTY bool, project, pullRequest string, result *portal.SonarIssueList) error {
+func renderTable(w io.Writer, isTTY bool, project, pullRequest, branch string, result *portal.SonarIssueList) error {
 	if _, err := fmt.Fprintf(
 		w,
 		"Issues for %s  (page %d/%d, %d total)\n\n",
@@ -182,16 +192,26 @@ func renderTable(w io.Writer, isTTY bool, project, pullRequest string, result *p
 		return err
 	}
 
-	if result.Paging.Total == 0 && pullRequest != "" {
-		// Empty pull-request scoped results are ambiguous (e.g. clean PR,
-		// unmatched filters, or a PR id that is not analyzed upstream), so
-		// print a non-assertive hint.
-		_, err := fmt.Fprintf(
-			w,
-			"(no issues — verify the pull-request id %q and applied filters)\n",
-			pullRequest,
-		)
-		return err
+	// Zero-result scoped queries are ambiguous (e.g. clean PR/branch,
+	// unmatched filters, or a scope that is not analyzed upstream), so print
+	// a non-assertive hint naming the scope the user supplied.
+	if result.Paging.Total == 0 {
+		switch {
+		case pullRequest != "":
+			_, err := fmt.Fprintf(
+				w,
+				"(no issues — verify the pull-request id %q and applied filters)\n",
+				pullRequest,
+			)
+			return err
+		case branch != "":
+			_, err := fmt.Fprintf(
+				w,
+				"(no issues — verify the branch name %q and applied filters)\n",
+				branch,
+			)
+			return err
+		}
 	}
 
 	headers := []string{"KEY", "SEVERITY", "TYPE", "STATUS", "RULE", "COMPONENT", "LINE", "MESSAGE"}

@@ -214,7 +214,7 @@ func TestGet_ValidInvocationReachesRunF(t *testing.T) {
 		return nil
 	})
 
-	cmd.SetArgs([]string{"my-proj", "--pull-request", "99", "-o", "json"})
+	cmd.SetArgs([]string{"my-proj", "--pr", "99", "-o", "json"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -231,16 +231,82 @@ func TestGet_RejectsEmptyPullRequest(t *testing.T) {
 	t.Parallel()
 
 	cmd := NewCmdGet(newFactory(), nil)
-	cmd.SetArgs([]string{"my-proj", "--pull-request", ""})
+	cmd.SetArgs([]string{"my-proj", "--pr", ""})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
 	err := cmd.Execute()
 	if err == nil {
-		t.Fatal("expected error for empty --pull-request")
+		t.Fatal("expected error for empty --pr")
 	}
 
 	if !strings.Contains(err.Error(), "non-empty") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestGet_BranchReachesRunF(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	cmd := NewCmdGet(newFactory(), func(opts *GetOptions) error {
+		called = true
+
+		if opts.Branch != "main" {
+			t.Errorf("Branch = %q, want %q", opts.Branch, "main")
+		}
+		if opts.PullRequest != "" {
+			t.Errorf("PullRequest must stay empty when only --branch is set, got %q", opts.PullRequest)
+		}
+
+		return nil
+	})
+
+	cmd.SetArgs([]string{"my-proj", "--branch", "main"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute error: %v", err)
+	}
+
+	if !called {
+		t.Error("runF was not called")
+	}
+}
+
+func TestGet_RejectsEmptyBranch(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCmdGet(newFactory(), nil)
+	cmd.SetArgs([]string{"my-proj", "--branch", ""})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for empty --branch")
+	}
+
+	if !strings.Contains(err.Error(), "--branch requires a non-empty value") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestGet_RejectsBothScopes(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCmdGet(newFactory(), nil)
+	cmd.SetArgs([]string{"my-proj", "--pr", "42", "--branch", "main"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when both scope flags are set")
+	}
+
+	if !strings.Contains(err.Error(), "mutually exclusive") {
 		t.Errorf("unexpected error: %v", err)
 	}
 }

@@ -72,12 +72,16 @@ Coverage & Size:
   Lines of code      28518
 ```
 
-Scope to a pull request or pull a single metric:
+Scope to a pull request, a named branch, or pull a single metric:
 
 ```bash
-krci sonar get keycloak-operator --pull-request 123
+krci sonar get keycloak-operator --pr 123
+krci sonar get keycloak-operator --branch main
 krci sonar get keycloak-operator -o json | jq -r '.data.measures.coverage'
 ```
+
+`--pr` and `--branch` are mutually exclusive — they map to SonarQube's two
+scope selectors. Omit both to target the project's default branch.
 
 ## `sonar gate`
 
@@ -107,7 +111,7 @@ if [ "$(krci sonar gate keycloak-operator -o json | jq -r '.data.projectStatus.s
 fi
 ```
 
-Flags: `--pull-request`, `-o`.
+Flags: `--pr`, `--branch`, `-o`. `--pr` and `--branch` are mutually exclusive.
 
 ## `sonar issues`
 
@@ -134,7 +138,10 @@ krci sonar issues keycloak-operator --severity BLOCKER,CRITICAL
 krci sonar issues keycloak-operator --type BUG,VULNERABILITY --resolved --sort SEVERITY --asc
 
 # Scope to a pull request
-krci sonar issues keycloak-operator --pull-request 123 --severity BLOCKER
+krci sonar issues keycloak-operator --pr 123 --severity BLOCKER
+
+# Scope to a named branch (mirrors Sonar's ?branch= URL param)
+krci sonar issues keycloak-operator --branch main --severity BLOCKER
 ```
 
 | Flag             | Values                                                           |
@@ -145,7 +152,8 @@ krci sonar issues keycloak-operator --pull-request 123 --severity BLOCKER
 | `--resolved`     | Include resolved issues                                          |
 | `--sort / --asc` | Sort field (forwarded to SonarQube) and direction               |
 | `--page[-size]`  | Pagination; `--page-size` max 500                                |
-| `--pull-request` | PR id to scope the view                                          |
+| `--pr`           | PR id to scope the view (mutually exclusive with `--branch`)     |
+| `--branch`       | Branch name to scope the view (mutually exclusive with `--pr`)   |
 
 ## JSON output
 
@@ -175,8 +183,13 @@ krci sonar get payments-api
 krci sonar issues payments-api --severity BLOCKER,CRITICAL
 
 # PR review
-krci sonar gate payments-api --pull-request 123
-krci sonar issues payments-api --pull-request 123 --type BUG,VULNERABILITY
+krci sonar gate payments-api --pr 123
+krci sonar issues payments-api --pr 123 --type BUG,VULNERABILITY
+
+# Branch review — use the same branch name you see in the Sonar URL
+# (?branch=<sha-or-name>), commonly a commit SHA when scans are driven by CI.
+krci sonar gate payments-api --branch 29279c5b871fa4966374a7144ed40ff2a52798d2
+krci sonar issues payments-api --branch main --type BUG,VULNERABILITY
 
 # CI gate check (exit non-zero on red)
 krci sonar gate payments-api -o json \
