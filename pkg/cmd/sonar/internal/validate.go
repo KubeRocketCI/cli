@@ -37,11 +37,21 @@ func ValidateProjectKey(project string) error {
 	return nil
 }
 
-// ValidatePullRequest rejects an explicitly supplied empty --pull-request value.
-// changed is true when the flag was set on the command line (regardless of value).
-func ValidatePullRequest(changed bool, value string) error {
+// ValidateNonEmptyFlag rejects a flag that was explicitly supplied with an
+// empty value. changed is true when the flag was set on the command line.
+func ValidateNonEmptyFlag(name string, changed bool, value string) error {
 	if changed && value == "" {
-		return fmt.Errorf("--pull-request requires a non-empty value")
+		return fmt.Errorf("--%s requires a non-empty value", name)
+	}
+
+	return nil
+}
+
+// ValidateScopeMutex rejects commands that set both --pr and --branch,
+// since SonarQube treats the two as mutually exclusive scope selectors.
+func ValidateScopeMutex(pullRequest, branch string) error {
+	if pullRequest != "" && branch != "" {
+		return fmt.Errorf("--pr and --branch are mutually exclusive")
 	}
 
 	return nil
@@ -58,10 +68,11 @@ func ValidateOutputFormat(format string) error {
 	}
 }
 
-// ValidateProjectCommand runs the standard validator triple used by the three
+// ValidateProjectCommand runs the standard validator chain used by the three
 // project-scoped verbs (get, gate, issues): output format → DNS-1123 project
-// key → non-empty --pull-request (when supplied).
-func ValidateProjectCommand(cmd *cobra.Command, outputFormat, project, pullRequest string) error {
+// key → non-empty --pr / --branch (when supplied) → mutual exclusion of the
+// two scope flags.
+func ValidateProjectCommand(cmd *cobra.Command, outputFormat, project, pullRequest, branch string) error {
 	if err := ValidateOutputFormat(outputFormat); err != nil {
 		return err
 	}
@@ -70,7 +81,15 @@ func ValidateProjectCommand(cmd *cobra.Command, outputFormat, project, pullReque
 		return err
 	}
 
-	return ValidatePullRequest(cmd.Flags().Changed("pull-request"), pullRequest)
+	if err := ValidateNonEmptyFlag("pr", cmd.Flags().Changed("pr"), pullRequest); err != nil {
+		return err
+	}
+
+	if err := ValidateNonEmptyFlag("branch", cmd.Flags().Changed("branch"), branch); err != nil {
+		return err
+	}
+
+	return ValidateScopeMutex(pullRequest, branch)
 }
 
 // EnumSet pairs the canonical list and lookup map for a SonarQube enum.

@@ -3,6 +3,7 @@ package portal
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,7 +13,10 @@ import (
 	"github.com/KubeRocketCI/cli/internal/ptr"
 )
 
-const testProject = "my-proj"
+const (
+	testProject = "my-proj"
+	testBranch  = "main"
+)
 
 func newTestClient(t *testing.T, handler http.HandlerFunc) (*restapi.ClientWithResponses, func()) {
 	t.Helper()
@@ -109,7 +113,7 @@ func TestSonarService_Get_Success_PassesPullRequest(t *testing.T) {
 	client, closer := newTestClient(t, handler)
 	defer closer()
 
-	got, err := NewSonarService(client).Get(context.Background(), testProject, "123")
+	got, err := NewSonarService(client).Get(context.Background(), testProject, SonarScope{PullRequest: "123"})
 	if err != nil {
 		t.Fatalf("Get error: %v", err)
 	}
@@ -137,7 +141,7 @@ func TestSonarService_Get_Success_OmitsPullRequestWhenEmpty(t *testing.T) {
 	client, closer := newTestClient(t, handler)
 	defer closer()
 
-	_, err := NewSonarService(client).Get(context.Background(), testProject, "")
+	_, err := NewSonarService(client).Get(context.Background(), testProject, SonarScope{})
 	if err != nil {
 		t.Fatalf("Get error: %v", err)
 	}
@@ -153,7 +157,7 @@ func TestSonarService_Get_404_ProjectNotFoundMessage(t *testing.T) {
 	client, closer := newTestClient(t, handler)
 	defer closer()
 
-	_, err := NewSonarService(client).Get(context.Background(), "nope", "")
+	_, err := NewSonarService(client).Get(context.Background(), "nope", SonarScope{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -173,7 +177,7 @@ func TestSonarService_Get_404_PullRequestNotFoundMessage(t *testing.T) {
 	client, closer := newTestClient(t, handler)
 	defer closer()
 
-	_, err := NewSonarService(client).Get(context.Background(), testProject, "999")
+	_, err := NewSonarService(client).Get(context.Background(), testProject, SonarScope{PullRequest: "999"})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -194,7 +198,7 @@ func TestSonarService_Get_500(t *testing.T) {
 	client, closer := newTestClient(t, handler)
 	defer closer()
 
-	_, err := NewSonarService(client).Get(context.Background(), testProject, "")
+	_, err := NewSonarService(client).Get(context.Background(), testProject, SonarScope{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -215,7 +219,7 @@ func TestSonarService_Gate_Success_NONE(t *testing.T) {
 	client, closer := newTestClient(t, handler)
 	defer closer()
 
-	g, err := NewSonarService(client).Gate(context.Background(), testProject, "")
+	g, err := NewSonarService(client).Gate(context.Background(), testProject, SonarScope{})
 	if err != nil {
 		t.Fatalf("Gate error: %v", err)
 	}
@@ -244,7 +248,7 @@ func TestSonarService_Gate_Success_ERROR_WithConditions(t *testing.T) {
 	client, closer := newTestClient(t, handler)
 	defer closer()
 
-	g, err := NewSonarService(client).Gate(context.Background(), testProject, "123")
+	g, err := NewSonarService(client).Gate(context.Background(), testProject, SonarScope{PullRequest: "123"})
 	if err != nil {
 		t.Fatalf("Gate error: %v", err)
 	}
@@ -428,7 +432,7 @@ func TestSonarService_Get_404_ProjectNotFound_ErrorIs(t *testing.T) {
 	client, closer := newTestClient(t, handler)
 	defer closer()
 
-	_, err := NewSonarService(client).Get(context.Background(), "my-proj", "")
+	_, err := NewSonarService(client).Get(context.Background(), "my-proj", SonarScope{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -452,7 +456,7 @@ func TestSonarService_Get_404_PullRequest_ErrorIs(t *testing.T) {
 	client, closer := newTestClient(t, handler)
 	defer closer()
 
-	_, err := NewSonarService(client).Get(context.Background(), testProject, "123")
+	_, err := NewSonarService(client).Get(context.Background(), testProject, SonarScope{PullRequest: "123"})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -476,7 +480,7 @@ func TestSonarService_Gate_404_ProjectNotFound(t *testing.T) {
 	client, closer := newTestClient(t, handler)
 	defer closer()
 
-	_, err := NewSonarService(client).Gate(context.Background(), "ghost-proj", "")
+	_, err := NewSonarService(client).Gate(context.Background(), "ghost-proj", SonarScope{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -500,7 +504,7 @@ func TestSonarService_Gate_404_PullRequest_ErrorIs(t *testing.T) {
 	client, closer := newTestClient(t, handler)
 	defer closer()
 
-	_, err := NewSonarService(client).Gate(context.Background(), testProject, "123")
+	_, err := NewSonarService(client).Gate(context.Background(), testProject, SonarScope{PullRequest: "123"})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -748,6 +752,168 @@ func TestSonarService_Issues_PullRequest_Forwarded(t *testing.T) {
 	}
 }
 
+func TestSonarService_Get_Branch_Forwarded(t *testing.T) {
+	t.Parallel()
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if q.Get("branch") != testBranch {
+			t.Fatalf("expected branch=%s, got: %s", testBranch, r.URL.RawQuery)
+		}
+		if _, present := q["pullRequest"]; present {
+			t.Fatalf("pullRequest must be absent when only branch is set, got: %s", r.URL.RawQuery)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"key":"my-proj","name":"my-proj"}`))
+	}
+
+	client, closer := newTestClient(t, handler)
+	defer closer()
+
+	_, err := NewSonarService(client).Get(context.Background(), testProject, SonarScope{Branch: testBranch})
+	if err != nil {
+		t.Fatalf("Get error: %v", err)
+	}
+}
+
+func TestSonarService_Get_404_BranchNotFoundMessage(t *testing.T) {
+	t.Parallel()
+
+	handler := func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}
+
+	client, closer := newTestClient(t, handler)
+	defer closer()
+
+	_, err := NewSonarService(client).Get(context.Background(), testProject, SonarScope{Branch: "feat/x"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("errors.Is(err, ErrNotFound) must be true; got: %v", err)
+	}
+
+	if !strings.Contains(err.Error(), "branch feat/x not found") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestSonarService_Gate_Branch_Forwarded(t *testing.T) {
+	t.Parallel()
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("branch") != testBranch {
+			t.Fatalf("expected branch=%s, got: %s", testBranch, r.URL.RawQuery)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"projectStatus":{"status":"OK","conditions":[]}}`))
+	}
+
+	client, closer := newTestClient(t, handler)
+	defer closer()
+
+	g, err := NewSonarService(client).Gate(context.Background(), testProject, SonarScope{Branch: testBranch})
+	if err != nil {
+		t.Fatalf("Gate error: %v", err)
+	}
+
+	if g.ProjectStatus.Status != "OK" {
+		t.Errorf("status = %q", g.ProjectStatus.Status)
+	}
+}
+
+func TestSonarService_Gate_404_BranchNotFound(t *testing.T) {
+	t.Parallel()
+
+	handler := func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}
+
+	client, closer := newTestClient(t, handler)
+	defer closer()
+
+	_, err := NewSonarService(client).Gate(context.Background(), testProject, SonarScope{Branch: "feat/x"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("errors.Is(err, ErrNotFound) must be true; got: %v", err)
+	}
+
+	if !strings.Contains(err.Error(), "branch feat/x not found") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestSonarService_Issues_Branch_Forwarded(t *testing.T) {
+	t.Parallel()
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if q.Get("branch") != testBranch {
+			t.Fatalf("expected branch=%s, got: %s", testBranch, r.URL.RawQuery)
+		}
+		if _, present := q["pullRequest"]; present {
+			t.Fatalf("pullRequest must be absent when only branch is set, got: %s", r.URL.RawQuery)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"total":0,"p":1,"ps":10,"paging":{"pageIndex":1,"pageSize":10,"total":0},"issues":[]}`))
+	}
+
+	client, closer := newTestClient(t, handler)
+	defer closer()
+
+	_, err := NewSonarService(client).Issues(context.Background(), SonarIssuesParams{
+		ProjectKey: testProject,
+		Branch:     testBranch,
+	})
+	if err != nil {
+		t.Fatalf("Issues error: %v", err)
+	}
+}
+
+func TestSonarService_Issues_404_BranchNotFound(t *testing.T) {
+	t.Parallel()
+
+	handler := func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}
+
+	client, closer := newTestClient(t, handler)
+	defer closer()
+
+	_, err := NewSonarService(client).Issues(context.Background(), SonarIssuesParams{
+		ProjectKey: testProject,
+		Branch:     "feat/x",
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	if !strings.Contains(err.Error(), "branch feat/x not found") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestSonarNotFoundErr_BranchMessage(t *testing.T) {
+	t.Parallel()
+
+	notFound := fmt.Errorf("upstream: %w", ErrNotFound)
+
+	got := sonarNotFoundErr(notFound, "proj", SonarScope{Branch: "feat/x"})
+
+	if !errors.Is(got, ErrNotFound) {
+		t.Errorf("wrapped error must still match ErrNotFound via errors.Is")
+	}
+
+	if !strings.Contains(got.Error(), "branch feat/x not found") {
+		t.Errorf("expected branch-specific message, got: %v", got)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Mapper unit tests — called directly for high coverage-per-test ratio
 // ---------------------------------------------------------------------------
@@ -926,7 +1092,7 @@ func TestSonarNotFoundErr_NonNotFound_PassThrough(t *testing.T) {
 
 	sentinel := errors.New("some other error")
 
-	got := sonarNotFoundErr(sentinel, "proj", "")
+	got := sonarNotFoundErr(sentinel, "proj", SonarScope{})
 
 	if got != sentinel {
 		t.Errorf("expected same error instance to pass through, got: %v", got)
@@ -950,7 +1116,7 @@ func TestSonarService_Get_EmptyJSON200(t *testing.T) {
 	client, closer := newTestClient(t, handler)
 	defer closer()
 
-	_, err := NewSonarService(client).Get(context.Background(), testProject, "")
+	_, err := NewSonarService(client).Get(context.Background(), testProject, SonarScope{})
 	if err == nil {
 		t.Fatal("expected error when JSON200 is nil")
 	}
@@ -972,7 +1138,7 @@ func TestSonarService_Gate_EmptyJSON200(t *testing.T) {
 	client, closer := newTestClient(t, handler)
 	defer closer()
 
-	_, err := NewSonarService(client).Gate(context.Background(), testProject, "")
+	_, err := NewSonarService(client).Gate(context.Background(), testProject, SonarScope{})
 	if err == nil {
 		t.Fatal("expected error when JSON200 is nil")
 	}

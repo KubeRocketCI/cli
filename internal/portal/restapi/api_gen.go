@@ -486,18 +486,21 @@ type K8sListJSONBody struct {
 type SonarGateParams struct {
 	ProjectKey  string  `form:"projectKey" json:"projectKey"`
 	PullRequest *string `form:"pullRequest,omitempty" json:"pullRequest,omitempty"`
+	Branch      *string `form:"branch,omitempty" json:"branch,omitempty"`
 }
 
 // SonarGetParams defines parameters for SonarGet.
 type SonarGetParams struct {
 	ProjectKey  string  `form:"projectKey" json:"projectKey"`
 	PullRequest *string `form:"pullRequest,omitempty" json:"pullRequest,omitempty"`
+	Branch      *string `form:"branch,omitempty" json:"branch,omitempty"`
 }
 
 // SonarIssuesParams defines parameters for SonarIssues.
 type SonarIssuesParams struct {
 	ProjectKey  string                     `form:"projectKey" json:"projectKey"`
 	PullRequest *string                    `form:"pullRequest,omitempty" json:"pullRequest,omitempty"`
+	Branch      *string                    `form:"branch,omitempty" json:"branch,omitempty"`
 	Types       *string                    `form:"types,omitempty" json:"types,omitempty"`
 	Severities  *string                    `form:"severities,omitempty" json:"severities,omitempty"`
 	Statuses    *string                    `form:"statuses,omitempty" json:"statuses,omitempty"`
@@ -1209,6 +1212,22 @@ func NewSonarGateRequest(server string, params *SonarGateParams) (*http.Request,
 
 		}
 
+		if params.Branch != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "branch", runtime.ParamLocationQuery, *params.Branch); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
 		queryURL.RawQuery = queryValues.Encode()
 	}
 
@@ -1270,6 +1289,22 @@ func NewSonarGetRequest(server string, params *SonarGetParams) (*http.Request, e
 
 		}
 
+		if params.Branch != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "branch", runtime.ParamLocationQuery, *params.Branch); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
 		queryURL.RawQuery = queryValues.Encode()
 	}
 
@@ -1318,6 +1353,22 @@ func NewSonarIssuesRequest(server string, params *SonarIssuesParams) (*http.Requ
 		if params.PullRequest != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "pullRequest", runtime.ParamLocationQuery, *params.PullRequest); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Branch != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "branch", runtime.ParamLocationQuery, *params.Branch); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err

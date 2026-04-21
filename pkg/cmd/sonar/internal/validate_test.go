@@ -58,6 +58,8 @@ func TestValidateEnumCSV(t *testing.T) {
 	t.Parallel()
 
 	t.Run("empty returns nil", func(t *testing.T) {
+		t.Parallel()
+
 		got, err := ValidateEnumCSV("severity", nil, IssueSeverities)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -68,6 +70,8 @@ func TestValidateEnumCSV(t *testing.T) {
 	})
 
 	t.Run("csv and repeated expanded", func(t *testing.T) {
+		t.Parallel()
+
 		got, err := ValidateEnumCSV("severity", []string{"BLOCKER,CRITICAL", "MAJOR"}, IssueSeverities)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -78,6 +82,8 @@ func TestValidateEnumCSV(t *testing.T) {
 	})
 
 	t.Run("invalid enum rejected", func(t *testing.T) {
+		t.Parallel()
+
 		_, err := ValidateEnumCSV("severity", []string{"CATASTROPHIC"}, IssueSeverities)
 		if err == nil {
 			t.Fatal("expected error")
@@ -88,6 +94,8 @@ func TestValidateEnumCSV(t *testing.T) {
 	})
 
 	t.Run("whitespace tolerated", func(t *testing.T) {
+		t.Parallel()
+
 		got, err := ValidateEnumCSV("severity", []string{" BLOCKER , CRITICAL "}, IssueSeverities)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -141,42 +149,88 @@ func TestValidateOutputFormat(t *testing.T) {
 	}
 }
 
-func TestValidatePullRequest(t *testing.T) {
+func TestValidateNonEmptyFlag(t *testing.T) {
 	t.Parallel()
 
 	// Flag not set — empty value is fine (flag just omitted).
-	if err := ValidatePullRequest(false, ""); err != nil {
+	if err := ValidateNonEmptyFlag("pr", false, ""); err != nil {
 		t.Errorf("unchanged empty: want nil, got %v", err)
 	}
 
-	// Flag set to an explicit empty string — rejected.
-	err := ValidatePullRequest(true, "")
+	// Flag set to an explicit empty string — rejected, error names the flag.
+	err := ValidateNonEmptyFlag("pr", true, "")
 	if err == nil {
 		t.Fatal("changed empty: expected error")
 	}
-	if !strings.Contains(err.Error(), "non-empty") {
-		t.Errorf("want 'non-empty' in error, got %v", err)
+	if !strings.Contains(err.Error(), "--pr requires a non-empty value") {
+		t.Errorf("want '--pr requires a non-empty value' in error, got %v", err)
+	}
+
+	// Same helper, different flag name — error interpolates it correctly.
+	err = ValidateNonEmptyFlag("branch", true, "")
+	if err == nil {
+		t.Fatal("branch changed empty: expected error")
+	}
+	if !strings.Contains(err.Error(), "--branch requires a non-empty value") {
+		t.Errorf("want '--branch requires a non-empty value' in error, got %v", err)
 	}
 
 	// Flag set to a non-empty value — accepted.
-	if err := ValidatePullRequest(true, "123"); err != nil {
+	if err := ValidateNonEmptyFlag("pr", true, "123"); err != nil {
 		t.Errorf("changed non-empty: want nil, got %v", err)
 	}
 }
 
-// newTestCmd builds a minimal cobra.Command with a --pull-request string flag
-// so ValidateProjectCommand can call cmd.Flags().Changed("pull-request").
-func newTestCmd(pullRequestChanged bool, pullRequestValue string) *cobra.Command {
-	cmd := &cobra.Command{Use: "test"}
-	cmd.Flags().String("pull-request", "", "")
+// scopeFlag is one of the two optional scope flags accepted by the sonar
+// project-scoped verbs. newTestCmd registers both flags unconditionally so
+// ValidateProjectCommand can call cmd.Flags().Changed(...) on either.
+type scopeFlag struct {
+	changed bool
+	value   string
+}
 
-	if pullRequestChanged {
-		if err := cmd.Flags().Set("pull-request", pullRequestValue); err != nil {
+// newTestCmd builds a minimal cobra.Command with --pr and --branch string
+// flags so ValidateProjectCommand can probe cmd.Flags().Changed.
+func newTestCmd(pullRequest, branch scopeFlag) *cobra.Command {
+	cmd := &cobra.Command{Use: "test"}
+	cmd.Flags().String("pr", "", "")
+	cmd.Flags().String("branch", "", "")
+
+	if pullRequest.changed {
+		if err := cmd.Flags().Set("pr", pullRequest.value); err != nil {
+			panic("test setup: " + err.Error())
+		}
+	}
+
+	if branch.changed {
+		if err := cmd.Flags().Set("branch", branch.value); err != nil {
 			panic("test setup: " + err.Error())
 		}
 	}
 
 	return cmd
+}
+
+func TestValidateScopeMutex(t *testing.T) {
+	t.Parallel()
+
+	if err := ValidateScopeMutex("", ""); err != nil {
+		t.Errorf("both empty: want nil, got %v", err)
+	}
+	if err := ValidateScopeMutex("42", ""); err != nil {
+		t.Errorf("pr only: want nil, got %v", err)
+	}
+	if err := ValidateScopeMutex("", "main"); err != nil {
+		t.Errorf("branch only: want nil, got %v", err)
+	}
+
+	err := ValidateScopeMutex("42", "main")
+	if err == nil {
+		t.Fatal("both set: expected error")
+	}
+	if !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Errorf("want 'mutually exclusive' in error, got %v", err)
+	}
 }
 
 func TestValidateProjectCommand(t *testing.T) {
@@ -185,10 +239,10 @@ func TestValidateProjectCommand(t *testing.T) {
 	t.Run("invalid output format short-circuits before project validation", func(t *testing.T) {
 		t.Parallel()
 
-		cmd := newTestCmd(false, "")
+		cmd := newTestCmd(scopeFlag{}, scopeFlag{})
 		// Pass an empty project — if project validation ran it would also error,
 		// but the output-format check must fire first.
-		err := ValidateProjectCommand(cmd, "yaml", "", "")
+		err := ValidateProjectCommand(cmd, "yaml", "", "", "")
 		if err == nil {
 			t.Fatal("expected error for invalid output format")
 		}
@@ -197,13 +251,13 @@ func TestValidateProjectCommand(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid project short-circuits before pull-request validation", func(t *testing.T) {
+	t.Run("invalid project short-circuits before scope-flag validation", func(t *testing.T) {
 		t.Parallel()
 
-		// --pull-request is changed and empty (would be rejected by ValidatePullRequest),
+		// --pr is changed and empty (would be rejected by ValidateNonEmptyFlag),
 		// but project error must fire first.
-		cmd := newTestCmd(true, "")
-		err := ValidateProjectCommand(cmd, "", "", "")
+		cmd := newTestCmd(scopeFlag{changed: true, value: ""}, scopeFlag{})
+		err := ValidateProjectCommand(cmd, "", "", "", "")
 		if err == nil {
 			t.Fatal("expected error for empty project")
 		}
@@ -215,18 +269,53 @@ func TestValidateProjectCommand(t *testing.T) {
 	t.Run("valid inputs return nil", func(t *testing.T) {
 		t.Parallel()
 
-		cmd := newTestCmd(true, "42")
-		if err := ValidateProjectCommand(cmd, "json", "my-project", "42"); err != nil {
+		cmd := newTestCmd(scopeFlag{changed: true, value: "42"}, scopeFlag{})
+		if err := ValidateProjectCommand(cmd, "json", "my-project", "42", ""); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 	})
 
-	t.Run("valid inputs without pull-request return nil", func(t *testing.T) {
+	t.Run("valid inputs without scope flags return nil", func(t *testing.T) {
 		t.Parallel()
 
-		cmd := newTestCmd(false, "")
-		if err := ValidateProjectCommand(cmd, "", "my-project", ""); err != nil {
+		cmd := newTestCmd(scopeFlag{}, scopeFlag{})
+		if err := ValidateProjectCommand(cmd, "", "my-project", "", ""); err != nil {
 			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("valid inputs with branch return nil", func(t *testing.T) {
+		t.Parallel()
+
+		cmd := newTestCmd(scopeFlag{}, scopeFlag{changed: true, value: "main"})
+		if err := ValidateProjectCommand(cmd, "", "my-project", "", "main"); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("empty --branch rejected", func(t *testing.T) {
+		t.Parallel()
+
+		cmd := newTestCmd(scopeFlag{}, scopeFlag{changed: true, value: ""})
+		err := ValidateProjectCommand(cmd, "", "my-project", "", "")
+		if err == nil {
+			t.Fatal("expected error for empty --branch")
+		}
+		if !strings.Contains(err.Error(), "--branch requires a non-empty value") {
+			t.Errorf("want branch empty error, got %v", err)
+		}
+	})
+
+	t.Run("--pr and --branch together rejected", func(t *testing.T) {
+		t.Parallel()
+
+		cmd := newTestCmd(scopeFlag{changed: true, value: "42"}, scopeFlag{changed: true, value: "main"})
+		err := ValidateProjectCommand(cmd, "", "my-project", "42", "main")
+		if err == nil {
+			t.Fatal("expected mutex error")
+		}
+		if !strings.Contains(err.Error(), "mutually exclusive") {
+			t.Errorf("want mutex error, got %v", err)
 		}
 	})
 }

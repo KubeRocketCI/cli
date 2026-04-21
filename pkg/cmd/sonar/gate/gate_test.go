@@ -88,16 +88,79 @@ func TestGate_RejectsEmptyPullRequest(t *testing.T) {
 	t.Parallel()
 
 	cmd := NewCmdGate(newFactory(), nil)
-	cmd.SetArgs([]string{"my-proj", "--pull-request", ""})
+	cmd.SetArgs([]string{"my-proj", "--pr", ""})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
 	err := cmd.Execute()
 	if err == nil {
-		t.Fatal("expected error for empty --pull-request")
+		t.Fatal("expected error for empty --pr")
 	}
 
 	if !strings.Contains(err.Error(), "non-empty") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestGate_BranchReachesRunF(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	cmd := NewCmdGate(newFactory(), func(opts *GateOptions) error {
+		called = true
+		if opts.Branch != "main" {
+			t.Errorf("Branch = %q, want %q", opts.Branch, "main")
+		}
+		if opts.PullRequest != "" {
+			t.Errorf("PullRequest must stay empty when only --branch is set, got %q", opts.PullRequest)
+		}
+		return nil
+	})
+
+	cmd.SetArgs([]string{"my-proj", "--branch", "main"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute error: %v", err)
+	}
+	if !called {
+		t.Error("runF was not called")
+	}
+}
+
+func TestGate_RejectsEmptyBranch(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCmdGate(newFactory(), nil)
+	cmd.SetArgs([]string{"my-proj", "--branch", ""})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for empty --branch")
+	}
+
+	if !strings.Contains(err.Error(), "--branch requires a non-empty value") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestGate_RejectsBothScopes(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCmdGate(newFactory(), nil)
+	cmd.SetArgs([]string{"my-proj", "--pr", "42", "--branch", "main"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when both scope flags are set")
+	}
+
+	if !strings.Contains(err.Error(), "mutually exclusive") {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
@@ -124,7 +187,7 @@ func TestGate_ValidInvocationReachesRunF(t *testing.T) {
 		return nil
 	})
 
-	cmd.SetArgs([]string{"my-proj", "--pull-request", "42", "-o", "json"})
+	cmd.SetArgs([]string{"my-proj", "--pr", "42", "-o", "json"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 

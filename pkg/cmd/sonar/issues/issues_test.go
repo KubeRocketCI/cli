@@ -258,7 +258,7 @@ func TestIssues_RenderTable_EmptyPullRequest(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := renderTable(&buf, false, "my-proj", "pr-123", result); err != nil {
+	if err := renderTable(&buf, false, "my-proj", "pr-123", "", result); err != nil {
 		t.Fatalf("renderTable error: %v", err)
 	}
 
@@ -272,6 +272,29 @@ func TestIssues_RenderTable_EmptyPullRequest(t *testing.T) {
 	}
 }
 
+func TestIssues_RenderTable_EmptyBranch(t *testing.T) {
+	t.Parallel()
+
+	result := &portal.SonarIssueList{
+		Paging: portal.SonarPaging{PageIndex: 1, PageSize: 25, Total: 0},
+		Issues: nil,
+	}
+
+	var buf bytes.Buffer
+	if err := renderTable(&buf, false, "my-proj", "", "feat/x", result); err != nil {
+		t.Fatalf("renderTable error: %v", err)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "verify the branch name") {
+		t.Errorf("expected hint about branch name in output, got:\n%s", out)
+	}
+
+	if !strings.Contains(out, "feat/x") {
+		t.Errorf("expected branch name in hint, got:\n%s", out)
+	}
+}
+
 func TestIssues_RenderTable_EmptyNoPullRequest(t *testing.T) {
 	t.Parallel()
 
@@ -281,14 +304,18 @@ func TestIssues_RenderTable_EmptyNoPullRequest(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := renderTable(&buf, false, "my-proj", "", result); err != nil {
+	if err := renderTable(&buf, false, "my-proj", "", "", result); err != nil {
 		t.Fatalf("renderTable error: %v", err)
 	}
 
 	out := buf.String()
-	// No pull-request hint when pull-request was not specified
+	// No pull-request / branch hint when no scope was specified
 	if strings.Contains(out, "verify the pull-request id") {
 		t.Errorf("should not show pull-request hint when no PR given, got:\n%s", out)
+	}
+
+	if strings.Contains(out, "verify the branch name") {
+		t.Errorf("should not show branch hint when no branch given, got:\n%s", out)
 	}
 
 	if !strings.Contains(out, "0 total") {
@@ -326,7 +353,7 @@ func TestIssues_RenderTable_WithIssues(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := renderTable(&buf, false, "my-proj", "", result); err != nil {
+	if err := renderTable(&buf, false, "my-proj", "", "", result); err != nil {
 		t.Fatalf("renderTable error: %v", err)
 	}
 
@@ -367,7 +394,7 @@ func TestIssues_RenderTable_MessageTruncationInTTY(t *testing.T) {
 
 	// TTY mode — message should be truncated
 	var ttyBuf bytes.Buffer
-	if err := renderTable(&ttyBuf, true, "my-proj", "", result); err != nil {
+	if err := renderTable(&ttyBuf, true, "my-proj", "", "", result); err != nil {
 		t.Fatalf("renderTable TTY error: %v", err)
 	}
 
@@ -375,7 +402,7 @@ func TestIssues_RenderTable_MessageTruncationInTTY(t *testing.T) {
 
 	// Non-TTY mode — full message preserved
 	var plainBuf bytes.Buffer
-	if err := renderTable(&plainBuf, false, "my-proj", "", result); err != nil {
+	if err := renderTable(&plainBuf, false, "my-proj", "", "", result); err != nil {
 		t.Fatalf("renderTable plain error: %v", err)
 	}
 
@@ -459,7 +486,7 @@ func TestIssues_ValidInvocationAllFields(t *testing.T) {
 
 	cmd.SetArgs([]string{
 		"my-proj",
-		"--pull-request", "55",
+		"--pr", "55",
 		"--type", "BUG",
 		"--status", "OPEN,CONFIRMED",
 	})
@@ -472,5 +499,67 @@ func TestIssues_ValidInvocationAllFields(t *testing.T) {
 
 	if !called {
 		t.Error("runF was not called")
+	}
+}
+
+func TestIssues_BranchFlagForwarded(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	cmd := NewCmdIssues(newFactory(), func(opts *IssuesOptions) error {
+		called = true
+		p := opts.Normalized()
+		if p.Branch != "main" {
+			t.Errorf("Branch = %q, want %q", p.Branch, "main")
+		}
+		if p.PullRequest != "" {
+			t.Errorf("PullRequest must stay empty when only --branch is set, got %q", p.PullRequest)
+		}
+		return nil
+	})
+
+	cmd.SetArgs([]string{"my-proj", "--branch", "main", "--severity", "BLOCKER"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute error: %v", err)
+	}
+	if !called {
+		t.Error("runF was not called")
+	}
+}
+
+func TestIssues_RejectsEmptyBranch(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCmdIssues(newFactory(), nil)
+	cmd.SetArgs([]string{"my-proj", "--branch", ""})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for empty --branch")
+	}
+	if !strings.Contains(err.Error(), "--branch requires a non-empty value") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestIssues_RejectsBothScopes(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCmdIssues(newFactory(), nil)
+	cmd.SetArgs([]string{"my-proj", "--pr", "42", "--branch", "main"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when both scope flags are set")
+	}
+	if !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Errorf("unexpected error: %v", err)
 	}
 }

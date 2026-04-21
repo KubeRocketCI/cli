@@ -995,6 +995,13 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "branch",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1087,6 +1094,13 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "branch",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1176,6 +1190,13 @@
           {
             "in": "query",
             "name": "pullRequest",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branch",
             "schema": {
               "type": "string"
             }
