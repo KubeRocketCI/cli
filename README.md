@@ -11,21 +11,58 @@ straight from the terminal, with JSON output ready for agent workflows.
 
 `krci` is built to pair with an AI coding assistant (Claude Code, Cursor,
 Copilot CLI, etc.). Every data command emits predictable JSON under
-`-o json`, so an agent can call `krci` as a tool and reason about the
-results without scraping tables.
+`-o json`, so an agent can **discover** resources by filter (no hard-coded
+names) and then **drill in** — a list → get chain the agent plans on its
+own from your natural-language question.
 
-A typical day:
+### *"Check all my PRs that have failed and analyze the logs"*
 
-1. **Triage** — *"Any red PRs for me today?"*
-   → agent runs `krci run list --author jane --status failed -o json`
-2. **Diagnose** — *"Why did `build-api-master-x1y2` fail?"*
-   → agent runs `krci run get build-api-master-x1y2 --reason -o json`,
-     reads the task tree, the failed step, and the relevant log lines
-3. **Gate-check** — *"Is PR 44 ready to merge?"*
-   → agent runs `krci sonar gate my-app --pull-request 44 -o json` and
-     `krci sonar issues my-app --pull-request 44 --severity BLOCKER,CRITICAL -o json`
-4. **Fix & verify** — agent proposes a patch from the evidence, you commit,
-   CI re-runs, agent re-checks the new run
+```bash
+# 1. Discover failed runs for the author — no run names needed up front
+krci run list --author "jane" --status failed -o json
+
+# 2. For each name in .pipelineRuns[].name, fan out a diagnosis:
+#    task tree + failed step + relevant log lines
+krci run get <name> --reason -o json
+```
+
+### *"What's the reason the pipeline is failing on PR 44?"*
+
+```bash
+# --reason on list targets the most recent matching run automatically,
+# so the agent never has to know the run name
+krci run list --project my-app --pr 44 --reason -o json
+```
+
+### *"Check quality gates for each of my projects"*
+
+```bash
+# sonar list already carries the per-project quality-gate verdict
+krci sonar list -o json | jq '.data.projects[] | {key, qualityGateStatus}'
+
+# Drill into any red ones
+krci sonar gate <key> -o json
+krci sonar issues <key> --severity BLOCKER,CRITICAL -o json
+```
+
+### *"Is `keycloak-operator` healthy right now?"*
+
+```bash
+# One-shot snapshot: measures + gate + top offenders
+krci sonar get keycloak-operator -o json
+krci sonar issues keycloak-operator --severity BLOCKER,CRITICAL -o json
+```
+
+### Target state
+
+Questions we want the agent to answer next, keeping the same
+list-then-drill pattern:
+
+```bash
+# "On which environments is version 1.4.2 of payments-api deployed?"
+# "Which deployments include the payments-api application?"
+# "Show me the promotion history for my-pipeline."
+```
 
 Why this works: the CLI only talks to the KubeRocketCI Portal (no direct
 cluster access), tokens stay encrypted on disk, and the JSON shapes are
