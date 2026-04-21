@@ -361,6 +361,48 @@ func TestMapK8sPipelineRunInfo_Labels(t *testing.T) {
 	assert.Equal(t, "review-pipeline", got.Pipeline)
 }
 
+func TestParseResultAnnotations(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		raw  string
+		want map[string]string
+	}{
+		{name: "empty input", raw: "", want: nil},
+		{name: "invalid JSON", raw: "not json", want: nil},
+		{
+			name: "skips empty, null, and template placeholders",
+			raw: `{
+				"a": "kept",
+				"b": "",
+				"c": null,
+				"d": "${tt.params.foo}",
+				"e": 42
+			}`,
+			want: map[string]string{"a": "kept"},
+		},
+		{
+			name: "realistic blob",
+			raw: `{
+				"app.edp.epam.com/git-author": "bob",
+				"app.edp.epam.com/git-change-number": "99"
+			}`,
+			want: map[string]string{
+				"app.edp.epam.com/git-author":        "bob",
+				"app.edp.epam.com/git-change-number": "99",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, parseResultAnnotations(tt.raw))
+		})
+	}
+}
+
 // --- mapPipelineRunInfo (Tekton Results source) ---
 
 // TestMapPipelineRunInfo_PrefersSummaryStartTime verifies that StartTime comes
@@ -773,4 +815,149 @@ func TestList_RunningFilterSkipsResults(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result.PipelineRuns, 1)
 	assert.Equal(t, StatusRunning, result.PipelineRuns[0].Status)
+}
+
+// End-to-end guard that enriched columns survive the full HTTP→client→mapper decode path.
+func TestList_EnrichedFieldsFromWireBytes(t *testing.T) {
+	t.Parallel()
+
+	// Raw body mirroring the portal's /v1/resources/list shape for a review
+	// PipelineRun: EDP labels on metadata.labels, git URLs on metadata.annotations.
+	k8sBody := `{
+		"apiVersion": "v1",
+		"kind": "List",
+		"metadata": {},
+		"items": [{
+			"apiVersion": "tekton.dev/v1",
+			"kind": "PipelineRun",
+			"metadata": {
+				"name": "review-my-app-main-abc12",
+				"namespace": "test-ns",
+				"creationTimestamp": "2024-01-01T09:59:00Z",
+				"labels": {
+					"app.edp.epam.com/codebase":          "my-app",
+					"app.edp.epam.com/pipelinetype":      "review",
+					"app.edp.epam.com/git-branch":        "feature-x",
+					"app.edp.epam.com/git-author":        "alice",
+					"app.edp.epam.com/git-change-number": "42",
+					"app.edp.epam.com/git-target-branch": "main"
+				},
+				"annotations": {
+					"app.edp.epam.com/git-change-url": "https://github.com/org/my-app/pull/42",
+					"app.edp.epam.com/git-commit-sha": "deadbeefcafef00d"
+				}
+			},
+			"spec": {"pipelineRef": {"name": "review-pipeline"}},
+			"status": {
+				"startTime": "2024-01-01T10:00:00Z",
+				"completionTime": "2024-01-01T10:03:00Z",
+				"conditions": [{"type": "Succeeded", "status": "True"}]
+			}
+		}]
+	}`
+
+	s := newMockPortal(t, pathHandlers{
+		"/v1/resources/list": func(w http.ResponseWriter, _ *http.Request) { writeJSONOK(w, k8sBody) },
+		"/v1/pipeline-runs":  func(w http.ResponseWriter, _ *http.Request) { writeJSONOK(w, `{"results":[]}`) },
+	})
+
+	result, err := s.List(context.Background(), PipelineRunListOptions{})
+	require.NoError(t, err)
+	require.Len(t, result.PipelineRuns, 1)
+
+	got := result.PipelineRuns[0]
+	assert.Equal(t, "review-my-app-main-abc12", got.Name)
+	assert.Equal(t, StatusSucceeded, got.Status)
+	assert.Equal(t, "review-pipeline", got.Pipeline)
+	assert.Equal(t, "my-app", got.Project)
+	assert.Equal(t, "review", got.Type)
+	assert.Equal(t, "feature-x", got.Branch)
+	assert.Equal(t, "alice", got.Author)
+	assert.Equal(t, "42", got.PRNumber)
+	assert.Equal(t, "main", got.TargetBranch)
+	assert.Equal(t, "https://github.com/org/my-app/pull/42", got.PRURL)
+	assert.Equal(t, "deadbeefcafef00d", got.CommitSHA)
+	assert.Equal(t, "2024-01-01T10:00:00Z", got.StartTime)
+	assert.Equal(t, "3m 0s", got.Duration)
+}
+
+// End-to-end guard for the resultAnnotations JSON blob path: git metadata only
+// lives inside `results.tekton.dev/resultAnnotations`, no top-level labels.
+// Mirrors what modern EDP pipeline templates emit for in-flight runs.
+func TestList_ResultAnnotationsFromWireBytes(t *testing.T) {
+	t.Parallel()
+
+	k8sBody := `{
+		"apiVersion": "v1",
+		"kind": "List",
+		"metadata": {},
+		"items": [{
+			"apiVersion": "tekton.dev/v1",
+			"kind": "PipelineRun",
+			"metadata": {
+				"name": "review-my-app-main-8j8jt",
+				"namespace": "test-ns",
+				"labels": {
+					"app.edp.epam.com/codebase":     "my-app",
+					"app.edp.epam.com/pipelinetype": "review"
+				},
+				"annotations": {
+					"results.tekton.dev/resultAnnotations": "{\"app.edp.epam.com/git-branch\":\"TICKET-1234\",\"app.edp.epam.com/git-author\":\"alice\",\"app.edp.epam.com/git-change-number\":\"3112\",\"app.edp.epam.com/git-change-url\":\"https://gitlab/ns/repo/-/merge_requests/3112\",\"app.edp.epam.com/git-commit-sha\":\"abc123\",\"app.edp.epam.com/git-target-branch\":\"main\"}"
+				}
+			},
+			"status": {
+				"startTime": "2024-01-01T10:00:00Z",
+				"conditions": [{"type": "Succeeded", "status": "Unknown"}]
+			}
+		}]
+	}`
+
+	s := newMockPortal(t, pathHandlers{
+		"/v1/resources/list": func(w http.ResponseWriter, _ *http.Request) { writeJSONOK(w, k8sBody) },
+		"/v1/pipeline-runs": func(_ http.ResponseWriter, _ *http.Request) {
+			t.Error("Tekton Results must not be called when filter=running")
+		},
+	})
+
+	result, err := s.List(context.Background(), PipelineRunListOptions{
+		Filter: PipelineRunFilter{Status: strings.ToLower(StatusRunning)},
+	})
+	require.NoError(t, err)
+	require.Len(t, result.PipelineRuns, 1)
+
+	got := result.PipelineRuns[0]
+	assert.Equal(t, "my-app", got.Project)
+	assert.Equal(t, "review", got.Type)
+	assert.Equal(t, "TICKET-1234", got.Branch)
+	assert.Equal(t, "alice", got.Author)
+	assert.Equal(t, "3112", got.PRNumber)
+	assert.Equal(t, "https://gitlab/ns/repo/-/merge_requests/3112", got.PRURL)
+	assert.Equal(t, "abc123", got.CommitSHA)
+	assert.Equal(t, "main", got.TargetBranch)
+}
+
+func TestList_CreationTimestampFallbackFromWireBytes(t *testing.T) {
+	t.Parallel()
+
+	k8sBody := `{
+		"apiVersion": "v1",
+		"kind": "List",
+		"metadata": {},
+		"items": [{
+			"metadata": {
+				"name": "run-fresh",
+				"creationTimestamp": "2024-01-01T09:58:00Z"
+			}
+		}]
+	}`
+
+	s := newMockPortal(t, pathHandlers{
+		"/v1/resources/list": func(w http.ResponseWriter, _ *http.Request) { writeJSONOK(w, k8sBody) },
+		"/v1/pipeline-runs":  func(w http.ResponseWriter, _ *http.Request) { writeJSONOK(w, `{"results":[]}`) },
+	})
+
+	result, err := s.List(context.Background(), PipelineRunListOptions{})
+	require.NoError(t, err)
+	require.Len(t, result.PipelineRuns, 1)
+	assert.Equal(t, "2024-01-01T09:58:00Z", result.PipelineRuns[0].StartTime)
 }

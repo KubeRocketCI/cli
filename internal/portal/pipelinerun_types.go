@@ -7,16 +7,17 @@ import (
 
 // Tekton Result annotation keys.
 const (
-	annotationCodebase        = "app.edp.epam.com/codebase"
-	annotationPipelineType    = "app.edp.epam.com/pipelinetype"
-	annotationGitChangeNumber = "app.edp.epam.com/git-change-number"
-	annotationGitChangeURL    = "app.edp.epam.com/git-change-url"
-	annotationGitAuthor       = "app.edp.epam.com/git-author"
-	annotationGitBranch       = "app.edp.epam.com/git-branch"
-	annotationGitTargetBranch = "app.edp.epam.com/git-target-branch"
-	annotationGitCommitSHA    = "app.edp.epam.com/git-commit-sha"
-	annotationPipeline        = "tekton.dev/pipeline"
-	annotationObjectName      = "object.metadata.name"
+	annotationCodebase          = "app.edp.epam.com/codebase"
+	annotationPipelineType      = "app.edp.epam.com/pipelinetype"
+	annotationGitChangeNumber   = "app.edp.epam.com/git-change-number"
+	annotationGitChangeURL      = "app.edp.epam.com/git-change-url"
+	annotationGitAuthor         = "app.edp.epam.com/git-author"
+	annotationGitBranch         = "app.edp.epam.com/git-branch"
+	annotationGitTargetBranch   = "app.edp.epam.com/git-target-branch"
+	annotationGitCommitSHA      = "app.edp.epam.com/git-commit-sha"
+	annotationPipeline          = "tekton.dev/pipeline"
+	annotationObjectName        = "object.metadata.name"
+	annotationResultAnnotations = "results.tekton.dev/resultAnnotations"
 )
 
 const (
