@@ -3,239 +3,120 @@
 | :heavy_exclamation_mark: Please refer to the [KubeRocketCI documentation](https://docs.kuberocketci.io/) to get the notion of the main concepts and guidelines. |
 | --- |
 
-Command-line interface for the [KubeRocketCI](https://kuberocketci.io) platform — enables developers and AI agents to manage projects, deployments, and environments from the terminal.
+`krci` is the command-line companion for the [KubeRocketCI](https://kuberocketci.io)
+platform — inspect projects, deployments, pipeline runs, and SonarQube state
+straight from the terminal, with JSON output ready for agent workflows.
 
-## Overview
+## From chat to fix — CLI + AI agent
 
-`krci` is a CLI client that interacts with KubeRocketCI platform resources via the KubeRocketCI Portal API. It provides secure OIDC-based authentication and styled terminal output for human users, with JSON output for automation and AI agent workflows.
+`krci` is built to pair with an AI coding assistant (Claude Code, Cursor,
+Copilot CLI, etc.). Every data command emits predictable JSON under
+`-o json`, so an agent can call `krci` as a tool and reason about the
+results without scraping tables.
 
-## Features
+A typical day:
 
-- **Authentication** — OIDC Authorization Code + PKCE flow, encrypted token storage (AES-256-GCM), OS keyring integration
-- **Projects** — List and inspect Codebase resources
-- **Deployments** — List and inspect CDPipeline and Stage resources
-- **Pipeline Runs** — List, filter, diagnose failures, and stream logs
-- **Output** — Styled tables for terminals, plain text for pipes, JSON for automation
+1. **Triage** — *"Any red PRs for me today?"*
+   → agent runs `krci run list --author jane --status failed -o json`
+2. **Diagnose** — *"Why did `build-api-master-x1y2` fail?"*
+   → agent runs `krci run get build-api-master-x1y2 --reason -o json`,
+     reads the task tree, the failed step, and the relevant log lines
+3. **Gate-check** — *"Is PR 44 ready to merge?"*
+   → agent runs `krci sonar gate my-app --pull-request 44 -o json` and
+     `krci sonar issues my-app --pull-request 44 --severity BLOCKER,CRITICAL -o json`
+4. **Fix & verify** — agent proposes a patch from the evidence, you commit,
+   CI re-runs, agent re-checks the new run
 
-## Installation
+Why this works: the CLI only talks to the KubeRocketCI Portal (no direct
+cluster access), tokens stay encrypted on disk, and the JSON shapes are
+stable enough to treat `krci` as a first-class agent tool.
+
+## What it does
+
+| Area          | What you get                                                                     | Docs                                      |
+|---------------|----------------------------------------------------------------------------------|-------------------------------------------|
+| Authentication | OIDC + PKCE browser flow, AES-256-GCM token storage, OS keyring integration      | [`docs/auth.md`](docs/auth.md)            |
+| Projects       | List and inspect `Codebase` resources                                            | [`docs/project.md`](docs/project.md)      |
+| Deployments    | Inspect `CDPipeline` resources, their apps, environments, and promotion gates    | [`docs/deployment.md`](docs/deployment.md)|
+| Pipeline runs  | List, filter, stream logs, and diagnose failures across Tekton runs              | [`docs/pipelinerun.md`](docs/pipelinerun.md) |
+| SonarQube      | Projects, quality gates, measures, and issues via the Portal's Sonar binding     | [`docs/sonar.md`](docs/sonar.md)          |
+
+Every data command accepts `-o table` (default) or `-o json`. Tables render
+nicely on a TTY, plain text into pipes, JSON for automation.
+
+## Install
 
 ```bash
 brew tap KubeRocketCI/homebrew-tap
 brew install krci
 ```
 
-Or download a binary from [GitHub Releases](https://github.com/KubeRocketCI/cli/releases).
+Or grab a binary from [GitHub Releases](https://github.com/KubeRocketCI/cli/releases).
 
-## Quick Start
+## 30-second tour
 
 ```bash
-# Authenticate with your KubeRocketCI instance
+# Sign in
 krci auth login --portal-url https://portal.example.com
 
-# Check auth status
-krci auth status
-
-# List projects
+# See what's there
 krci project list
-
-# Get project details
-krci project get my-app
-
-# List deployments
 krci deployment list
+krci pipelinerun list --project keycloak-operator
 
-# Get deployment details
-krci deployment get my-pipeline
+# Diagnose a failing run
+krci run list --project keycloak-operator --pr 336 --reason
 
-# List recent pipeline runs
-krci pipelinerun list
-
-# Filter by project, PR, status, author, type
-krci pipelinerun list --project my-app --pr 44
-krci pipelinerun list --status failed --type review
-krci pipelinerun list --project my-app --author "John Doe"
-
-# Diagnose why a pipeline failed
-krci pipelinerun list --project my-app --pr 44 --reason
-
-# Get a specific pipeline run's logs
-krci pipelinerun get review-my-app-main-a1b2c3 --logs
-
-# JSON output for scripting
-krci project list -o json
+# Check a SonarQube gate
+krci sonar gate keycloak-operator
 ```
+
+Each command has a `--help` page. Deeper walk-throughs live in `docs/` —
+start with the area you care about.
 
 ## Commands
 
 ```
 krci [--portal-url <url>]
-  auth login              Authenticate via browser (OIDC)
-  auth status             Show authentication state
-  auth logout             Clear stored credentials
-  project list|ls         List projects
-  project get <name>      Show project details
-  deployment list|ls      List deployments
-  deployment get <name>   Show deployment details
-  pipelinerun list|ls     List and filter pipeline runs
-  pipelinerun get <name>  Get a specific pipeline run
-  version                 Print version info
+  auth        login | status | logout
+  project     list | get <name>
+  deployment  list | get <name>
+  pipelinerun list | get <name>       (also filters, --logs, --reason)
+  sonar       list | get | gate | issues <project>
+  version
 ```
 
 **Aliases:** `project` → `proj`, `deployment` → `dp`, `pipelinerun` → `run`
 
-### Pipeline Run Filters
-
-All filters combine with AND logic.
-
-| Flag        | Description                                                       |
-|-------------|-------------------------------------------------------------------|
-| `--project` | Filter by project name                                            |
-| `--pr`      | Filter by pull request number                                     |
-| `--author`  | Filter by author name                                             |
-| `--branch`  | Filter by source branch                                           |
-| `--type`    | Filter by type (review, build, deploy, release)                   |
-| `--status`  | Filter by status (succeeded, failed, running, timeout, cancelled) |
-| `--logs`    | Append logs for the most recent run                               |
-| `--reason`  | Show task tree and failure diagnosis                              |
-
-## Inspecting a Specific Pipeline Run
-
-Use `get` to inspect a specific run by name (from `list -o json` or the table output):
-
-```bash
-# Basic info
-krci run get review-my-app-main-a1b2c3
-
-# Full logs
-krci run get review-my-app-main-a1b2c3 --logs
-
-# Failure diagnosis (task tree + failed step + logs)
-krci run get review-my-app-main-a1b2c3 --reason
-```
-
-## Diagnosing Failed Pipelines
-
-Use `--reason` on either `list` or `get` for a full diagnosis — task tree, failed step, and relevant logs:
-
-```bash
-# From the list (targets most recent run matching filters)
-krci run list --project my-app --pr 44 --reason
-
-# Or by specific name
-krci run get review-my-app-main-a1b2c3 --reason
-```
-
-```bash
-Pipeline: review-my-app-main-a1b2c3
-  Status:   Failed
-  Duration: 3m 14s
-
-Tasks:
-  ✓ fetch-repository             Succeeded   11s
-  ✓ build                        Succeeded   2m 8s
-  ✗ sonar                        Failed      52s
-  ✓ helm-lint                    Succeeded   8s
-
-Failed: sonar
-  Step:    sonar-scanner (exit code 2)
-  Message: "step-sonar-scanner" exited with code 2
-
-Logs: sonar
-  [sonar-scanner] ERROR: QUALITY GATE STATUS: FAILED
-```
-
-For AI agents, use JSON output and filter failed tasks:
-
-```bash
-krci run get review-my-app-main-a1b2c3 --reason -o json | jq '.tasks[] | select(.failedStep)'
-```
-
-### Global Flag
+## Configuration
 
 | Flag           | Env               | Description             |
 |----------------|-------------------|-------------------------|
 | `--portal-url` | `KRCI_PORTAL_URL` | KubeRocketCI Portal URL |
 
-All other settings (issuer URL, cluster name, namespace) are auto-discovered on login.
+Issuer URL, cluster name, and namespace are auto-discovered from the
+Portal on `auth login`.
 
-### Output Flag
+| Path                         | Purpose                                     |
+|------------------------------|---------------------------------------------|
+| `~/.config/krci/config.yaml` | Portal URL and discovered metadata          |
+| `~/.config/krci/tokens.enc`  | AES-encrypted tokens; key lives in keyring  |
 
-All data commands accept `-o, --output` with values `table` (default) or `json`.
-
-## Configuration
-
-Config file: `~/.config/krci/config.yaml` (auto-populated on login).
-Token storage: `~/.config/krci/tokens.enc` (AES-encrypted, key in OS keyring).
-
-## Local Development
-
-### Prerequisites
-
-1. A running KubeRocketCI portal backend (port 3001)
-2. The portal's `.env` configured with a valid `OIDC_ISSUER_URL` (e.g. your Keycloak realm)
-
-Start the portal:
+## Build from source
 
 ```bash
-cd krci-portal
-cp .env.example .env   # fill in OIDC_ISSUER_URL, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET
-pnpm dev
+make build        # → dist/krci
+make ci           # lint → test → build
 ```
 
-The backend starts at `http://localhost:3001`. The Vite dev server (port 5173)
-only proxies `/api` — the CLI uses `/rest/v1/` endpoints, so it must talk to
-port 3001 directly.
-
-### Build the CLI
-
-```bash
-make build    # → dist/krci
-```
-
-### Login
-
-The portal runs over HTTP, so the CLI cannot auto-discover the OIDC issuer or
-cluster metadata. Supply all values upfront via environment variables (copy
-`OIDC_ISSUER_URL` from the portal's `.env` or its startup output):
-
-```bash
-KRCI_ISSUER_URL=https://idp.example.com/realms/my-realm \
-KRCI_CLUSTER_NAME=my-cluster \
-KRCI_NAMESPACE=my-namespace \
-  ./dist/krci auth login --portal-url http://localhost:3001
-```
-
-A browser window opens for authentication. On success:
-
-```
-Logged in as user@example.com (User Name)
-```
-
-All values are saved to `~/.config/krci/config.yaml`, so subsequent commands
-need no flags or environment variables:
-
-```bash
-./dist/krci project list
-./dist/krci deployment list
-./dist/krci pipelinerun list --project my-app --reason
-```
-
-## Prerequisites
-
-- Go 1.26+ (for building from source)
-- Access to a KubeRocketCI instance with an OIDC provider configured
-
-## Building
-
-```bash
-make build
-```
+Requires Go 1.26+. For running against a local portal, see
+[`docs/development.md`](docs/development.md).
 
 ## License
 
 [Apache License 2.0](LICENSE)
 
-### Related Articles
+## Related reading
 
 - [KubeRocketCI Documentation](https://docs.kuberocketci.io/)
 - [Developer Guide](https://docs.kuberocketci.io/docs/next/developer-guide)
