@@ -540,39 +540,32 @@ func TestMergePipelineRuns(t *testing.T) {
 	}
 }
 
-// TestMergePipelineRuns_ExpansionAttachment verifies that expansion data (logs/tasks)
-// is NOT attached when a history run sorts to top but was NOT the run whose expansion
-// was fetched (i.e., historyResult.PipelineRuns[0] differs from allRuns[0]).
-func TestMergePipelineRuns_ExpansionAttachment(t *testing.T) {
+// TestMergePipelineRuns_TopIsMostRecent verifies that after merging live (K8s) and
+// history (Tekton Results) runs, the top entry is the most recent by StartTime.
+// Expansion (logs/tasks) is fetched by name for allRuns[0] in List, so this is the
+// only ordering invariant the merge needs to guarantee.
+func TestMergePipelineRuns_TopIsMostRecent(t *testing.T) {
 	t.Parallel()
 
-	// History has two entries; expansion was fetched for entry[0] ("run-h1").
-	// A live run sorts ahead of "run-h1" so "run-h1" is NOT allRuns[0].
 	live := []PipelineRunInfo{
 		{Name: "run-live", StartTime: "2024-01-01T12:00:00Z"},
 	}
 	history := []PipelineRunInfo{
-		{Name: "run-h1", StartTime: "2024-01-01T11:00:00Z"}, // expansion fetched for this
+		{Name: "run-h1", StartTime: "2024-01-01T11:00:00Z"},
 		{Name: "run-h2", StartTime: "2024-01-01T10:00:00Z"},
 	}
 
 	allRuns := mergePipelineRuns(live, history)
 
 	require.Len(t, allRuns, 3)
-	// run-live is first — different from history[0] ("run-h1")
-	assert.Equal(t, "run-live", allRuns[0].Name)
+	assert.Equal(t, "run-live", allRuns[0].Name, "most recent run must be first regardless of source")
+	assert.Equal(t, "run-h1", allRuns[1].Name)
+	assert.Equal(t, "run-h2", allRuns[2].Name)
 
-	// Simulate what List does with the expansion guard.
-	historyFirstName := history[0].Name
-	shouldAttach := len(allRuns) > 0 && len(history) > 0 && allRuns[0].Name == historyFirstName
-	assert.False(t, shouldAttach, "expansion must NOT be attached when live run sorted ahead")
-
-	// Scenario 2: no live run — history[0] stays at top → expansion SHOULD be attached.
+	// No live runs — history's most recent stays at top.
 	allRuns2 := mergePipelineRuns(nil, history)
 	require.Len(t, allRuns2, 2)
 	assert.Equal(t, "run-h1", allRuns2[0].Name)
-	shouldAttach2 := len(allRuns2) > 0 && len(history) > 0 && allRuns2[0].Name == historyFirstName
-	assert.True(t, shouldAttach2, "expansion SHOULD be attached when history[0] is still top")
 }
 
 // --- Sort precision regression ---
