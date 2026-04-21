@@ -1870,6 +1870,9 @@ type K8sGetResponse struct {
 	JSON500 *ErrorINTERNALSERVERERROR
 }
 type K8sGet_200_Metadata struct {
+	Annotations          *map[string]string     `json:"annotations,omitempty"`
+	CreationTimestamp    *string                `json:"creationTimestamp,omitempty"`
+	Labels               *map[string]string     `json:"labels,omitempty"`
 	Name                 string                 `json:"name"`
 	Namespace            *string                `json:"namespace,omitempty"`
 	ResourceVersion      *string                `json:"resourceVersion,omitempty"`
@@ -1907,6 +1910,9 @@ type K8sListResponse struct {
 	JSON500 *ErrorINTERNALSERVERERROR
 }
 type K8sList_200_Items_Metadata struct {
+	Annotations          *map[string]string     `json:"annotations,omitempty"`
+	CreationTimestamp    *string                `json:"creationTimestamp,omitempty"`
+	Labels               *map[string]string     `json:"labels,omitempty"`
 	Name                 string                 `json:"name"`
 	Namespace            *string                `json:"namespace,omitempty"`
 	ResourceVersion      *string                `json:"resourceVersion,omitempty"`
