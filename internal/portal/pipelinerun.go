@@ -1,7 +1,9 @@
 package portal
 
 import (
+	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -414,6 +416,16 @@ func mapK8sPipelineRunInfo(item *restapi.K8sList_200_Items_Item) PipelineRunInfo
 	if annotations := ptr.Deref(item.Metadata.Annotations, nil); annotations != nil {
 		info.PRURL = annotations[annotationGitChangeURL]
 		info.CommitSHA = annotations[annotationGitCommitSHA]
+
+		// Prefer values from the resultAnnotations blob — that's what the portal UI does.
+		if ra := parseResultAnnotations(annotations[annotationResultAnnotations]); ra != nil {
+			info.Branch = cmp.Or(ra[annotationGitBranch], info.Branch)
+			info.Author = cmp.Or(ra[annotationGitAuthor], info.Author)
+			info.PRNumber = cmp.Or(ra[annotationGitChangeNumber], info.PRNumber)
+			info.PRURL = cmp.Or(ra[annotationGitChangeURL], info.PRURL)
+			info.CommitSHA = cmp.Or(ra[annotationGitCommitSHA], info.CommitSHA)
+			info.TargetBranch = cmp.Or(ra[annotationGitTargetBranch], info.TargetBranch)
+		}
 	}
 
 	// pipelineRef lives under spec, not status, so it is available even before the reconciler runs.
@@ -474,6 +486,32 @@ func mapK8sPipelineRunInfo(item *restapi.K8sList_200_Items_Item) PipelineRunInfo
 	}
 
 	return info
+}
+
+// parseResultAnnotations decodes the results.tekton.dev/resultAnnotations JSON
+// blob into a flat map. Entries that are null, empty, or Tekton template
+// placeholders (e.g. "${tt.params.foo}") are skipped so callers never pick them
+// up as values. Returns nil on invalid JSON or empty input.
+func parseResultAnnotations(raw string) map[string]string {
+	if raw == "" {
+		return nil
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+		return nil
+	}
+
+	out := make(map[string]string, len(parsed))
+	for k, v := range parsed {
+		s, ok := v.(string)
+		if !ok || s == "" || strings.Contains(s, "${") {
+			continue
+		}
+		out[k] = s
+	}
+
+	return out
 }
 
 // fetchExpansion fetches optional task tree or logs for the given pipeline run result.
