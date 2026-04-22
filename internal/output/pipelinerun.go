@@ -39,7 +39,7 @@ func RenderReason(w io.Writer, result *portal.PipelineRunListResult) error {
 			return err
 		}
 
-		if _, err := fmt.Fprintln(w, SectionStyle.Render("Tasks:")); err != nil {
+		if _, err := lipgloss.Fprintln(w, SectionStyle.Render("Tasks:")); err != nil {
 			return err
 		}
 
@@ -62,7 +62,7 @@ func RenderReason(w io.Writer, result *portal.PipelineRunListResult) error {
 			continue
 		}
 
-		if _, err := fmt.Fprintln(w, SectionStyle.Render("Failed: "+t.Name)); err != nil {
+		if _, err := lipgloss.Fprintln(w, SectionStyle.Render("Failed: "+t.Name)); err != nil {
 			return err
 		}
 
@@ -89,7 +89,7 @@ func RenderReason(w io.Writer, result *portal.PipelineRunListResult) error {
 				return err
 			}
 
-			if _, err := fmt.Fprintln(w, SectionStyle.Render("Logs: "+t.Name)); err != nil {
+			if _, err := lipgloss.Fprintln(w, SectionStyle.Render("Logs: "+t.Name)); err != nil {
 				return err
 			}
 
@@ -116,13 +116,13 @@ func RenderNoTaskData(w io.Writer, status string) error {
 		msg = "Task data is not available. The run may not yet be indexed in Tekton Results."
 	}
 
-	_, err := fmt.Fprintln(w, DimStyle.Render(msg))
+	_, err := lipgloss.Fprintln(w, DimStyle.Render(msg))
 
 	return err
 }
 
 func renderRunHeader(w io.Writer, run *portal.PipelineRunInfo) error {
-	if _, err := fmt.Fprintln(w, SectionStyle.Render("Pipeline: "+run.Name)); err != nil {
+	if _, err := lipgloss.Fprintln(w, SectionStyle.Render("Pipeline: "+run.Name)); err != nil {
 		return err
 	}
 

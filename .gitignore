@@ -10,3 +10,8 @@ bin/
 # test coverage
 coverage.out
 coverage.html
+# e2e test fixtures with real portal data
+e2e/**/fixtures.env
+
+# local settings
+.claude/settings.local.json
