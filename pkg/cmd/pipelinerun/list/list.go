@@ -121,18 +121,21 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		return err
 	}
 
-	if len(result.PipelineRuns) == 0 {
-		_, err = lipgloss.Fprintln(opts.IO.Out, output.DimStyle.Render("No pipeline runs found"))
-
-		return err
-	}
-
 	if opts.IncludeReason {
 		output.TruncateTaskLogs(result)
 	}
 
+	// JSON consumers (jq, agents) depend on a stable envelope shape, so emit
+	// one even when the result is empty — before the human-readable
+	// "No pipeline runs found" short-circuit below.
 	if output.ResolveFormat(opts.OutputFormat) == output.FormatJSON {
 		return output.PrintJSON(opts.IO.Out, result)
+	}
+
+	if len(result.PipelineRuns) == 0 {
+		_, err = lipgloss.Fprintln(opts.IO.Out, output.DimStyle.Render("No pipeline runs found"))
+
+		return err
 	}
 
 	// --reason: pipeline info + task tree + failure details (no summary table).
