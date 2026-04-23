@@ -1333,6 +1333,496 @@
         }
       }
     },
+    "/v1/sca/list": {
+      "get": {
+        "operationId": "sca-list",
+        "tags": [
+          "sca"
+        ],
+        "description": "List Dependency-Track projects known to the Portal. Returns `{ items, totalCount }` envelope; an empty Dep-Track portfolio yields `items: []` with `totalCount: 0`. Authentication required (401 when the session/bearer token is missing). Upstream failures: 502 Bad Gateway when the Dep-Track instance is unreachable, 503 Service Unavailable when the Portal's DEPENDENCY_TRACK_URL / DEPENDENCY_TRACK_API_KEY environment is unset.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pageNumber",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          {
+            "in": "query",
+            "name": "searchTerm",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "onlyRoot",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "excludeInactive",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SCAListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.BAD_REQUEST"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization not provided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.UNAUTHORIZED"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream Dep-Track unreachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.INTERNAL_SERVER_ERROR"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dep-Track integration not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.INTERNAL_SERVER_ERROR"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.INTERNAL_SERVER_ERROR"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sca/get": {
+      "get": {
+        "operationId": "sca-get",
+        "tags": [
+          "sca"
+        ],
+        "description": "Return Dep-Track project overview for `(codebase, branch)`. When `branch` is omitted, the Portal resolves `Codebase.spec.defaultBranch` from the Kubernetes API and uses that value. A missing Codebase CR or empty `spec.defaultBranch` yields 404; a missing Dep-Track project yields 200 with `{ status: \"NONE\" }`. Authentication required. Upstream failures: 502 unreachable, 503 unconfigured.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "codebase",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "branch",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SCAGetResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.BAD_REQUEST"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization not provided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.UNAUTHORIZED"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Codebase not found or default branch missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.NOT_FOUND"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream Dep-Track unreachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.INTERNAL_SERVER_ERROR"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dep-Track integration not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.INTERNAL_SERVER_ERROR"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.INTERNAL_SERVER_ERROR"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sca/components": {
+      "get": {
+        "operationId": "sca-components",
+        "tags": [
+          "sca"
+        ],
+        "description": "Return paginated dependencies for `(codebase, branch)`. Branch resolution + NONE state semantics identical to `/v1/sca/get`. `onlyOutdated` / `onlyDirect` are forwarded to Dep-Track as server-side filters. Authentication required. Upstream failures: 502 / 503 as above.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "codebase",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "branch",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageNumber",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          {
+            "in": "query",
+            "name": "onlyOutdated",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "onlyDirect",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SCAComponentsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.BAD_REQUEST"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization not provided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.UNAUTHORIZED"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Codebase not found or default branch missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.NOT_FOUND"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream Dep-Track unreachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.INTERNAL_SERVER_ERROR"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dep-Track integration not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.INTERNAL_SERVER_ERROR"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.INTERNAL_SERVER_ERROR"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sca/findings": {
+      "get": {
+        "operationId": "sca-findings",
+        "tags": [
+          "sca"
+        ],
+        "description": "Return vulnerability findings for `(codebase, branch)`. Dep-Track returns all findings in a single upstream response; the Portal caps the response at 1000 rows and sets `truncated=true` when capped. Default excludes suppressed rows unless `suppressed=true`. Authentication required. Upstream failures: 502 / 503 as above.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "codebase",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "branch",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "suppressed",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SCAFindingsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.BAD_REQUEST"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization not provided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.UNAUTHORIZED"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Codebase not found or default branch missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.NOT_FOUND"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream Dep-Track unreachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.INTERNAL_SERVER_ERROR"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dep-Track integration not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.INTERNAL_SERVER_ERROR"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.INTERNAL_SERVER_ERROR"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/sonar/list": {
       "get": {
         "operationId": "sonar-list",
@@ -2056,6 +2546,316 @@
           "record",
           "type",
           "status"
+        ]
+      },
+      "SCAMetrics": {
+        "type": "object",
+        "description": "Vulnerability-count metrics for a project or component.",
+        "properties": {
+          "critical": {
+            "type": "integer"
+          },
+          "high": {
+            "type": "integer"
+          },
+          "medium": {
+            "type": "integer"
+          },
+          "low": {
+            "type": "integer"
+          },
+          "unassigned": {
+            "type": "integer"
+          },
+          "vulnerabilities": {
+            "type": "integer"
+          },
+          "components": {
+            "type": "integer"
+          },
+          "vulnerableComponents": {
+            "type": "integer"
+          }
+        }
+      },
+      "SCAProject": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "classifier": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "isLatest": {
+            "type": "boolean"
+          },
+          "lastBomImport": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lastBomImportFormat": {
+            "type": "string"
+          },
+          "lastVulnerabilityAnalysis": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "riskScore": {
+            "type": "number"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/SCAMetrics"
+          }
+        },
+        "required": [
+          "uuid",
+          "name",
+          "version"
+        ]
+      },
+      "SCAListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SCAProject"
+            }
+          },
+          "totalCount": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "totalCount"
+        ]
+      },
+      "SCAGetResponse": {
+        "type": "object",
+        "description": "Either `{ status: \"OK\", project, metrics }` or `{ status: \"NONE\" }` when the codebase has no Dep-Track binding.",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "OK",
+              "NONE"
+            ]
+          },
+          "project": {
+            "$ref": "#/components/schemas/SCAProject"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/SCAMetrics"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "SCAComponent": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "latestVersion": {
+            "type": "string"
+          },
+          "outdated": {
+            "type": "boolean"
+          },
+          "group": {
+            "type": "string"
+          },
+          "license": {
+            "type": "string"
+          },
+          "isInternal": {
+            "type": "boolean"
+          },
+          "riskScore": {
+            "type": "number"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/SCAMetrics"
+          }
+        },
+        "required": [
+          "uuid",
+          "name",
+          "version"
+        ]
+      },
+      "SCAComponentsResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "OK",
+              "NONE"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SCAComponent"
+            }
+          },
+          "totalCount": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "items",
+          "totalCount"
+        ]
+      },
+      "SCAFindingComponent": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "group": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "uuid",
+          "name"
+        ]
+      },
+      "SCAFindingVulnerability": {
+        "type": "object",
+        "properties": {
+          "vulnId": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "CRITICAL",
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "INFO",
+              "UNASSIGNED"
+            ]
+          },
+          "cvssV3BaseScore": {
+            "type": "number"
+          },
+          "cvssV2BaseScore": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "vulnId",
+          "source",
+          "severity"
+        ]
+      },
+      "SCAFindingAnalysis": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "isSuppressed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "state",
+          "isSuppressed"
+        ]
+      },
+      "SCAFindingAttribution": {
+        "type": "object",
+        "properties": {
+          "analyzerIdentity": {
+            "type": "string"
+          },
+          "attributedOn": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "SCAFinding": {
+        "type": "object",
+        "properties": {
+          "component": {
+            "$ref": "#/components/schemas/SCAFindingComponent"
+          },
+          "vulnerability": {
+            "$ref": "#/components/schemas/SCAFindingVulnerability"
+          },
+          "analysis": {
+            "$ref": "#/components/schemas/SCAFindingAnalysis"
+          },
+          "attribution": {
+            "$ref": "#/components/schemas/SCAFindingAttribution"
+          }
+        },
+        "required": [
+          "component",
+          "vulnerability",
+          "analysis"
+        ]
+      },
+      "SCAFindingsResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "OK",
+              "NONE"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SCAFinding"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "status",
+          "items",
+          "truncated"
         ]
       },
       "SonarGate": {

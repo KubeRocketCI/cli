@@ -1015,7 +1015,7 @@ func TestMapSonarIssueList_TagsNil(t *testing.T) {
 			{
 				Key:          "I1",
 				Rule:         "rule1",
-				Severity:     restapi.BLOCKER,
+				Severity:     restapi.SonarIssueSeverityBLOCKER,
 				Type:         restapi.BUG,
 				Status:       restapi.OPEN,
 				Component:    "comp",
@@ -1044,7 +1044,7 @@ func TestMapSonarIssueList_TagsNonNil(t *testing.T) {
 			{
 				Key:          "I2",
 				Rule:         "rule2",
-				Severity:     restapi.CRITICAL,
+				Severity:     restapi.SonarIssueSeverityCRITICAL,
 				Type:         restapi.VULNERABILITY,
 				Status:       restapi.OPEN,
 				Component:    "comp",

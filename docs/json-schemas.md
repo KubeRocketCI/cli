@@ -151,6 +151,166 @@ Enum values:
 - `type`: `BUG | VULNERABILITY | CODE_SMELL`
 - `status`: `OPEN | CONFIRMED | REOPENED | RESOLVED | CLOSED`
 
+## `krci sca list`
+
+```json
+{
+  "schemaVersion": "1",
+  "data": {
+    "items": [
+      {
+        "uuid": "550e8400-e29b-41d4-a716-446655440000",
+        "name": "payments-api",
+        "version": "main",
+        "classifier": "APPLICATION",
+        "active": true,
+        "isLatest": true,
+        "lastBomImport": 1713456000000,
+        "lastBomImportFormat": "CycloneDX 1.4",
+        "riskScore": 12.5,
+        "metrics": {
+          "critical": 1,
+          "high": 3,
+          "medium": 8,
+          "low": 2,
+          "unassigned": 0,
+          "vulnerabilities": 14
+        }
+      }
+    ],
+    "totalCount": 42
+  }
+}
+```
+
+`lastBomImport` is a Unix milliseconds timestamp. `metrics` is optional — the upstream
+payload omits it for projects that have never had a BOM uploaded; downstream consumers
+should guard on `.data.items[].metrics != null` before indexing counts.
+
+## `krci sca get <codebase>`
+
+Two variants: `status: "OK"` when the codebase has a Dep-Track project; `status: "NONE"`
+when the Portal's lookup returned no project for the resolved `(name, branch)` pair.
+
+```json
+{
+  "schemaVersion": "1",
+  "data": {
+    "status": "OK",
+    "project": {
+      "uuid": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "payments-api",
+      "version": "main",
+      "classifier": "APPLICATION",
+      "active": true,
+      "isLatest": true,
+      "lastBomImport": 1713456000000,
+      "lastBomImportFormat": "CycloneDX 1.4",
+      "lastVulnerabilityAnalysis": 1713459600000,
+      "riskScore": 12.5
+    },
+    "metrics": {
+      "critical": 1,
+      "high": 3,
+      "medium": 8,
+      "low": 2,
+      "unassigned": 0,
+      "vulnerabilities": 14,
+      "components": 120,
+      "vulnerableComponents": 12
+    }
+  }
+}
+```
+
+```json
+{ "schemaVersion": "1", "data": { "status": "NONE" } }
+```
+
+When `status` is `"NONE"` the `project` and `metrics` fields are absent. CLI exit is `0`
+in both cases.
+
+## `krci sca components <codebase>`
+
+```json
+{
+  "schemaVersion": "1",
+  "data": {
+    "status": "OK",
+    "items": [
+      {
+        "uuid": "5c0e...",
+        "name": "log4j-core",
+        "version": "2.11.2",
+        "latestVersion": "2.24.0",
+        "outdated": true,
+        "group": "org.apache.logging.log4j",
+        "license": "Apache-2.0",
+        "isInternal": false,
+        "riskScore": 9.8,
+        "metrics": {
+          "critical": 1,
+          "high": 0,
+          "medium": 0,
+          "low": 0,
+          "unassigned": 0,
+          "vulnerabilities": 1
+        }
+      }
+    ],
+    "totalCount": 120
+  }
+}
+```
+
+`status` is `"OK"` for a bound codebase and `"NONE"` for an unbound one (with
+`items: [], totalCount: 0`). `outdated` is a server-side flag from Dep-Track —
+no client-side semver comparison is performed. When `--severity=<min>` is passed,
+the CLI additionally filters client-side to rows whose metrics contain at least
+one finding of severity `>= min` (inclusive).
+
+## `krci sca findings <codebase>`
+
+```json
+{
+  "schemaVersion": "1",
+  "data": {
+    "status": "OK",
+    "items": [
+      {
+        "component": {
+          "uuid": "c1",
+          "name": "log4j-core",
+          "version": "2.11.2"
+        },
+        "vulnerability": {
+          "vulnId": "CVE-2021-44228",
+          "source": "NVD",
+          "severity": "CRITICAL",
+          "cvssV3BaseScore": 10.0
+        },
+        "analysis": { "state": "NOT_SET", "isSuppressed": false },
+        "attribution": {
+          "analyzerIdentity": "OSSINDEX_ANALYZER",
+          "attributedOn": 1713456000000
+        }
+      }
+    ],
+    "truncated": false
+  }
+}
+```
+
+Results are sorted by `vulnerability.severity` descending (CRITICAL first), then
+`component.name` ascending, then `vulnerability.vulnId` ascending. Default
+excludes suppressed findings; `--include-suppressed` opts in.
+
+The Portal caps the response at 1000 rows per request. When the upstream returned
+more, the CLI sets `truncated=true` and prints a footer hint in table output;
+scripts should branch on `.data.truncated` rather than counting rows.
+
+Severity enum: `CRITICAL | HIGH | MEDIUM | LOW | INFO | UNASSIGNED`.
+
 ## Error envelope
 
 ```json

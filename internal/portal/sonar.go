@@ -272,9 +272,9 @@ func (s *SonarService) Issues(ctx context.Context, params SonarIssuesParams) (*S
 		p.S = ptr.To(params.Sort)
 	}
 	if params.Asc != nil {
-		v := restapi.SonarIssuesParamsAscFalse
+		v := restapi.False
 		if *params.Asc {
-			v = restapi.SonarIssuesParamsAscTrue
+			v = restapi.True
 		}
 		p.Asc = &v
 	}

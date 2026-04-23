@@ -22,6 +22,34 @@ const (
 	BearerAuthScopes = "bearerAuth.Scopes"
 )
 
+// Defines values for SCAComponentsResponseStatus.
+const (
+	SCAComponentsResponseStatusNONE SCAComponentsResponseStatus = "NONE"
+	SCAComponentsResponseStatusOK   SCAComponentsResponseStatus = "OK"
+)
+
+// Defines values for SCAFindingVulnerabilitySeverity.
+const (
+	SCAFindingVulnerabilitySeverityCRITICAL   SCAFindingVulnerabilitySeverity = "CRITICAL"
+	SCAFindingVulnerabilitySeverityHIGH       SCAFindingVulnerabilitySeverity = "HIGH"
+	SCAFindingVulnerabilitySeverityINFO       SCAFindingVulnerabilitySeverity = "INFO"
+	SCAFindingVulnerabilitySeverityLOW        SCAFindingVulnerabilitySeverity = "LOW"
+	SCAFindingVulnerabilitySeverityMEDIUM     SCAFindingVulnerabilitySeverity = "MEDIUM"
+	SCAFindingVulnerabilitySeverityUNASSIGNED SCAFindingVulnerabilitySeverity = "UNASSIGNED"
+)
+
+// Defines values for SCAFindingsResponseStatus.
+const (
+	SCAFindingsResponseStatusNONE SCAFindingsResponseStatus = "NONE"
+	SCAFindingsResponseStatusOK   SCAFindingsResponseStatus = "OK"
+)
+
+// Defines values for SCAGetResponseStatus.
+const (
+	SCAGetResponseStatusNONE SCAGetResponseStatus = "NONE"
+	SCAGetResponseStatusOK   SCAGetResponseStatus = "OK"
+)
+
 // Defines values for SonarGateProjectStatusStatus.
 const (
 	SonarGateProjectStatusStatusERROR SonarGateProjectStatusStatus = "ERROR"
@@ -40,11 +68,11 @@ const (
 
 // Defines values for SonarIssueSeverity.
 const (
-	BLOCKER  SonarIssueSeverity = "BLOCKER"
-	CRITICAL SonarIssueSeverity = "CRITICAL"
-	INFO     SonarIssueSeverity = "INFO"
-	MAJOR    SonarIssueSeverity = "MAJOR"
-	MINOR    SonarIssueSeverity = "MINOR"
+	SonarIssueSeverityBLOCKER  SonarIssueSeverity = "BLOCKER"
+	SonarIssueSeverityCRITICAL SonarIssueSeverity = "CRITICAL"
+	SonarIssueSeverityINFO     SonarIssueSeverity = "INFO"
+	SonarIssueSeverityMAJOR    SonarIssueSeverity = "MAJOR"
+	SonarIssueSeverityMINOR    SonarIssueSeverity = "MINOR"
 )
 
 // Defines values for SonarIssueStatus.
@@ -73,10 +101,10 @@ const (
 
 // Defines values for SonarProjectDetailQualityGateStatus.
 const (
-	SonarProjectDetailQualityGateStatusERROR SonarProjectDetailQualityGateStatus = "ERROR"
-	SonarProjectDetailQualityGateStatusNONE  SonarProjectDetailQualityGateStatus = "NONE"
-	SonarProjectDetailQualityGateStatusOK    SonarProjectDetailQualityGateStatus = "OK"
-	SonarProjectDetailQualityGateStatusWARN  SonarProjectDetailQualityGateStatus = "WARN"
+	ERROR SonarProjectDetailQualityGateStatus = "ERROR"
+	NONE  SonarProjectDetailQualityGateStatus = "NONE"
+	OK    SonarProjectDetailQualityGateStatus = "OK"
+	WARN  SonarProjectDetailQualityGateStatus = "WARN"
 )
 
 // Defines values for TektonResultSummaryStatus.
@@ -88,6 +116,36 @@ const (
 	UNKNOWN   TektonResultSummaryStatus = "UNKNOWN"
 )
 
+// Defines values for ScaComponentsParamsOnlyOutdated.
+const (
+	ScaComponentsParamsOnlyOutdatedFalse ScaComponentsParamsOnlyOutdated = "false"
+	ScaComponentsParamsOnlyOutdatedTrue  ScaComponentsParamsOnlyOutdated = "true"
+)
+
+// Defines values for ScaComponentsParamsOnlyDirect.
+const (
+	ScaComponentsParamsOnlyDirectFalse ScaComponentsParamsOnlyDirect = "false"
+	ScaComponentsParamsOnlyDirectTrue  ScaComponentsParamsOnlyDirect = "true"
+)
+
+// Defines values for ScaFindingsParamsSuppressed.
+const (
+	ScaFindingsParamsSuppressedFalse ScaFindingsParamsSuppressed = "false"
+	ScaFindingsParamsSuppressedTrue  ScaFindingsParamsSuppressed = "true"
+)
+
+// Defines values for ScaListParamsOnlyRoot.
+const (
+	ScaListParamsOnlyRootFalse ScaListParamsOnlyRoot = "false"
+	ScaListParamsOnlyRootTrue  ScaListParamsOnlyRoot = "true"
+)
+
+// Defines values for ScaListParamsExcludeInactive.
+const (
+	ScaListParamsExcludeInactiveFalse ScaListParamsExcludeInactive = "false"
+	ScaListParamsExcludeInactiveTrue  ScaListParamsExcludeInactive = "true"
+)
+
 // Defines values for SonarIssuesParamsResolved.
 const (
 	SonarIssuesParamsResolvedFalse SonarIssuesParamsResolved = "false"
@@ -96,14 +154,136 @@ const (
 
 // Defines values for SonarIssuesParamsAsc.
 const (
-	SonarIssuesParamsAscFalse SonarIssuesParamsAsc = "false"
-	SonarIssuesParamsAscTrue  SonarIssuesParamsAsc = "true"
+	False SonarIssuesParamsAsc = "false"
+	True  SonarIssuesParamsAsc = "true"
 )
 
 // PipelineRunResultsResponse defines model for PipelineRunResultsResponse.
 type PipelineRunResultsResponse struct {
 	NextPageToken *string        `json:"nextPageToken,omitempty"`
 	Results       []TektonResult `json:"results"`
+}
+
+// SCAComponent defines model for SCAComponent.
+type SCAComponent struct {
+	Group         *string `json:"group,omitempty"`
+	IsInternal    *bool   `json:"isInternal,omitempty"`
+	LatestVersion *string `json:"latestVersion,omitempty"`
+	License       *string `json:"license,omitempty"`
+
+	// Metrics Vulnerability-count metrics for a project or component.
+	Metrics   *SCAMetrics `json:"metrics,omitempty"`
+	Name      string      `json:"name"`
+	Outdated  *bool       `json:"outdated,omitempty"`
+	RiskScore *float32    `json:"riskScore,omitempty"`
+	Uuid      string      `json:"uuid"`
+	Version   string      `json:"version"`
+}
+
+// SCAComponentsResponse defines model for SCAComponentsResponse.
+type SCAComponentsResponse struct {
+	Items      []SCAComponent              `json:"items"`
+	Status     SCAComponentsResponseStatus `json:"status"`
+	TotalCount int                         `json:"totalCount"`
+}
+
+// SCAComponentsResponseStatus defines model for SCAComponentsResponse.Status.
+type SCAComponentsResponseStatus string
+
+// SCAFinding defines model for SCAFinding.
+type SCAFinding struct {
+	Analysis      SCAFindingAnalysis      `json:"analysis"`
+	Attribution   *SCAFindingAttribution  `json:"attribution,omitempty"`
+	Component     SCAFindingComponent     `json:"component"`
+	Vulnerability SCAFindingVulnerability `json:"vulnerability"`
+}
+
+// SCAFindingAnalysis defines model for SCAFindingAnalysis.
+type SCAFindingAnalysis struct {
+	IsSuppressed bool   `json:"isSuppressed"`
+	State        string `json:"state"`
+}
+
+// SCAFindingAttribution defines model for SCAFindingAttribution.
+type SCAFindingAttribution struct {
+	AnalyzerIdentity *string `json:"analyzerIdentity,omitempty"`
+	AttributedOn     *int64  `json:"attributedOn,omitempty"`
+}
+
+// SCAFindingComponent defines model for SCAFindingComponent.
+type SCAFindingComponent struct {
+	Group   *string `json:"group,omitempty"`
+	Name    string  `json:"name"`
+	Uuid    string  `json:"uuid"`
+	Version *string `json:"version,omitempty"`
+}
+
+// SCAFindingVulnerability defines model for SCAFindingVulnerability.
+type SCAFindingVulnerability struct {
+	CvssV2BaseScore *float32                        `json:"cvssV2BaseScore,omitempty"`
+	CvssV3BaseScore *float32                        `json:"cvssV3BaseScore,omitempty"`
+	Severity        SCAFindingVulnerabilitySeverity `json:"severity"`
+	Source          string                          `json:"source"`
+	VulnId          string                          `json:"vulnId"`
+}
+
+// SCAFindingVulnerabilitySeverity defines model for SCAFindingVulnerability.Severity.
+type SCAFindingVulnerabilitySeverity string
+
+// SCAFindingsResponse defines model for SCAFindingsResponse.
+type SCAFindingsResponse struct {
+	Items     []SCAFinding              `json:"items"`
+	Status    SCAFindingsResponseStatus `json:"status"`
+	Truncated bool                      `json:"truncated"`
+}
+
+// SCAFindingsResponseStatus defines model for SCAFindingsResponse.Status.
+type SCAFindingsResponseStatus string
+
+// SCAGetResponse Either `{ status: "OK", project, metrics }` or `{ status: "NONE" }` when the codebase has no Dep-Track binding.
+type SCAGetResponse struct {
+	// Metrics Vulnerability-count metrics for a project or component.
+	Metrics *SCAMetrics          `json:"metrics,omitempty"`
+	Project *SCAProject          `json:"project,omitempty"`
+	Status  SCAGetResponseStatus `json:"status"`
+}
+
+// SCAGetResponseStatus defines model for SCAGetResponse.Status.
+type SCAGetResponseStatus string
+
+// SCAListResponse defines model for SCAListResponse.
+type SCAListResponse struct {
+	Items      []SCAProject `json:"items"`
+	TotalCount int          `json:"totalCount"`
+}
+
+// SCAMetrics Vulnerability-count metrics for a project or component.
+type SCAMetrics struct {
+	Components           *int `json:"components,omitempty"`
+	Critical             *int `json:"critical,omitempty"`
+	High                 *int `json:"high,omitempty"`
+	Low                  *int `json:"low,omitempty"`
+	Medium               *int `json:"medium,omitempty"`
+	Unassigned           *int `json:"unassigned,omitempty"`
+	Vulnerabilities      *int `json:"vulnerabilities,omitempty"`
+	VulnerableComponents *int `json:"vulnerableComponents,omitempty"`
+}
+
+// SCAProject defines model for SCAProject.
+type SCAProject struct {
+	Active                    *bool   `json:"active,omitempty"`
+	Classifier                *string `json:"classifier,omitempty"`
+	IsLatest                  *bool   `json:"isLatest,omitempty"`
+	LastBomImport             *int64  `json:"lastBomImport,omitempty"`
+	LastBomImportFormat       *string `json:"lastBomImportFormat,omitempty"`
+	LastVulnerabilityAnalysis *int64  `json:"lastVulnerabilityAnalysis,omitempty"`
+
+	// Metrics Vulnerability-count metrics for a project or component.
+	Metrics   *SCAMetrics `json:"metrics,omitempty"`
+	Name      string      `json:"name"`
+	RiskScore *float32    `json:"riskScore,omitempty"`
+	Uuid      string      `json:"uuid"`
+	Version   string      `json:"version"`
 }
 
 // SonarGate defines model for SonarGate.
@@ -482,6 +662,54 @@ type K8sListJSONBody struct {
 	} `json:"resourceConfig"`
 }
 
+// ScaComponentsParams defines parameters for ScaComponents.
+type ScaComponentsParams struct {
+	Codebase     string                           `form:"codebase" json:"codebase"`
+	Branch       *string                          `form:"branch,omitempty" json:"branch,omitempty"`
+	PageNumber   *int                             `form:"pageNumber,omitempty" json:"pageNumber,omitempty"`
+	PageSize     *int                             `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+	OnlyOutdated *ScaComponentsParamsOnlyOutdated `form:"onlyOutdated,omitempty" json:"onlyOutdated,omitempty"`
+	OnlyDirect   *ScaComponentsParamsOnlyDirect   `form:"onlyDirect,omitempty" json:"onlyDirect,omitempty"`
+}
+
+// ScaComponentsParamsOnlyOutdated defines parameters for ScaComponents.
+type ScaComponentsParamsOnlyOutdated string
+
+// ScaComponentsParamsOnlyDirect defines parameters for ScaComponents.
+type ScaComponentsParamsOnlyDirect string
+
+// ScaFindingsParams defines parameters for ScaFindings.
+type ScaFindingsParams struct {
+	Codebase   string                       `form:"codebase" json:"codebase"`
+	Branch     *string                      `form:"branch,omitempty" json:"branch,omitempty"`
+	Suppressed *ScaFindingsParamsSuppressed `form:"suppressed,omitempty" json:"suppressed,omitempty"`
+	Source     *string                      `form:"source,omitempty" json:"source,omitempty"`
+}
+
+// ScaFindingsParamsSuppressed defines parameters for ScaFindings.
+type ScaFindingsParamsSuppressed string
+
+// ScaGetParams defines parameters for ScaGet.
+type ScaGetParams struct {
+	Codebase string  `form:"codebase" json:"codebase"`
+	Branch   *string `form:"branch,omitempty" json:"branch,omitempty"`
+}
+
+// ScaListParams defines parameters for ScaList.
+type ScaListParams struct {
+	PageNumber      *int                          `form:"pageNumber,omitempty" json:"pageNumber,omitempty"`
+	PageSize        *int                          `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+	SearchTerm      *string                       `form:"searchTerm,omitempty" json:"searchTerm,omitempty"`
+	OnlyRoot        *ScaListParamsOnlyRoot        `form:"onlyRoot,omitempty" json:"onlyRoot,omitempty"`
+	ExcludeInactive *ScaListParamsExcludeInactive `form:"excludeInactive,omitempty" json:"excludeInactive,omitempty"`
+}
+
+// ScaListParamsOnlyRoot defines parameters for ScaList.
+type ScaListParamsOnlyRoot string
+
+// ScaListParamsExcludeInactive defines parameters for ScaList.
+type ScaListParamsExcludeInactive string
+
 // SonarGateParams defines parameters for SonarGate.
 type SonarGateParams struct {
 	ProjectKey  string  `form:"projectKey" json:"projectKey"`
@@ -635,6 +863,18 @@ type ClientInterface interface {
 
 	K8sList(ctx context.Context, body K8sListJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ScaComponents request
+	ScaComponents(ctx context.Context, params *ScaComponentsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ScaFindings request
+	ScaFindings(ctx context.Context, params *ScaFindingsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ScaGet request
+	ScaGet(ctx context.Context, params *ScaGetParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ScaList request
+	ScaList(ctx context.Context, params *ScaListParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// SonarGate request
 	SonarGate(ctx context.Context, params *SonarGateParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -749,6 +989,54 @@ func (c *Client) K8sListWithBody(ctx context.Context, contentType string, body i
 
 func (c *Client) K8sList(ctx context.Context, body K8sListJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewK8sListRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ScaComponents(ctx context.Context, params *ScaComponentsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewScaComponentsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ScaFindings(ctx context.Context, params *ScaFindingsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewScaFindingsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ScaGet(ctx context.Context, params *ScaGetParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewScaGetRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ScaList(ctx context.Context, params *ScaListParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewScaListRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -1158,6 +1446,398 @@ func NewK8sListRequestWithBody(server string, contentType string, body io.Reader
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewScaComponentsRequest generates requests for ScaComponents
+func NewScaComponentsRequest(server string, params *ScaComponentsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sca/components")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "codebase", runtime.ParamLocationQuery, params.Codebase); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		if params.Branch != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "branch", runtime.ParamLocationQuery, *params.Branch); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.PageNumber != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "pageNumber", runtime.ParamLocationQuery, *params.PageNumber); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.PageSize != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "pageSize", runtime.ParamLocationQuery, *params.PageSize); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.OnlyOutdated != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "onlyOutdated", runtime.ParamLocationQuery, *params.OnlyOutdated); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.OnlyDirect != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "onlyDirect", runtime.ParamLocationQuery, *params.OnlyDirect); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewScaFindingsRequest generates requests for ScaFindings
+func NewScaFindingsRequest(server string, params *ScaFindingsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sca/findings")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "codebase", runtime.ParamLocationQuery, params.Codebase); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		if params.Branch != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "branch", runtime.ParamLocationQuery, *params.Branch); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Suppressed != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "suppressed", runtime.ParamLocationQuery, *params.Suppressed); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Source != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "source", runtime.ParamLocationQuery, *params.Source); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewScaGetRequest generates requests for ScaGet
+func NewScaGetRequest(server string, params *ScaGetParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sca/get")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "codebase", runtime.ParamLocationQuery, params.Codebase); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		if params.Branch != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "branch", runtime.ParamLocationQuery, *params.Branch); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewScaListRequest generates requests for ScaList
+func NewScaListRequest(server string, params *ScaListParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sca/list")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.PageNumber != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "pageNumber", runtime.ParamLocationQuery, *params.PageNumber); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.PageSize != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "pageSize", runtime.ParamLocationQuery, *params.PageSize); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.SearchTerm != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "searchTerm", runtime.ParamLocationQuery, *params.SearchTerm); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.OnlyRoot != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "onlyRoot", runtime.ParamLocationQuery, *params.OnlyRoot); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ExcludeInactive != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "excludeInactive", runtime.ParamLocationQuery, *params.ExcludeInactive); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -1750,6 +2430,18 @@ type ClientWithResponsesInterface interface {
 
 	K8sListWithResponse(ctx context.Context, body K8sListJSONRequestBody, reqEditors ...RequestEditorFn) (*K8sListResponse, error)
 
+	// ScaComponentsWithResponse request
+	ScaComponentsWithResponse(ctx context.Context, params *ScaComponentsParams, reqEditors ...RequestEditorFn) (*ScaComponentsResponse, error)
+
+	// ScaFindingsWithResponse request
+	ScaFindingsWithResponse(ctx context.Context, params *ScaFindingsParams, reqEditors ...RequestEditorFn) (*ScaFindingsResponse, error)
+
+	// ScaGetWithResponse request
+	ScaGetWithResponse(ctx context.Context, params *ScaGetParams, reqEditors ...RequestEditorFn) (*ScaGetResponse, error)
+
+	// ScaListWithResponse request
+	ScaListWithResponse(ctx context.Context, params *ScaListParams, reqEditors ...RequestEditorFn) (*ScaListResponse, error)
+
 	// SonarGateWithResponse request
 	SonarGateWithResponse(ctx context.Context, params *SonarGateParams, reqEditors ...RequestEditorFn) (*SonarGateResponse, error)
 
@@ -1994,6 +2686,117 @@ func (r K8sListResponse) StatusCode() int {
 	return 0
 }
 
+type ScaComponentsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SCAComponentsResponse
+	JSON400      *ErrorBADREQUEST
+	JSON401      *ErrorUNAUTHORIZED
+	JSON404      *ErrorNOTFOUND
+	JSON500      *ErrorINTERNALSERVERERROR
+	JSON502      *ErrorINTERNALSERVERERROR
+	JSON503      *ErrorINTERNALSERVERERROR
+}
+
+// Status returns HTTPResponse.Status
+func (r ScaComponentsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ScaComponentsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ScaFindingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SCAFindingsResponse
+	JSON400      *ErrorBADREQUEST
+	JSON401      *ErrorUNAUTHORIZED
+	JSON404      *ErrorNOTFOUND
+	JSON500      *ErrorINTERNALSERVERERROR
+	JSON502      *ErrorINTERNALSERVERERROR
+	JSON503      *ErrorINTERNALSERVERERROR
+}
+
+// Status returns HTTPResponse.Status
+func (r ScaFindingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ScaFindingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ScaGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SCAGetResponse
+	JSON400      *ErrorBADREQUEST
+	JSON401      *ErrorUNAUTHORIZED
+	JSON404      *ErrorNOTFOUND
+	JSON500      *ErrorINTERNALSERVERERROR
+	JSON502      *ErrorINTERNALSERVERERROR
+	JSON503      *ErrorINTERNALSERVERERROR
+}
+
+// Status returns HTTPResponse.Status
+func (r ScaGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ScaGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ScaListResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SCAListResponse
+	JSON400      *ErrorBADREQUEST
+	JSON401      *ErrorUNAUTHORIZED
+	JSON500      *ErrorINTERNALSERVERERROR
+	JSON502      *ErrorINTERNALSERVERERROR
+	JSON503      *ErrorINTERNALSERVERERROR
+}
+
+// Status returns HTTPResponse.Status
+func (r ScaListResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ScaListResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type SonarGateResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -2213,6 +3016,42 @@ func (c *ClientWithResponses) K8sListWithResponse(ctx context.Context, body K8sL
 		return nil, err
 	}
 	return ParseK8sListResponse(rsp)
+}
+
+// ScaComponentsWithResponse request returning *ScaComponentsResponse
+func (c *ClientWithResponses) ScaComponentsWithResponse(ctx context.Context, params *ScaComponentsParams, reqEditors ...RequestEditorFn) (*ScaComponentsResponse, error) {
+	rsp, err := c.ScaComponents(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseScaComponentsResponse(rsp)
+}
+
+// ScaFindingsWithResponse request returning *ScaFindingsResponse
+func (c *ClientWithResponses) ScaFindingsWithResponse(ctx context.Context, params *ScaFindingsParams, reqEditors ...RequestEditorFn) (*ScaFindingsResponse, error) {
+	rsp, err := c.ScaFindings(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseScaFindingsResponse(rsp)
+}
+
+// ScaGetWithResponse request returning *ScaGetResponse
+func (c *ClientWithResponses) ScaGetWithResponse(ctx context.Context, params *ScaGetParams, reqEditors ...RequestEditorFn) (*ScaGetResponse, error) {
+	rsp, err := c.ScaGet(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseScaGetResponse(rsp)
+}
+
+// ScaListWithResponse request returning *ScaListResponse
+func (c *ClientWithResponses) ScaListWithResponse(ctx context.Context, params *ScaListParams, reqEditors ...RequestEditorFn) (*ScaListResponse, error) {
+	rsp, err := c.ScaList(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseScaListResponse(rsp)
 }
 
 // SonarGateWithResponse request returning *SonarGateResponse
@@ -2646,6 +3485,271 @@ func ParseK8sListResponse(rsp *http.Response) (*K8sListResponse, error) {
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseScaComponentsResponse parses an HTTP response from a ScaComponentsWithResponse call
+func ParseScaComponentsResponse(rsp *http.Response) (*ScaComponentsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ScaComponentsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SCAComponentsResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorBADREQUEST
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorUNAUTHORIZED
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorNOTFOUND
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON502 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseScaFindingsResponse parses an HTTP response from a ScaFindingsWithResponse call
+func ParseScaFindingsResponse(rsp *http.Response) (*ScaFindingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ScaFindingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SCAFindingsResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorBADREQUEST
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorUNAUTHORIZED
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorNOTFOUND
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON502 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseScaGetResponse parses an HTTP response from a ScaGetWithResponse call
+func ParseScaGetResponse(rsp *http.Response) (*ScaGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ScaGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SCAGetResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorBADREQUEST
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorUNAUTHORIZED
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorNOTFOUND
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON502 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseScaListResponse parses an HTTP response from a ScaListWithResponse call
+func ParseScaListResponse(rsp *http.Response) (*ScaListResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ScaListResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SCAListResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorBADREQUEST
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorUNAUTHORIZED
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON502 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 
