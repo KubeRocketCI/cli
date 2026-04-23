@@ -223,6 +223,28 @@ func PrintJSONErrorEnvelope(w io.Writer, schemaVersion string, err error) error 
 	})
 }
 
+// SCASeverityColor colorizes a Dep-Track vulnerability severity for TTY
+// rendering. Unknown severities pass through unstyled so future values never
+// break existing renderers.
+//
+//	CRITICAL  → red         HIGH      → yellow
+//	MEDIUM    → blue        LOW       → gray
+//	INFO      → gray        UNASSIGNED→ gray
+func SCASeverityColor(severity string) string {
+	switch strings.ToUpper(severity) {
+	case "CRITICAL":
+		return redStyle.Render(severity)
+	case "HIGH":
+		return yellowStyle.Render(severity)
+	case "MEDIUM":
+		return blueStyle.Render(severity)
+	case "LOW", "INFO", "UNASSIGNED":
+		return grayStyle.Render(severity)
+	default:
+		return severity
+	}
+}
+
 // SonarGateStatusColor colorizes a SonarQube quality-gate / issue status value.
 // Unknown values pass through unstyled.
 func SonarGateStatusColor(status portal.QualityGateStatus) string {

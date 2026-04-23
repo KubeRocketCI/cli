@@ -41,7 +41,7 @@ func fetchOIDCConfig(portalURL string) (string, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("OIDC config returned HTTP %d: %s", resp.StatusCode, truncate(body, 200))
+		return "", fmt.Errorf("OIDC config returned HTTP %d: %s", resp.StatusCode, truncateBody(body))
 	}
 
 	var result struct {

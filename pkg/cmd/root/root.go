@@ -10,6 +10,7 @@ import (
 	"github.com/KubeRocketCI/cli/pkg/cmd/deployment"
 	"github.com/KubeRocketCI/cli/pkg/cmd/pipelinerun"
 	"github.com/KubeRocketCI/cli/pkg/cmd/project"
+	"github.com/KubeRocketCI/cli/pkg/cmd/sca"
 	"github.com/KubeRocketCI/cli/pkg/cmd/sonar"
 	"github.com/KubeRocketCI/cli/pkg/cmd/version"
 )
@@ -43,6 +44,7 @@ func NewCmdRoot(f *cmdutil.Factory, v, commit, date string) *cobra.Command {
 		project.NewCmdProject(f),
 		deployment.NewCmdDeployment(f),
 		pipelinerun.NewCmdPipelineRun(f),
+		sca.NewCmdSca(f),
 		sonar.NewCmdSonar(f),
 		version.NewCmdVersion(f.IOStreams, v, commit, date),
 	)
