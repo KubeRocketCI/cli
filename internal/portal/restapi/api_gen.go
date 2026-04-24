@@ -107,15 +107,6 @@ const (
 	WARN  SonarProjectDetailQualityGateStatus = "WARN"
 )
 
-// Defines values for TektonResultSummaryStatus.
-const (
-	CANCELLED TektonResultSummaryStatus = "CANCELLED"
-	FAILURE   TektonResultSummaryStatus = "FAILURE"
-	SUCCESS   TektonResultSummaryStatus = "SUCCESS"
-	TIMEOUT   TektonResultSummaryStatus = "TIMEOUT"
-	UNKNOWN   TektonResultSummaryStatus = "UNKNOWN"
-)
-
 // Defines values for ScaComponentsParamsOnlyOutdated.
 const (
 	ScaComponentsParamsOnlyOutdatedFalse ScaComponentsParamsOnlyOutdated = "false"
@@ -157,12 +148,6 @@ const (
 	False SonarIssuesParamsAsc = "false"
 	True  SonarIssuesParamsAsc = "true"
 )
-
-// PipelineRunResultsResponse defines model for PipelineRunResultsResponse.
-type PipelineRunResultsResponse struct {
-	NextPageToken *string        `json:"nextPageToken,omitempty"`
-	Results       []TektonResult `json:"results"`
-}
 
 // SCAComponent defines model for SCAComponent.
 type SCAComponent struct {
@@ -514,30 +499,6 @@ type TaskRunStep struct {
 		Reason  *string `json:"reason,omitempty"`
 	} `json:"waiting,omitempty"`
 }
-
-// TektonResult defines model for TektonResult.
-type TektonResult struct {
-	Annotations *map[string]interface{} `json:"annotations,omitempty"`
-	CreateTime  string                  `json:"create_time"`
-	Etag        *string                 `json:"etag,omitempty"`
-	Name        string                  `json:"name"`
-	Summary     *TektonResultSummary    `json:"summary,omitempty"`
-	Uid         string                  `json:"uid"`
-	UpdateTime  string                  `json:"update_time"`
-}
-
-// TektonResultSummary defines model for TektonResultSummary.
-type TektonResultSummary struct {
-	Annotations *map[string]interface{}   `json:"annotations,omitempty"`
-	EndTime     *string                   `json:"end_time,omitempty"`
-	Record      string                    `json:"record"`
-	StartTime   *string                   `json:"start_time,omitempty"`
-	Status      TektonResultSummaryStatus `json:"status"`
-	Type        string                    `json:"type"`
-}
-
-// TektonResultSummaryStatus defines model for TektonResultSummary.Status.
-type TektonResultSummaryStatus string
 
 // ErrorBADREQUEST The error information
 type ErrorBADREQUEST struct {
@@ -2516,13 +2477,32 @@ func (r ConfigOidcResponse) StatusCode() int {
 type TektonResultsGetPipelineRunResultsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *PipelineRunResultsResponse
-	JSON400      *ErrorBADREQUEST
-	JSON401      *ErrorUNAUTHORIZED
-	JSON403      *ErrorFORBIDDEN
-	JSON404      *ErrorNOTFOUND
-	JSON500      *ErrorINTERNALSERVERERROR
+	JSON200      *struct {
+		NextPageToken *string `json:"nextPageToken,omitempty"`
+		Results       []struct {
+			Annotations *map[string]interface{} `json:"annotations,omitempty"`
+			CreateTime  string                  `json:"create_time"`
+			Etag        *string                 `json:"etag,omitempty"`
+			Name        string                  `json:"name"`
+			Summary     nullable.Nullable[struct {
+				Annotations *map[string]interface{}                                   `json:"annotations,omitempty"`
+				EndTime     nullable.Nullable[string]                                 `json:"end_time,omitempty"`
+				Record      string                                                    `json:"record"`
+				StartTime   nullable.Nullable[string]                                 `json:"start_time,omitempty"`
+				Status      TektonResultsGetPipelineRunResults200ResultsSummaryStatus `json:"status"`
+				Type        string                                                    `json:"type"`
+			}] `json:"summary,omitempty"`
+			Uid        string `json:"uid"`
+			UpdateTime string `json:"update_time"`
+		} `json:"results"`
+	}
+	JSON400 *ErrorBADREQUEST
+	JSON401 *ErrorUNAUTHORIZED
+	JSON403 *ErrorFORBIDDEN
+	JSON404 *ErrorNOTFOUND
+	JSON500 *ErrorINTERNALSERVERERROR
 }
+type TektonResultsGetPipelineRunResults200ResultsSummaryStatus string
 
 // Status returns HTTPResponse.Status
 func (r TektonResultsGetPipelineRunResultsResponse) Status() string {
@@ -3201,7 +3181,25 @@ func ParseTektonResultsGetPipelineRunResultsResponse(rsp *http.Response) (*Tekto
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest PipelineRunResultsResponse
+		var dest struct {
+			NextPageToken *string `json:"nextPageToken,omitempty"`
+			Results       []struct {
+				Annotations *map[string]interface{} `json:"annotations,omitempty"`
+				CreateTime  string                  `json:"create_time"`
+				Etag        *string                 `json:"etag,omitempty"`
+				Name        string                  `json:"name"`
+				Summary     nullable.Nullable[struct {
+					Annotations *map[string]interface{}                                   `json:"annotations,omitempty"`
+					EndTime     nullable.Nullable[string]                                 `json:"end_time,omitempty"`
+					Record      string                                                    `json:"record"`
+					StartTime   nullable.Nullable[string]                                 `json:"start_time,omitempty"`
+					Status      TektonResultsGetPipelineRunResults200ResultsSummaryStatus `json:"status"`
+					Type        string                                                    `json:"type"`
+				}] `json:"summary,omitempty"`
+				Uid        string `json:"uid"`
+				UpdateTime string `json:"update_time"`
+			} `json:"results"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

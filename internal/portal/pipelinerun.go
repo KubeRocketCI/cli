@@ -14,11 +14,57 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/oapi-codegen/nullable"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/internal/ptr"
 )
+
+// toTektonResult converts a generated Tekton Results record into the local
+// projection. Centralizing the generated anonymous-struct and nullable.Nullable
+// wrappers here keeps service code and tests on clean internal types; Go
+// structural identity makes the parameter match resp.JSON200.Results[i].
+func toTektonResult(gen *struct {
+	Annotations *map[string]any `json:"annotations,omitempty"`
+	CreateTime  string          `json:"create_time"`
+	Etag        *string         `json:"etag,omitempty"`
+	Name        string          `json:"name"`
+	Summary     nullable.Nullable[struct {
+		Annotations *map[string]any                                                   `json:"annotations,omitempty"`
+		EndTime     nullable.Nullable[string]                                         `json:"end_time,omitempty"`
+		Record      string                                                            `json:"record"`
+		StartTime   nullable.Nullable[string]                                         `json:"start_time,omitempty"`
+		Status      restapi.TektonResultsGetPipelineRunResults200ResultsSummaryStatus `json:"status"`
+		Type        string                                                            `json:"type"`
+	}] `json:"summary,omitempty"`
+	Uid        string `json:"uid"`
+	UpdateTime string `json:"update_time"`
+}) *tektonResult {
+	r := &tektonResult{
+		UID:         gen.Uid,
+		Name:        gen.Name,
+		CreateTime:  gen.CreateTime,
+		UpdateTime:  gen.UpdateTime,
+		Annotations: ptr.Deref(gen.Annotations, nil),
+	}
+
+	sum, err := gen.Summary.Get()
+	if err != nil {
+		return r
+	}
+
+	start, _ := sum.StartTime.Get()
+	end, _ := sum.EndTime.Get()
+	r.Summary = &tektonResultSummary{
+		Record:    sum.Record,
+		Status:    string(sum.Status),
+		StartTime: start,
+		EndTime:   end,
+	}
+
+	return r
+}
 
 var pipelineRunResourceConfig = restapi.K8sListJSONBody{
 	ResourceConfig: struct {
@@ -114,7 +160,8 @@ func (s *PipelineRunService) getFromResults(
 		return nil, fmt.Errorf("pipeline run %q: %w", name, ErrNotFound)
 	}
 
-	r := &resp.JSON200.Results[0]
+	r := toTektonResult(&resp.JSON200.Results[0])
+
 	info := mapPipelineRunInfo(r)
 	info.PortalURL = s.pipelineRunPortalURL(info.Name)
 
@@ -224,7 +271,7 @@ func (s *PipelineRunService) listFromResults(
 	runs := make([]PipelineRunInfo, 0, len(resp.JSON200.Results))
 
 	for i := range resp.JSON200.Results {
-		info := mapPipelineRunInfo(&resp.JSON200.Results[i])
+		info := mapPipelineRunInfo(toTektonResult(&resp.JSON200.Results[i]))
 		info.PortalURL = s.pipelineRunPortalURL(info.Name)
 		runs = append(runs, info)
 	}
@@ -541,7 +588,7 @@ func parseResultAnnotations(raw string) map[string]string {
 
 // fetchExpansion fetches optional task tree or logs for the given pipeline run result.
 func (s *PipelineRunService) fetchExpansion(
-	ctx context.Context, r *restapi.TektonResult, out *PipelineRunListResult, includeLogs, includeReason bool,
+	ctx context.Context, r *tektonResult, out *PipelineRunListResult, includeLogs, includeReason bool,
 ) error {
 	if includeReason {
 		return s.fetchReason(ctx, r, out)
@@ -559,7 +606,7 @@ func (s *PipelineRunService) fetchExpansion(
 	return nil
 }
 
-func (s *PipelineRunService) fetchLogs(ctx context.Context, r *restapi.TektonResult) (string, error) {
+func (s *PipelineRunService) fetchLogs(ctx context.Context, r *tektonResult) (string, error) {
 	if r.Summary == nil {
 		return "", nil
 	}
@@ -601,7 +648,7 @@ func (s *PipelineRunService) fetchLogs(ctx context.Context, r *restapi.TektonRes
 }
 
 func (s *PipelineRunService) fetchReason(
-	ctx context.Context, r *restapi.TektonResult, out *PipelineRunListResult,
+	ctx context.Context, r *tektonResult, out *PipelineRunListResult,
 ) error {
 	if r.Summary == nil {
 		return nil
@@ -765,15 +812,15 @@ func computeTaskDuration(t *restapi.TaskRun) string {
 }
 
 // mapPipelineRunInfo converts a Tekton Result to the display model.
-func mapPipelineRunInfo(r *restapi.TektonResult) PipelineRunInfo {
+func mapPipelineRunInfo(r *tektonResult) PipelineRunInfo {
 	name := resultAnnotation(r, annotationObjectName)
 	if name == "" {
-		name = r.Uid
+		name = r.UID
 	}
 
 	status := ""
 	if r.Summary != nil {
-		status = displayStatus(string(r.Summary.Status))
+		status = displayStatus(r.Summary.Status)
 	}
 
 	// Prefer summary.start_time (actual pipeline start) over create_time (when the
@@ -782,10 +829,8 @@ func mapPipelineRunInfo(r *restapi.TektonResult) PipelineRunInfo {
 	// use status.startTime and would sort alongside Results entries tagged with
 	// completion timestamps.
 	startTime := r.CreateTime
-	if r.Summary != nil {
-		if s := ptr.Deref(r.Summary.StartTime, ""); s != "" {
-			startTime = s
-		}
+	if r.Summary != nil && r.Summary.StartTime != "" {
+		startTime = r.Summary.StartTime
 	}
 
 	return PipelineRunInfo{
@@ -805,12 +850,12 @@ func mapPipelineRunInfo(r *restapi.TektonResult) PipelineRunInfo {
 	}
 }
 
-func computeDuration(r *restapi.TektonResult, startStr string) string {
-	if r.Summary == nil || string(r.Summary.Status) == resultStatusUnknown {
+func computeDuration(r *tektonResult, startStr string) string {
+	if r.Summary == nil || r.Summary.Status == resultStatusUnknown {
 		return ""
 	}
 
-	endStr := ptr.Deref(r.Summary.EndTime, "")
+	endStr := r.Summary.EndTime
 	if endStr == "" {
 		endStr = r.UpdateTime
 	}
