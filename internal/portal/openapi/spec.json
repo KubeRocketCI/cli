@@ -1707,6 +1707,14 @@
                 "false"
               ]
             }
+          },
+          {
+            "in": "query",
+            "name": "severity",
+            "description": "Comma-separated canonical Dep-Track severity set (CRITICAL,HIGH,MEDIUM,LOW,INFO,UNASSIGNED). Filter applied server-side across all components in the project before paginating. When set, response may include truncated=true if the auto-paging safety cap is reached.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2716,12 +2724,16 @@
           },
           "totalCount": {
             "type": "integer"
+          },
+          "truncated": {
+            "type": "boolean"
           }
         },
         "required": [
           "status",
           "items",
-          "totalCount"
+          "totalCount",
+          "truncated"
         ]
       },
       "SCAFindingComponent": {
