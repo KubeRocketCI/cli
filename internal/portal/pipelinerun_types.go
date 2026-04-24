@@ -79,13 +79,32 @@ func displayStatus(resultStatus string) string {
 
 const conditionSucceeded = "Succeeded"
 
-func resultAnnotation(r *restapi.TektonResult, key string) string {
-	annotations := ptr.Deref(r.Annotations, nil)
-	if annotations == nil {
+// tektonResult is a local projection of a Tekton Results record. The portal
+// inlines these fields into the response schema rather than exposing a named
+// component, so we copy them across the API boundary and keep the service code
+// and tests free of the generated anonymous struct.
+type tektonResult struct {
+	UID         string
+	Name        string
+	CreateTime  string
+	UpdateTime  string
+	Annotations map[string]any
+	Summary     *tektonResultSummary
+}
+
+type tektonResultSummary struct {
+	Record    string
+	Status    string
+	StartTime string
+	EndTime   string
+}
+
+func resultAnnotation(r *tektonResult, key string) string {
+	if r.Annotations == nil {
 		return ""
 	}
 
-	v, ok := annotations[key]
+	v, ok := r.Annotations[key]
 	if !ok {
 		return ""
 	}

@@ -416,16 +416,16 @@ func TestMapPipelineRunInfo_PrefersSummaryStartTime(t *testing.T) {
 	summaryStart := "2024-01-01T10:00:00Z"
 	recordCreate := "2024-01-01T10:05:00Z" // record stored 5 min after start
 
-	r := &restapi.TektonResult{
-		Uid:        "uuid-1",
+	r := &tektonResult{
+		UID:        "uuid-1",
 		Name:       "results/ns/records/r1",
 		CreateTime: recordCreate,
 		UpdateTime: "2024-01-01T10:05:00Z",
-		Summary: &restapi.TektonResultSummary{
+		Summary: &tektonResultSummary{
 			Record:    "results/ns/records/r1",
 			Status:    "SUCCESS",
-			StartTime: &summaryStart,
-			EndTime:   func() *string { s := "2024-01-01T10:04:30Z"; return &s }(),
+			StartTime: summaryStart,
+			EndTime:   "2024-01-01T10:04:30Z",
 		},
 	}
 
@@ -440,8 +440,8 @@ func TestMapPipelineRunInfo_FallsBackToCreateTime(t *testing.T) {
 
 	t.Run("no summary", func(t *testing.T) {
 		t.Parallel()
-		r := &restapi.TektonResult{
-			Uid:        "uuid-1",
+		r := &tektonResult{
+			UID:        "uuid-1",
 			Name:       "results/ns/records/r1",
 			CreateTime: "2024-01-01T10:05:00Z",
 			UpdateTime: "2024-01-01T10:05:00Z",
@@ -452,12 +452,12 @@ func TestMapPipelineRunInfo_FallsBackToCreateTime(t *testing.T) {
 
 	t.Run("summary without start_time", func(t *testing.T) {
 		t.Parallel()
-		r := &restapi.TektonResult{
-			Uid:        "uuid-1",
+		r := &tektonResult{
+			UID:        "uuid-1",
 			Name:       "results/ns/records/r1",
 			CreateTime: "2024-01-01T10:05:00Z",
 			UpdateTime: "2024-01-01T10:05:00Z",
-			Summary: &restapi.TektonResultSummary{
+			Summary: &tektonResultSummary{
 				Record: "results/ns/records/r1",
 				Status: "SUCCESS",
 			},

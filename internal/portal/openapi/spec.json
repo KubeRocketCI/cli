@@ -911,7 +911,88 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PipelineRunResultsResponse"
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "uid": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "create_time": {
+                            "type": "string"
+                          },
+                          "update_time": {
+                            "type": "string"
+                          },
+                          "summary": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "record": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "UNKNOWN",
+                                  "SUCCESS",
+                                  "FAILURE",
+                                  "TIMEOUT",
+                                  "CANCELLED"
+                                ],
+                                "default": "UNKNOWN"
+                              },
+                              "start_time": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "end_time": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "annotations": {
+                                "type": "object",
+                                "additionalProperties": {}
+                              }
+                            },
+                            "required": [
+                              "record",
+                              "type",
+                              "status"
+                            ]
+                          },
+                          "annotations": {
+                            "type": "object",
+                            "additionalProperties": {}
+                          },
+                          "etag": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "uid",
+                          "name",
+                          "create_time",
+                          "update_time"
+                        ]
+                      }
+                    },
+                    "nextPageToken": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "results"
+                  ]
                 }
               }
             }
@@ -2460,92 +2541,6 @@
         },
         "required": [
           "exitCode"
-        ]
-      },
-      "PipelineRunResultsResponse": {
-        "type": "object",
-        "properties": {
-          "results": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TektonResult"
-            }
-          },
-          "nextPageToken": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "results"
-        ]
-      },
-      "TektonResult": {
-        "type": "object",
-        "properties": {
-          "uid": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "create_time": {
-            "type": "string"
-          },
-          "update_time": {
-            "type": "string"
-          },
-          "summary": {
-            "$ref": "#/components/schemas/TektonResultSummary"
-          },
-          "annotations": {
-            "type": "object",
-            "additionalProperties": {}
-          },
-          "etag": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "uid",
-          "name",
-          "create_time",
-          "update_time"
-        ]
-      },
-      "TektonResultSummary": {
-        "type": "object",
-        "properties": {
-          "record": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "UNKNOWN",
-              "SUCCESS",
-              "FAILURE",
-              "TIMEOUT",
-              "CANCELLED"
-            ]
-          },
-          "start_time": {
-            "type": "string"
-          },
-          "end_time": {
-            "type": "string"
-          },
-          "annotations": {
-            "type": "object",
-            "additionalProperties": {}
-          }
-        },
-        "required": [
-          "record",
-          "type",
-          "status"
         ]
       },
       "SCAMetrics": {
