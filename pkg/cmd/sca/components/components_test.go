@@ -44,6 +44,9 @@ func TestComponents_RunFCapturesFlags(t *testing.T) {
 	if !captured.OnlyOutdated || captured.Branch != "main" || len(captured.Severity) != 1 {
 		t.Errorf("flag capture: %+v", captured)
 	}
+	if captured.Severity[0] != "high" {
+		t.Errorf("raw severity should be preserved on options; got %q", captured.Severity[0])
+	}
 }
 
 func TestComponents_PageBounds(t *testing.T) {
@@ -77,52 +80,41 @@ func TestComponents_RejectsPRFlag(t *testing.T) {
 	}
 }
 
-func TestApplySeverityFilter(t *testing.T) {
+func TestRenderTable_TruncatedFooter(t *testing.T) {
 	t.Parallel()
 
-	items := []portal.SCAComponent{
-		{Name: "a", Metrics: &portal.SCAMetrics{Critical: 1}},
-		{Name: "b", Metrics: &portal.SCAMetrics{Medium: 2}},
-		{Name: "c", Metrics: &portal.SCAMetrics{Low: 1}},
-		{Name: "d", Metrics: nil},
+	var buf bytes.Buffer
+	err := renderTable(&buf, false, "svc", 1, 50, &portal.SCAComponentList{
+		Status: portal.SCAStatusOK,
+		Items: []portal.SCAComponent{
+			{Name: "log4j", Version: "2.11.2"},
+		},
+		TotalCount: 1,
+		Truncated:  true,
+	})
+	if err != nil {
+		t.Fatalf("renderTable: %v", err)
 	}
-
-	// No filter → passthrough (all four, including nil-metrics component).
-	got := applySeverityFilter(items, nil)
-	if len(got) != 4 {
-		t.Errorf("nil filter must return all items, got %d", len(got))
-	}
-
-	// "HIGH" → only components with CRITICAL or HIGH metrics.
-	got = applySeverityFilter(items, []string{"CRITICAL", "HIGH"})
-	if len(got) != 1 || got[0].Name != "a" {
-		t.Errorf("filter got %v; want ['a']", got)
-	}
-
-	// "MEDIUM" → CRITICAL + HIGH + MEDIUM-bearing rows.
-	got = applySeverityFilter(items, []string{"CRITICAL", "HIGH", "MEDIUM"})
-	if len(got) != 2 {
-		t.Errorf("filter got %v; want 2 rows", got)
+	if !strings.Contains(buf.String(), "truncated") {
+		t.Errorf("expected truncation footer, got %q", buf.String())
 	}
 }
 
-func TestMetricsCountFor(t *testing.T) {
+func TestRenderTable_NoTruncatedFooterByDefault(t *testing.T) {
 	t.Parallel()
-	m := &portal.SCAMetrics{Critical: 1, High: 2, Medium: 3, Low: 4, Unassigned: 5}
 
-	cases := map[string]int{
-		"CRITICAL":   1,
-		"HIGH":       2,
-		"MEDIUM":     3,
-		"LOW":        4,
-		"INFO":       5,
-		"UNASSIGNED": 5,
-		"OTHER":      0,
+	var buf bytes.Buffer
+	err := renderTable(&buf, false, "svc", 1, 50, &portal.SCAComponentList{
+		Status:     portal.SCAStatusOK,
+		Items:      []portal.SCAComponent{{Name: "log4j", Version: "2.11.2"}},
+		TotalCount: 1,
+		Truncated:  false,
+	})
+	if err != nil {
+		t.Fatalf("renderTable: %v", err)
 	}
-	for sev, want := range cases {
-		if got := metricsCountFor(m, sev); got != want {
-			t.Errorf("metricsCountFor(%s) = %d; want %d", sev, got, want)
-		}
+	if strings.Contains(buf.String(), "truncated") {
+		t.Errorf("unexpected truncation footer when Truncated=false: %q", buf.String())
 	}
 }
 

@@ -78,10 +78,13 @@ type SCAComponent struct {
 }
 
 // SCAComponentList is the response for `krci sca components <codebase>`.
+// Truncated signals that items and totalCount reflect an incomplete view
+// because the Portal could not examine every dependency before paginating.
 type SCAComponentList struct {
 	Status     SCAStatus      `json:"status"`
 	Items      []SCAComponent `json:"items"`
 	TotalCount int            `json:"totalCount"`
+	Truncated  bool           `json:"truncated"`
 }
 
 // SCAFindingComponent is the component side of one finding row.
@@ -138,6 +141,8 @@ type SCAListParams struct {
 }
 
 // SCAComponentsParams carries the CLI-validated inputs for `krci sca components`.
+// Severity holds the canonical upper-case Dep-Track severity set to filter by;
+// empty slice means no filter.
 type SCAComponentsParams struct {
 	Codebase     string
 	Branch       string
@@ -145,6 +150,7 @@ type SCAComponentsParams struct {
 	PageSize     int
 	OnlyOutdated bool
 	OnlyDirect   bool
+	Severity     []string
 }
 
 // SCAFindingsParams carries the CLI-validated inputs for `krci sca findings`.
@@ -327,6 +333,9 @@ func (s *SCAService) Components(ctx context.Context, params SCAComponentsParams)
 	}
 	p.OnlyOutdated = scaComponentsOnlyOutdated(params.OnlyOutdated)
 	p.OnlyDirect = scaComponentsOnlyDirect(params.OnlyDirect)
+	if len(params.Severity) > 0 {
+		p.Severity = ptr.To(strings.Join(params.Severity, ","))
+	}
 
 	resp, err := s.client.ScaComponentsWithResponse(ctx, p)
 	if err != nil {
@@ -439,6 +448,7 @@ func mapSCAComponentList(src *restapi.SCAComponentsResponse) *SCAComponentList {
 		Status:     SCAStatus(src.Status),
 		Items:      make([]SCAComponent, 0, len(src.Items)),
 		TotalCount: src.TotalCount,
+		Truncated:  src.Truncated,
 	}
 	for i := range src.Items {
 		out.Items = append(out.Items, mapSCAComponent(&src.Items[i]))

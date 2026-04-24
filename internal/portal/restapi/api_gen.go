@@ -170,6 +170,7 @@ type SCAComponentsResponse struct {
 	Items      []SCAComponent              `json:"items"`
 	Status     SCAComponentsResponseStatus `json:"status"`
 	TotalCount int                         `json:"totalCount"`
+	Truncated  bool                        `json:"truncated"`
 }
 
 // SCAComponentsResponseStatus defines model for SCAComponentsResponse.Status.
@@ -631,6 +632,9 @@ type ScaComponentsParams struct {
 	PageSize     *int                             `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 	OnlyOutdated *ScaComponentsParamsOnlyOutdated `form:"onlyOutdated,omitempty" json:"onlyOutdated,omitempty"`
 	OnlyDirect   *ScaComponentsParamsOnlyDirect   `form:"onlyDirect,omitempty" json:"onlyDirect,omitempty"`
+
+	// Severity Comma-separated canonical Dep-Track severity set (CRITICAL,HIGH,MEDIUM,LOW,INFO,UNASSIGNED). Filter applied server-side across all components in the project before paginating. When set, response may include truncated=true if the auto-paging safety cap is reached.
+	Severity *string `form:"severity,omitempty" json:"severity,omitempty"`
 }
 
 // ScaComponentsParamsOnlyOutdated defines parameters for ScaComponents.
@@ -1512,6 +1516,22 @@ func NewScaComponentsRequest(server string, params *ScaComponentsParams) (*http.
 		if params.OnlyDirect != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "onlyDirect", runtime.ParamLocationQuery, *params.OnlyDirect); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Severity != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "severity", runtime.ParamLocationQuery, *params.Severity); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err

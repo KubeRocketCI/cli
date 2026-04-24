@@ -15,6 +15,11 @@ import (
 	"github.com/KubeRocketCI/cli/internal/token"
 )
 
+// DefaultHTTPTimeout caps every portal REST request. Must exceed the portal's
+// own 30s request timeout so its 408 or truncated:true response arrives before
+// the client aborts as a transport error.
+const DefaultHTTPTimeout = 45 * time.Second
+
 // Factory holds lazy-func dependencies shared across all CLI commands.
 // Each func is memoized: the first call resolves the dependency; subsequent calls
 // return the cached result instantly.
@@ -112,7 +117,7 @@ func New() *Factory {
 				return
 			}
 
-			httpClient := &http.Client{Timeout: 30 * time.Second}
+			httpClient := &http.Client{Timeout: DefaultHTTPTimeout}
 
 			bearerAuth := func(ctx context.Context, req *http.Request) error {
 				tok, err := tp.GetToken(ctx)

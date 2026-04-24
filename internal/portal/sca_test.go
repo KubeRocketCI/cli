@@ -315,6 +315,9 @@ func TestSCAService_Components_OmitsOptionalFiltersWhenFalse(t *testing.T) {
 		if q.Get("onlyOutdated") != "" || q.Get("onlyDirect") != "" {
 			t.Fatalf("filters should be omitted when false, got %s", r.URL.RawQuery)
 		}
+		if _, ok := q["severity"]; ok {
+			t.Fatalf("severity should be omitted when not set, got %s", r.URL.RawQuery)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"OK","items":[],"totalCount":0}`))
 	}
@@ -327,6 +330,53 @@ func TestSCAService_Components_OmitsOptionalFiltersWhenFalse(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("Components error: %v", err)
+	}
+}
+
+func TestSCAService_Components_SendsSeverityCSVWhenProvided(t *testing.T) {
+	t.Parallel()
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if got := q.Get("severity"); got != "CRITICAL,HIGH" {
+			t.Fatalf("expected severity=CRITICAL,HIGH; got %q (raw=%s)", got, r.URL.RawQuery)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"OK","items":[],"totalCount":0}`))
+	}
+
+	client, closer := newTestClient(t, handler)
+	defer closer()
+
+	_, err := NewSCAService(client).Components(context.Background(), SCAComponentsParams{
+		Codebase: testCodebase,
+		Severity: []string{"CRITICAL", "HIGH"},
+	})
+	if err != nil {
+		t.Fatalf("Components error: %v", err)
+	}
+}
+
+func TestSCAService_Components_TruncatedFieldPropagates(t *testing.T) {
+	t.Parallel()
+
+	handler := func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"OK","items":[],"totalCount":0,"truncated":true}`))
+	}
+
+	client, closer := newTestClient(t, handler)
+	defer closer()
+
+	got, err := NewSCAService(client).Components(context.Background(), SCAComponentsParams{
+		Codebase: testCodebase,
+		Severity: []string{"HIGH"},
+	})
+	if err != nil {
+		t.Fatalf("Components error: %v", err)
+	}
+	if !got.Truncated {
+		t.Errorf("expected Truncated=true; got %+v", got)
 	}
 }
 

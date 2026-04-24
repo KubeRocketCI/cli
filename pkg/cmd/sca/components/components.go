@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -83,8 +82,7 @@ func NewCmdComponents(f *cmdutil.Factory, runF func(*ComponentsOptions) error) *
 	cmd.Flags().StringVar(&opts.Branch, "branch", "", scainternal.BranchFlagUsage)
 	cmd.Flags().StringSliceVar(&opts.Severity, "severity", nil,
 		scainternal.SeverityFlagUsage+
-			" Applied client-side to the fetched page only; "+
-			"increase --page-size to examine more components.")
+			" Applied server-side across all dependencies of the project.")
 	cmd.Flags().BoolVar(&opts.OnlyOutdated, "only-outdated", false, "Only components marked outdated by Dependency-Track")
 	cmd.Flags().BoolVar(&opts.OnlyDirect, "only-direct", false, "Only direct (non-transitive) dependencies")
 	cmd.Flags().IntVar(&opts.Page, "page", 1, "Page index (1-based)")
@@ -108,62 +106,15 @@ func componentsRun(ctx context.Context, opts *ComponentsOptions) error {
 		PageSize:     opts.PageSize,
 		OnlyOutdated: opts.OnlyOutdated,
 		OnlyDirect:   opts.OnlyDirect,
+		Severity:     scainternal.ExpandSeverityFlag(opts.Severity),
 	})
 	if err != nil {
 		return scainternal.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
-	if inclusive := scainternal.ExpandSeverityFlag(opts.Severity); len(inclusive) > 0 {
-		filtered := applySeverityFilter(result.Items, inclusive)
-		result.Items = filtered
-		// The server returns a TotalCount across the unfiltered page; once we
-		// narrow client-side, both the JSON envelope and the table footer must
-		// reflect the visible row count or the "page X of Y" line lies.
-		result.TotalCount = len(filtered)
-	}
-
 	return scainternal.Render(opts.IO, opts.OutputFormat, result, func(w io.Writer, isTTY bool) error {
 		return renderTable(w, isTTY, opts.Codebase, opts.Page, opts.PageSize, result)
 	})
-}
-
-// applySeverityFilter keeps only components whose metrics contain at least
-// one vulnerability in the allowed severity set. Empty allowed means no
-// filter. Client-side because Dep-Track's /component/project endpoint does
-// not filter by severity.
-func applySeverityFilter(items []portal.SCAComponent, allowed []string) []portal.SCAComponent {
-	if len(allowed) == 0 {
-		return items
-	}
-	out := make([]portal.SCAComponent, 0, len(items))
-	for _, c := range items {
-		if c.Metrics == nil {
-			continue
-		}
-		if scainternal.ComponentMatchesSeverity(func(sev string) int {
-			return metricsCountFor(c.Metrics, sev)
-		}, allowed) {
-			out = append(out, c)
-		}
-	}
-	return out
-}
-
-func metricsCountFor(m *portal.SCAMetrics, severity string) int {
-	switch strings.ToUpper(severity) {
-	case "CRITICAL":
-		return m.Critical
-	case "HIGH":
-		return m.High
-	case "MEDIUM":
-		return m.Medium
-	case "LOW":
-		return m.Low
-	case "INFO", "UNASSIGNED":
-		// Dep-Track folds these together in its component metrics.
-		return m.Unassigned
-	}
-	return 0
 }
 
 func renderTable(
@@ -197,6 +148,16 @@ func renderTable(
 		return err
 	}
 
-	_, err := fmt.Fprintln(w, scainternal.PageFooter("component", result.TotalCount, page, pageSize))
-	return err
+	if _, err := fmt.Fprintln(w, scainternal.PageFooter("component", result.TotalCount, page, pageSize)); err != nil {
+		return err
+	}
+
+	if result.Truncated {
+		if _, err := fmt.Fprintln(w,
+			"(results truncated — not all dependencies examined; try --only-direct to narrow scope)"); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

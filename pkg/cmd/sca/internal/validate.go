@@ -240,19 +240,3 @@ func InclusiveFromSet(set []string) []string {
 	}
 	return InclusiveSeverities(min)
 }
-
-// ComponentMatchesSeverity returns true if the component's metrics contain at
-// least one vulnerability of a severity present in `allowed` (or any
-// severity when `allowed` is empty). Separated so callers can invoke it
-// without reaching into the scainternal types.
-func ComponentMatchesSeverity(hasCounts func(severity string) int, allowed []string) bool {
-	if len(allowed) == 0 {
-		return true
-	}
-	for _, sev := range allowed {
-		if hasCounts(sev) > 0 {
-			return true
-		}
-	}
-	return false
-}

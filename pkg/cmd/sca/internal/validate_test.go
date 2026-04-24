@@ -198,25 +198,6 @@ func TestSeverityMatches(t *testing.T) {
 	}
 }
 
-func TestComponentMatchesSeverity(t *testing.T) {
-	t.Parallel()
-
-	// empty allowed → match anything.
-	if !ComponentMatchesSeverity(func(string) int { return 0 }, nil) {
-		t.Error("empty allowed must return true")
-	}
-
-	counts := map[string]int{"CRITICAL": 0, "HIGH": 2, "MEDIUM": 0}
-	lookup := func(severity string) int { return counts[severity] }
-
-	if !ComponentMatchesSeverity(lookup, []string{"CRITICAL", "HIGH"}) {
-		t.Error("must match when HIGH > 0")
-	}
-	if ComponentMatchesSeverity(lookup, []string{"CRITICAL"}) {
-		t.Error("must not match when CRITICAL=0")
-	}
-}
-
 func TestConstants(t *testing.T) {
 	t.Parallel()
 	if MaxPageSize != 500 {
