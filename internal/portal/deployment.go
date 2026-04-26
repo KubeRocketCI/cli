@@ -11,48 +11,73 @@ import (
 	"github.com/KubeRocketCI/cli/internal/ptr"
 )
 
-var cdPipelineResourceConfig = restapi.K8sListJSONBody{
-	ResourceConfig: struct {
-		ApiVersion    string             `json:"apiVersion"`
-		ClusterScoped *bool              `json:"clusterScoped,omitempty"`
-		Group         string             `json:"group"`
-		Kind          string             `json:"kind"`
-		Labels        *map[string]string `json:"labels,omitempty"`
-		PluralName    string             `json:"pluralName"`
-		SingularName  string             `json:"singularName"`
-		Version       string             `json:"version"`
-	}{
-		ApiVersion:   "v2.edp.epam.com/v1",
-		Kind:         "CDPipeline",
-		Group:        "v2.edp.epam.com",
-		Version:      "v1",
-		SingularName: "cdpipeline",
-		PluralName:   "cdpipelines",
-	},
+// newK8sResourceConfig assembles a K8sListJSONBody whose ResourceConfig
+// identifies a single CRD by its group/version/kind triple. Centralizes the
+// anonymous-struct shape from the generated restapi package so each new kind
+// (CDPipeline, Stage, Application, …) reduces to one line.
+func newK8sResourceConfig(group, version, kind, singular, plural string) restapi.K8sListJSONBody {
+	return restapi.K8sListJSONBody{
+		ResourceConfig: struct {
+			ApiVersion    string             `json:"apiVersion"`
+			ClusterScoped *bool              `json:"clusterScoped,omitempty"`
+			Group         string             `json:"group"`
+			Kind          string             `json:"kind"`
+			Labels        *map[string]string `json:"labels,omitempty"`
+			PluralName    string             `json:"pluralName"`
+			SingularName  string             `json:"singularName"`
+			Version       string             `json:"version"`
+		}{
+			ApiVersion:   group + "/" + version,
+			Group:        group,
+			Version:      version,
+			Kind:         kind,
+			SingularName: singular,
+			PluralName:   plural,
+		},
+	}
 }
 
-var stageResourceConfig = restapi.K8sListJSONBody{
-	ResourceConfig: struct {
-		ApiVersion    string             `json:"apiVersion"`
-		ClusterScoped *bool              `json:"clusterScoped,omitempty"`
-		Group         string             `json:"group"`
-		Kind          string             `json:"kind"`
-		Labels        *map[string]string `json:"labels,omitempty"`
-		PluralName    string             `json:"pluralName"`
-		SingularName  string             `json:"singularName"`
-		Version       string             `json:"version"`
-	}{
-		ApiVersion:   "v2.edp.epam.com/v1",
-		Kind:         "Stage",
-		Group:        "v2.edp.epam.com",
-		Version:      "v1",
-		SingularName: "stage",
-		PluralName:   "stages",
-	},
-}
+var (
+	cdPipelineResourceConfig = newK8sResourceConfig(
+		"v2.edp.epam.com", "v1", "CDPipeline", "cdpipeline", "cdpipelines")
+	stageResourceConfig = newK8sResourceConfig(
+		"v2.edp.epam.com", "v1", "Stage", "stage", "stages")
+	applicationResourceConfig = newK8sResourceConfig(
+		"argoproj.io", "v1alpha1", "Application", "application", "applications")
+)
+
+// Canonical KRCI / ArgoCD label keys used by the deployment-discovery surface.
+const (
+	labelAppName        = "app.edp.epam.com/app-name"
+	labelCDPipelineName = "app.edp.epam.com/cdPipelineName"
+	labelStage          = "app.edp.epam.com/stage"
+	labelPipeline       = "app.edp.epam.com/pipeline"
+)
 
 // k8sItem is the type of items returned by K8sList.
 type k8sItem = restapi.K8sList_200_Items_Item
+
+// buildK8sListBody assembles a K8sListJSONRequestBody from the given cluster,
+// namespace, resource config, and optional label selector. Labels are omitted
+// (kept nil) when empty.
+func buildK8sListBody(
+	clusterName, namespace string,
+	rc restapi.K8sListJSONBody,
+	labels map[string]string,
+) restapi.K8sListJSONRequestBody {
+	ns := namespace
+	body := restapi.K8sListJSONRequestBody{
+		ClusterName:    clusterName,
+		Namespace:      &ns,
+		ResourceConfig: rc.ResourceConfig,
+	}
+
+	if len(labels) > 0 {
+		body.Labels = &labels
+	}
+
+	return body
+}
 
 // DeploymentService provides access to CDPipeline and Stage resources via the portal REST API.
 type DeploymentService struct {
@@ -67,14 +92,7 @@ func NewDeploymentService(client *restapi.ClientWithResponses, clusterName, name
 }
 
 func (s *DeploymentService) k8sList(ctx context.Context, rc restapi.K8sListJSONBody) (*restapi.K8sListResponse, error) {
-	ns := s.namespace
-	body := restapi.K8sListJSONRequestBody{
-		ClusterName:    s.clusterName,
-		Namespace:      &ns,
-		ResourceConfig: rc.ResourceConfig,
-	}
-
-	return s.client.K8sListWithResponse(ctx, body)
+	return s.client.K8sListWithResponse(ctx, buildK8sListBody(s.clusterName, s.namespace, rc, nil))
 }
 
 // List returns all CDPipelines with their stage names ordered by spec.order.
@@ -353,4 +371,70 @@ func int64Val(m map[string]any, key string) int64 {
 	default:
 		return 0
 	}
+}
+
+// stageOrder returns the integer Stage.spec.order. Defaults to 0 when missing
+// or non-numeric.
+func stageOrder(spec map[string]any) int {
+	return int(int64Val(spec, "order"))
+}
+
+// findSliceItem returns the first map within slice whose entry at key equals
+// val, or nil when no match exists.
+func findSliceItem(slice []any, key, val string) map[string]any {
+	for _, raw := range slice {
+		m, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		if stringVal(m, key) == val {
+			return m
+		}
+	}
+
+	return nil
+}
+
+// deepGet walks a nested *map[string]any tree by key. Returns nil if any
+// intermediate key is missing or a non-map value blocks the path. Defensive
+// against the schemaless `*map[string]any` shape returned by k8s.list.
+func deepGet(m map[string]any, keys ...string) map[string]any {
+	cur := m
+	for _, k := range keys {
+		if cur == nil {
+			return nil
+		}
+
+		raw, ok := cur[k]
+		if !ok {
+			return nil
+		}
+
+		next, ok := raw.(map[string]any)
+		if !ok {
+			return nil
+		}
+
+		cur = next
+	}
+
+	return cur
+}
+
+// sliceVal returns the slice at m[key] as []any, or nil when missing or not a
+// slice.
+func sliceVal(m map[string]any, key string) []any {
+	if m == nil {
+		return nil
+	}
+
+	raw, ok := m[key]
+	if !ok {
+		return nil
+	}
+
+	items, _ := raw.([]any)
+
+	return items
 }
