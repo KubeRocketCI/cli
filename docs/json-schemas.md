@@ -311,6 +311,154 @@ scripts should branch on `.data.truncated` rather than counting rows.
 
 Severity enum: `CRITICAL | HIGH | MEDIUM | LOW | INFO | UNASSIGNED`.
 
+## `krci env list`
+
+```json
+{
+  "schemaVersion": "1",
+  "data": {
+    "stages": [
+      {
+        "deployment": "my-pipeline",
+        "env": "dev",
+        "cluster": "in-cluster",
+        "namespace": "my-pipeline-dev",
+        "triggerType": "Auto",
+        "status": "created",
+        "order": 0
+      }
+    ]
+  }
+}
+```
+
+Rows are sorted by `deployment` ascending, then by `Stage.spec.order` ascending.
+Empty result returns `data.stages: []` and exit 0; the table view writes a
+single `No environments found.` line to stderr.
+
+## `krci env get <deployment> <env>`
+
+```json
+{
+  "schemaVersion": "1",
+  "data": {
+    "deployment": "my-pipeline",
+    "env": "prod",
+    "status": "created",
+    "description": "Production environment",
+    "order": 2,
+    "infrastructure": {
+      "cluster": "in-cluster",
+      "namespace": "my-pipeline-prod",
+      "triggerType": "Manual",
+      "deployPipeline": "deploy-with-helm",
+      "cleanPipeline": "clean-helm"
+    },
+    "qualityGates": [
+      {
+        "type": "manual",
+        "stepName": "stage-approval",
+        "autotestName": null,
+        "branchName": null
+      }
+    ],
+    "projects": [
+      {
+        "name": "foo",
+        "status": "healthy",
+        "sync": "synced",
+        "version": "1.2.0",
+        "imageTag": "1.2.0",
+        "imageDigest": "sha256:abc12345...",
+        "ingressUrls": ["https://foo.prod.example.com"],
+        "argocdUrl": "/applications/my-pipeline-prod-foo",
+        "deployedAt": "2026-04-25T08:00:00Z",
+        "valuesOverride": false
+      }
+    ]
+  }
+}
+```
+
+Field absence rules:
+
+- `description`, `cleanPipeline` may be `null` when absent on the Stage spec.
+- Per-project dynamic fields (`status`, `sync`, `version`, `imageTag`,
+  `imageDigest`, `argocdUrl`, `deployedAt`, `valuesOverride`) are `null` for
+  projects registered in `CDPipeline.spec.applications` but without a matching
+  `Application` resource. `ingressUrls` is always an array (`[]` when none).
+- In `-o json`, `imageDigest` carries the FULL `sha256:...` digest. The table
+  view shortens it to `sha256:` plus the first 8 hex chars (15 visible chars)
+  under the `IMAGE_SHA` column.
+- `qualityGates[]` is always an array (empty when none).
+- `projects[]` is sorted by name ascending.
+- In table mode, the `INGRESS` column stacks one URL per visual row when a
+  project carries multiple ingresses (project name appears only on the first
+  row); each hostname is truncated to 50 chars with a trailing `...` when
+  longer, but the OSC 8 hyperlink target retains the full URL. JSON output is
+  unaffected by this rendering — `ingressUrls` is always the full array.
+
+## `krci project deployments <project>`
+
+```json
+{
+  "schemaVersion": "1",
+  "data": {
+    "project": "foo",
+    "rows": [
+      {
+        "deployment": "my-pipeline",
+        "env": "dev",
+        "deployed": true,
+        "status": "healthy",
+        "sync": "synced",
+        "version": "1.2.3",
+        "imageTag": "1.2.3",
+        "imageDigest": "sha256:abc12345...",
+        "cluster": "in-cluster",
+        "namespace": "my-pipeline-dev",
+        "triggerType": "Auto",
+        "deployedAt": "2026-04-25T08:00:00Z",
+        "ingressUrls": ["https://foo.dev.example.com"],
+        "argocdUrl": "/applications/my-pipeline-dev-foo"
+      },
+      {
+        "deployment": "other-pipe",
+        "env": "dev",
+        "deployed": false,
+        "status": null,
+        "sync": null,
+        "version": null,
+        "imageTag": null,
+        "imageDigest": null,
+        "cluster": "in-cluster",
+        "namespace": "other-pipe-dev",
+        "triggerType": "Auto",
+        "deployedAt": null,
+        "ingressUrls": [],
+        "argocdUrl": null
+      }
+    ]
+  }
+}
+```
+
+Rules:
+
+- Rows are sorted by `deployment` ascending, then by `Stage.spec.order` ascending.
+- `deployed: false` rows still carry `cluster`, `namespace`, and `triggerType`
+  from the Stage so the user sees the full footprint of the project even when
+  no `Application` resource exists yet. Dynamic fields are `null` and
+  `ingressUrls` is `[]`.
+- An empty result is success: `data.rows: []`, exit 0, with
+  `No deployments found for project <name>.` written to stderr in table mode.
+- "Project missing" and "project deployed nowhere" are indistinguishable from
+  the user's perspective: both return `data.rows: []` with exit 0.
+- In table mode, the `INGRESS` column stacks one URL per visual row when a
+  (deployment, env) row carries multiple ingresses (deployment/env/etc.
+  appear only on the first row). Hostnames are truncated to 50 visible chars;
+  the OSC 8 hyperlink target keeps the full URL. JSON output is unaffected.
+
 ## Error envelope
 
 ```json

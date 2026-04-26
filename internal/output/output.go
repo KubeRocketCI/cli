@@ -143,6 +143,12 @@ func GreenText(s string) string { return greenStyle.Render(s) }
 // YellowText returns s rendered in yellow.
 func YellowText(s string) string { return yellowStyle.Render(s) }
 
+// RedText returns s rendered in red.
+func RedText(s string) string { return redStyle.Render(s) }
+
+// BlueText returns s rendered in blue.
+func BlueText(s string) string { return blueStyle.Render(s) }
+
 // PrintStyledTable renders a lipgloss table with colored headers, alternating row colors, and no borders.
 // Uses lipgloss for ANSI-aware column width calculation.
 func PrintStyledTable(w io.Writer, headers []string, rows [][]string) error {
