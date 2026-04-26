@@ -73,8 +73,9 @@ stable enough to treat `krci` as a first-class agent tool.
 | Area          | What you get                                                                     | Docs                                      |
 |---------------|----------------------------------------------------------------------------------|-------------------------------------------|
 | Authentication | OIDC + PKCE browser flow, AES-256-GCM token storage, OS keyring integration      | [`docs/auth.md`](docs/auth.md)            |
-| Projects       | List and inspect `Codebase` resources                                            | [`docs/project.md`](docs/project.md)      |
-| Deployments    | Inspect `CDPipeline` resources, their apps, environments, and promotion gates    | [`docs/deployment.md`](docs/deployment.md)|
+| Projects       | List and inspect projects                                                        | [`docs/project.md`](docs/project.md)      |
+| Deployments    | Inspect deployments, their apps, environments, and promotion gates               | [`docs/deployment.md`](docs/deployment.md)|
+| Environments   | Inspect envs — deployed apps, infrastructure, gates, and health                  | [`docs/env.md`](docs/env.md)              |
 | Pipeline runs  | List, filter, stream logs, and diagnose failures across Tekton runs              | [`docs/pipelinerun.md`](docs/pipelinerun.md) |
 | SonarQube      | Projects, quality gates, measures, and issues via the Portal's Sonar binding     | [`docs/sonar.md`](docs/sonar.md)          |
 
