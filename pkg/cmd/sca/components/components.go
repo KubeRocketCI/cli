@@ -39,9 +39,9 @@ func NewCmdComponents(f *cmdutil.Factory, runF func(*ComponentsOptions) error) *
 	}
 
 	cmd := &cobra.Command{
-		Use:   "components <codebase>",
+		Use:   "components <project>",
 		Short: "List dependencies (components) for an SCA project",
-		Args: cmdutil.ExactArgs(1, "a KubeRocketCI codebase name",
+		Args: cmdutil.ExactArgs(1, "a KubeRocketCI project name",
 			"to see available projects: krci sca list"),
 		Example: `  # Default branch, first 50 dependencies
   krci sca components payments-api
@@ -83,7 +83,8 @@ func NewCmdComponents(f *cmdutil.Factory, runF func(*ComponentsOptions) error) *
 	cmd.Flags().StringSliceVar(&opts.Severity, "severity", nil,
 		scainternal.SeverityFlagUsage+
 			" Applied server-side across all dependencies of the project.")
-	cmd.Flags().BoolVar(&opts.OnlyOutdated, "only-outdated", false, "Only components marked outdated by Dependency-Track")
+	cmd.Flags().BoolVar(&opts.OnlyOutdated, "only-outdated", false,
+		"Only components Dep-Track marks outdated (newer version exists; independent of vulnerability status)")
 	cmd.Flags().BoolVar(&opts.OnlyDirect, "only-direct", false, "Only direct (non-transitive) dependencies")
 	cmd.Flags().IntVar(&opts.Page, "page", 1, "Page index (1-based)")
 	cmd.Flags().IntVar(&opts.PageSize, "page-size", defaultComponentsPageSize, "Page size (max 500)")

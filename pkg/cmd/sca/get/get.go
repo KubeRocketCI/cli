@@ -35,9 +35,9 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 	}
 
 	cmd := &cobra.Command{
-		Use:   "get <codebase>",
-		Short: "Show a Dep-Track project's overview for a codebase",
-		Args: cmdutil.ExactArgs(1, "a KubeRocketCI codebase name",
+		Use:   "get <project>",
+		Short: "Show SCA scan overview for a project",
+		Args: cmdutil.ExactArgs(1, "a KubeRocketCI project name",
 			"to see available projects: krci sca list"),
 		Example: `  # Uses Codebase.spec.defaultBranch when --branch is omitted
   krci sca get payments-api
@@ -118,7 +118,7 @@ func printDetail(w io.Writer, codebase, requestedBranch string, d *portal.SCAPro
 	}
 
 	pairs := []kvPair{
-		{label: "Codebase", value: codebase},
+		{label: "Project", value: codebase},
 		{label: "Branch", value: project.Version},
 		{label: "Classifier", value: scainternal.OrDash(project.Classifier)},
 		{label: "Active", value: formatActive(project.Active, styled)},

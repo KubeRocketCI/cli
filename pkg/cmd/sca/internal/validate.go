@@ -18,13 +18,19 @@ import (
 // verb. Matches the OpenAPI ceiling.
 const MaxPageSize = 500
 
+// FindingsServerCap is the maximum number of rows the portal returns from
+// the unpaginated `sca findings` endpoint. Mirrors the server-side ceiling
+// documented in the OpenAPI spec; the help text and truncation footer must
+// stay in sync with it.
+const FindingsServerCap = 1000
+
 // BranchFlagUsage is the verbatim help text for `--branch` across every
 // per-codebase sca verb. Spec Requirement "Codebase + Branch Addressing"
 // mandates this exact string so users always see the same Dep-Track `version`
 // field explanation.
 const BranchFlagUsage = "branch name (maps to the Dep-Track project 'version' field). " +
-	"Defaults to the codebase's spec.defaultBranch. " +
-	"Run 'krci sca list --search=<codebase>' to discover all recorded versions."
+	"Defaults to the project's spec.defaultBranch. " +
+	"Run 'krci sca list --search=<project>' to discover all recorded versions."
 
 // SeverityFlagUsage is the verbatim help text for `--severity` across the
 // verbs that expose it. Spec design §D4 mandates this exact string: it
@@ -38,15 +44,15 @@ const SeverityFlagUsage = "minimum severity to include (inclusive). " +
 // names by platform convention follow DNS-1123.
 func ValidateCodebaseKey(codebase string) error {
 	if codebase == "" {
-		return fmt.Errorf("<codebase> must not be empty")
+		return fmt.Errorf("<project> must not be empty")
 	}
 
 	if len(codebase) > cmdutil.DNS1123SubdomainMaxLength {
-		return fmt.Errorf("<codebase> must be at most %d characters", cmdutil.DNS1123SubdomainMaxLength)
+		return fmt.Errorf("<project> must be at most %d characters", cmdutil.DNS1123SubdomainMaxLength)
 	}
 
 	if !cmdutil.IsValidDNS1123Label(codebase) {
-		return fmt.Errorf("<codebase> must be a valid DNS-1123 name")
+		return fmt.Errorf("<project> must be a valid DNS-1123 name")
 	}
 
 	return nil
