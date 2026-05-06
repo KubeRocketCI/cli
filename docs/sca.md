@@ -25,12 +25,13 @@ Every per-codebase verb takes a positional `<codebase>` and an optional
 Dep-Track project "version". You can also supply an explicit branch name or
 release tag.
 
-### Severity filter (inclusive)
+### Severity filter (inclusive, server-side)
 
 `--severity` accepts case-insensitive values `critical | high | medium | low | info`.
 The filter is **inclusive**: `--severity=high` returns rows at HIGH or above;
 `--severity=medium` returns CRITICAL + HIGH + MEDIUM. `INFO` implicitly
-includes `UNASSIGNED`.
+includes `UNASSIGNED`. Applied server-side on both `findings` and `components`,
+so any server-side cap (`truncated=true`) applies only to matching rows.
 
 ## `sca list`
 
@@ -152,14 +153,13 @@ Filter by upstream vulnerability source (e.g. `NVD`, `GITHUB`, `OSV`):
 krci sca findings payments-api --source=NVD
 ```
 
-Very large projects are capped server-side at 1000 rows. `--source` is the
-only flag that narrows the upstream query; `--severity` filters client-side
-after the cap and cannot recover findings beyond row 1000. To audit a
-truncated project for severities, drop `--severity` and post-filter the JSON,
-or scope by `--branch` first:
+Very large projects are capped server-side at 1000 rows. Both `--severity`
+and `--source` are applied before the cap, so `truncated=true` means more
+**matching** findings exist, not just more total findings. Narrow further with
+`--branch` when still truncated:
 
 ```
-(findings truncated to 1000 rows server-side — only --source narrows the upstream query; --severity filters client-side and cannot recover capped rows)
+(findings truncated to 1000 rows — narrow with --severity or --source to reduce the upstream result set)
 ```
 
 Script-friendly CVE extraction:

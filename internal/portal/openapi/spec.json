@@ -1836,6 +1836,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "severity",
+            "description": "Comma-separated canonical Dep-Track severity set (CRITICAL,HIGH,MEDIUM,LOW,INFO,UNASSIGNED). Filter applied server-side before the 1000-row cap, so truncated=true accurately reports more matching findings exist.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {

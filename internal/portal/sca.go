@@ -141,8 +141,6 @@ type SCAListParams struct {
 }
 
 // SCAComponentsParams carries the CLI-validated inputs for `krci sca components`.
-// Severity holds the canonical upper-case Dep-Track severity set to filter by;
-// empty slice means no filter.
 type SCAComponentsParams struct {
 	Codebase     string
 	Branch       string
@@ -150,7 +148,9 @@ type SCAComponentsParams struct {
 	PageSize     int
 	OnlyOutdated bool
 	OnlyDirect   bool
-	Severity     []string
+	// Severity is the canonical upper-case Dep-Track severity set to filter by;
+	// empty slice means no filter. Applied server-side before the cap.
+	Severity []string
 }
 
 // SCAFindingsParams carries the CLI-validated inputs for `krci sca findings`.
@@ -159,6 +159,9 @@ type SCAFindingsParams struct {
 	Branch            string
 	IncludeSuppressed bool
 	Source            string
+	// Severity is the canonical upper-case Dep-Track severity set to filter by;
+	// empty slice means no filter. Applied server-side before the cap.
+	Severity []string
 }
 
 // SCAService wraps the generated restapi ScaList/ScaGet/ScaComponents/ScaFindings
@@ -355,7 +358,7 @@ func (s *SCAService) Components(ctx context.Context, params SCAComponentsParams)
 
 // Findings returns the vulnerability findings for a codebase/branch pair.
 // The Portal caps the server-side result at 1000 rows; when exceeded,
-// Truncated is true.
+// Truncated is true. Severity filter is applied server-side before the cap.
 func (s *SCAService) Findings(ctx context.Context, params SCAFindingsParams) (*SCAFindingList, error) {
 	p := &restapi.ScaFindingsParams{Codebase: params.Codebase}
 	if params.Branch != "" {
@@ -364,6 +367,9 @@ func (s *SCAService) Findings(ctx context.Context, params SCAFindingsParams) (*S
 	p.Suppressed = scaFindingsSuppressed(params.IncludeSuppressed)
 	if params.Source != "" {
 		p.Source = ptr.To(params.Source)
+	}
+	if len(params.Severity) > 0 {
+		p.Severity = ptr.To(strings.Join(params.Severity, ","))
 	}
 
 	resp, err := s.client.ScaFindingsWithResponse(ctx, p)
