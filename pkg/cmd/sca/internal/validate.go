@@ -200,14 +200,6 @@ func InclusiveSeverities(min string) []string {
 	return out
 }
 
-// SeverityMatches returns true if severity is in the allowed set. Empty allowed
-// means "no filter" — callers expected to short-circuit before calling.
-// Severity is normalised to upper-case so upstream casing variations don't
-// silently drop rows (allowed is always canonical upper-case).
-func SeverityMatches(severity string, allowed []string) bool {
-	return slices.Contains(allowed, strings.ToUpper(severity))
-}
-
 // severityRank ranks Dep-Track severities ascending (UNASSIGNED=0 is least
 // severe). Used by InclusiveFromSet to pick the lowest-rank threshold.
 var severityRank = map[string]int{

@@ -185,19 +185,6 @@ func TestInclusiveFromSet(t *testing.T) {
 	}
 }
 
-func TestSeverityMatches(t *testing.T) {
-	t.Parallel()
-	if !SeverityMatches("CRITICAL", []string{"CRITICAL", "HIGH"}) {
-		t.Error("CRITICAL must match")
-	}
-	if SeverityMatches("LOW", []string{"CRITICAL", "HIGH"}) {
-		t.Error("LOW must not match")
-	}
-	if SeverityMatches("CRITICAL", nil) {
-		t.Error("empty allowed must not match")
-	}
-}
-
 func TestConstants(t *testing.T) {
 	t.Parallel()
 	if MaxPageSize != 500 {

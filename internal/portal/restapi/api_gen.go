@@ -649,6 +649,9 @@ type ScaFindingsParams struct {
 	Branch     *string                      `form:"branch,omitempty" json:"branch,omitempty"`
 	Suppressed *ScaFindingsParamsSuppressed `form:"suppressed,omitempty" json:"suppressed,omitempty"`
 	Source     *string                      `form:"source,omitempty" json:"source,omitempty"`
+
+	// Severity Comma-separated canonical Dep-Track severity set (CRITICAL,HIGH,MEDIUM,LOW,INFO,UNASSIGNED). Filter applied server-side before the 1000-row cap, so truncated=true accurately reports more matching findings exist.
+	Severity *string `form:"severity,omitempty" json:"severity,omitempty"`
 }
 
 // ScaFindingsParamsSuppressed defines parameters for ScaFindings.
@@ -1625,6 +1628,22 @@ func NewScaFindingsRequest(server string, params *ScaFindingsParams) (*http.Requ
 		if params.Source != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "source", runtime.ParamLocationQuery, *params.Source); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Severity != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "severity", runtime.ParamLocationQuery, *params.Severity); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err

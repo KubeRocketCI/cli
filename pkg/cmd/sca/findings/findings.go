@@ -46,10 +46,9 @@ func NewCmdFindings(f *cmdutil.Factory, runF func(*FindingsOptions) error) *cobr
 		Long: fmt.Sprintf(
 			"List Dep-Track vulnerability findings for a project.\n\n"+
 				"Unpaginated: the portal returns a single response capped at %d rows\n"+
-				"server-side. Only --source narrows the upstream query; --severity is\n"+
-				"applied client-side after the cap, so it cannot recover findings beyond\n"+
-				"row %d.",
-			scainternal.FindingsServerCap, scainternal.FindingsServerCap),
+				"server-side. Both --severity and --source are applied server-side before\n"+
+				"the cap, so truncated=true accurately reports more matching findings exist.",
+			scainternal.FindingsServerCap),
 		Args: cmdutil.ExactArgs(1, "a KubeRocketCI project name",
 			"to see available projects: krci sca list"),
 		Example: `  # All unsuppressed findings, default branch
@@ -113,23 +112,10 @@ func findingsRun(ctx context.Context, opts *FindingsOptions) error {
 		Branch:            opts.Branch,
 		IncludeSuppressed: opts.IncludeSuppressed,
 		Source:            opts.Source,
+		Severity:          scainternal.ExpandSeverityFlag(opts.Severity),
 	})
 	if err != nil {
 		return scainternal.HandleError(opts.IO, opts.OutputFormat, err)
-	}
-
-	// Client-side inclusive severity filter — server does not narrow by
-	// severity. Truncated stays as-returned by the server: hiding it after a
-	// client-side filter would silently drop findings that fell off the cap
-	// before we ever saw them.
-	if inclusive := scainternal.ExpandSeverityFlag(opts.Severity); len(inclusive) > 0 {
-		filtered := make([]portal.SCAFinding, 0, len(result.Items))
-		for _, f := range result.Items {
-			if scainternal.SeverityMatches(f.Vulnerability.Severity, inclusive) {
-				filtered = append(filtered, f)
-			}
-		}
-		result.Items = filtered
 	}
 
 	return scainternal.Render(opts.IO, opts.OutputFormat, result, func(w io.Writer, isTTY bool) error {
@@ -180,8 +166,7 @@ func renderTable(w io.Writer, isTTY bool, codebase string, result *portal.SCAFin
 			return err
 		}
 		if _, err := fmt.Fprintf(w,
-			"(findings truncated to %d rows server-side — only --source narrows the upstream query;"+
-				" --severity filters client-side and cannot recover capped rows)\n",
+			"(findings truncated to %d rows — narrow with --severity or --source to reduce the upstream result set)\n",
 			scainternal.FindingsServerCap); err != nil {
 			return err
 		}
