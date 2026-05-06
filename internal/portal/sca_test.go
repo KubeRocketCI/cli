@@ -224,7 +224,7 @@ func TestSCAService_Get_404_CodebaseNotFound_WithExplicitBranch(t *testing.T) {
 	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("want wrap of ErrNotFound, got %v", err)
 	}
-	if !strings.Contains(err.Error(), "codebase nope not found") {
+	if !strings.Contains(err.Error(), "project nope not found") {
 		t.Errorf("unexpected message: %v", err)
 	}
 }

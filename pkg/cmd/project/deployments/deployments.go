@@ -45,7 +45,7 @@ project is registered (CDPipeline.spec.applications) but no Application
 exists yet are emitted with "-" placeholders (table) or null values (JSON).
 
 Rows are sorted by deployment ascending, then by Stage.spec.order ascending.`,
-		Args: cmdutil.ExactArgs(1, "a project (codebase) name",
+		Args: cmdutil.ExactArgs(1, "a project name",
 			"to see available projects: krci project list"),
 		Example: `  # Default
   krci project deployments my-app

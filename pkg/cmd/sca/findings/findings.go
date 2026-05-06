@@ -41,9 +41,16 @@ func NewCmdFindings(f *cmdutil.Factory, runF func(*FindingsOptions) error) *cobr
 	}
 
 	cmd := &cobra.Command{
-		Use:   "findings <codebase>",
-		Short: "List Dep-Track vulnerability findings for a codebase",
-		Args: cmdutil.ExactArgs(1, "a KubeRocketCI codebase name",
+		Use:   "findings <project>",
+		Short: "List Dep-Track vulnerability findings for a project",
+		Long: fmt.Sprintf(
+			"List Dep-Track vulnerability findings for a project.\n\n"+
+				"Unpaginated: the portal returns a single response capped at %d rows\n"+
+				"server-side. Only --source narrows the upstream query; --severity is\n"+
+				"applied client-side after the cap, so it cannot recover findings beyond\n"+
+				"row %d.",
+			scainternal.FindingsServerCap, scainternal.FindingsServerCap),
+		Args: cmdutil.ExactArgs(1, "a KubeRocketCI project name",
 			"to see available projects: krci sca list"),
 		Example: `  # All unsuppressed findings, default branch
   krci sca findings payments-api
@@ -111,7 +118,10 @@ func findingsRun(ctx context.Context, opts *FindingsOptions) error {
 		return scainternal.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
-	// Client-side inclusive severity filter (server does not narrow by severity).
+	// Client-side inclusive severity filter — server does not narrow by
+	// severity. Truncated stays as-returned by the server: hiding it after a
+	// client-side filter would silently drop findings that fell off the cap
+	// before we ever saw them.
 	if inclusive := scainternal.ExpandSeverityFlag(opts.Severity); len(inclusive) > 0 {
 		filtered := make([]portal.SCAFinding, 0, len(result.Items))
 		for _, f := range result.Items {
@@ -120,11 +130,6 @@ func findingsRun(ctx context.Context, opts *FindingsOptions) error {
 			}
 		}
 		result.Items = filtered
-		// Once the user has narrowed by --severity, the upstream "1000-row cap"
-		// hint is misleading: they already supplied the only follow-up flag we
-		// would have suggested. Clear the flag so neither the table footer nor
-		// the JSON envelope keeps advertising it.
-		result.Truncated = false
 	}
 
 	return scainternal.Render(opts.IO, opts.OutputFormat, result, func(w io.Writer, isTTY bool) error {
@@ -174,8 +179,10 @@ func renderTable(w io.Writer, isTTY bool, codebase string, result *portal.SCAFin
 		if _, err := fmt.Fprintln(w); err != nil {
 			return err
 		}
-		if _, err := fmt.Fprintln(w,
-			"(findings truncated to 1000 rows — narrow the query via --severity or --source)"); err != nil {
+		if _, err := fmt.Fprintf(w,
+			"(findings truncated to %d rows server-side — only --source narrows the upstream query;"+
+				" --severity filters client-side and cannot recover capped rows)\n",
+			scainternal.FindingsServerCap); err != nil {
 			return err
 		}
 	}

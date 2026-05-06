@@ -13,7 +13,7 @@ credentials are required.
 | `sca list`                       | List SCA projects known to Dependency-Track                               |
 | `sca get <codebase>`             | Project overview: risk score, severity counts, last BOM import           |
 | `sca components <codebase>`      | Dependencies with outdated / direct / severity filters                    |
-| `sca findings <codebase>`        | Flat vulnerability listing (CVE-level) with severity filter + truncation |
+| `sca findings <codebase>`        | Flat vulnerability listing (CVE-level), unpaginated, server-cap 1000 rows |
 
 All commands accept `-o, --output` with `table` (default) or `json`.
 
@@ -118,8 +118,10 @@ commons-text             1.9        1.13.1    yes        Apache-2.0   5.5    0/1
 2 components, page 1 of 1 (page-size 50)
 ```
 
-Combined filters are **AND** — server-side `--only-outdated` / `--only-direct`
-are forwarded to Dep-Track, and `--severity` narrows client-side afterwards:
+Combined filters are **AND** — `--only-outdated`, `--only-direct`, and
+`--severity` are all applied server-side. The portal auto-pages across the
+full project (up to a safety cap) to evaluate the severity filter before
+paginating; if the cap is reached, the response carries `truncated=true`:
 
 ```bash
 # Outdated direct dependencies with at least one HIGH or CRITICAL finding
@@ -150,10 +152,14 @@ Filter by upstream vulnerability source (e.g. `NVD`, `GITHUB`, `OSV`):
 krci sca findings payments-api --source=NVD
 ```
 
-Very large projects are capped server-side at 1000 rows with a footer hint:
+Very large projects are capped server-side at 1000 rows. `--source` is the
+only flag that narrows the upstream query; `--severity` filters client-side
+after the cap and cannot recover findings beyond row 1000. To audit a
+truncated project for severities, drop `--severity` and post-filter the JSON,
+or scope by `--branch` first:
 
 ```
-(findings truncated to 1000 rows — narrow the query via --severity or --source)
+(findings truncated to 1000 rows server-side — only --source narrows the upstream query; --severity filters client-side and cannot recover capped rows)
 ```
 
 Script-friendly CVE extraction:

@@ -87,7 +87,7 @@ func TestGet_BranchFlagUsageStringIsVerbatim(t *testing.T) {
 	if !strings.Contains(flag.Usage, "Dep-Track project 'version'") {
 		t.Errorf("--branch usage must reference Dep-Track version field: %q", flag.Usage)
 	}
-	if !strings.Contains(flag.Usage, "krci sca list --search=<codebase>") {
+	if !strings.Contains(flag.Usage, "krci sca list --search=<project>") {
 		t.Errorf("--branch usage must hint discovery path: %q", flag.Usage)
 	}
 }
@@ -140,7 +140,7 @@ func TestPrintDetail_HappyPath(t *testing.T) {
 		t.Fatalf("printDetail: %v", err)
 	}
 	out := buf.String()
-	wants := []string{"svc @ main", "Codebase", "Branch", "Classifier", "Risk score",
+	wants := []string{"svc @ main", "Project", "Branch", "Classifier", "Risk score",
 		"Vulnerabilities", "Critical", "Components", "Total"}
 	for _, w := range wants {
 		if !strings.Contains(out, w) {

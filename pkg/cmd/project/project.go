@@ -14,7 +14,7 @@ import (
 func NewCmdProject(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "project",
-		Short:   "Manage projects (Codebases)",
+		Short:   "Manage projects",
 		Aliases: []string{"proj"},
 	}
 
