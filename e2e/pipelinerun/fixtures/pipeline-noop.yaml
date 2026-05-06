@@ -1,0 +1,74 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: krci-cli-e2e-noop
+  labels:
+    # Distinguishes test fixtures from real KubeRocketCI pipelines (build/review/deploy/...)
+    # so they can be filtered with -l app.edp.epam.com/pipelinetype=tests.
+    app.edp.epam.com/pipelinetype: tests
+    # Empty string is treated as "absent" by the portal's getTriggerTemplateLabel,
+    # so start skips TT lookup. Required by the portal's Pipeline Zod schema.
+    app.edp.epam.com/triggertemplate: ""
+spec:
+  description: |
+    No-op test fixture for the krci CLI e2e suite (pipelinerun start).
+    Pure echo with controllable failure. Source of truth:
+    source/cli/e2e/pipelinerun/fixtures/pipeline-noop.yaml.
+  params:
+    - name: message
+      type: string
+      default: "hello"
+      description: Echoed verbatim in task logs.
+    - name: git-revision
+      type: string
+      default: "main"
+      description: Echoed alongside the message; matches a common build param name so PR-S-2 can override it.
+    - name: count
+      type: string
+      default: "1"
+      description: How many times to echo the message.
+    - name: should-fail
+      type: string
+      default: "false"
+      description: Set to "true" to make the run exit non-zero (deterministic failure for tests).
+  tasks:
+    - name: echo
+      params:
+        - name: message
+          value: $(params.message)
+        - name: revision
+          value: $(params.git-revision)
+        - name: count
+          value: $(params.count)
+        - name: should-fail
+          value: $(params.should-fail)
+      taskSpec:
+        params:
+          - name: message
+          - name: revision
+          - name: count
+          - name: should-fail
+        steps:
+          - name: hello
+            image: docker.io/library/busybox:1.36
+            env:
+              - name: MESSAGE
+                value: $(params.message)
+              - name: REVISION
+                value: $(params.revision)
+              - name: COUNT
+                value: $(params.count)
+              - name: SHOULD_FAIL
+                value: $(params.should-fail)
+            script: |
+              #!/bin/sh
+              set -eu
+              i=1
+              while [ "$i" -le "$COUNT" ]; do
+                echo "[$i] $MESSAGE @ $REVISION"
+                i=$((i + 1))
+              done
+              if [ "$SHOULD_FAIL" = "true" ]; then
+                echo "SHOULD_FAIL=true -> exiting 1"
+                exit 1
+              fi

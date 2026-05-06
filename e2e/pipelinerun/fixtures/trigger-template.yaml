@@ -1,0 +1,55 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: krci-cli-e2e-tt
+  labels:
+    app.edp.epam.com/pipelinetype: tests
+spec:
+  # TT-side param declarations exist for parity with real KubeRocketCI
+  # TriggerTemplates (and for any EventListener flows that may target this
+  # TT). NOTE: the portal's createPipelineRunDraftFromPipeline does NOT
+  # consume TT.spec.params — it resolves $(tt.params.X) placeholders in
+  # resourcetemplates against Pipeline.spec.params defaults instead.
+  params:
+    - name: message
+      default: "tt-spec-default"
+      description: Documentation-only; not used by CLI start.
+    - name: git-revision
+      default: "main"
+      description: Documentation-only; not used by CLI start.
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        # prepareStartDraft replaces this with metadata.generateName before
+        # the K8s create call, so the literal value here is irrelevant.
+        name: krci-cli-e2e-with-tt-from-tt
+        labels:
+          app.edp.epam.com/pipelinetype: tests
+          app.edp.epam.com/codebase: krci-cli-e2e
+          # Placeholder resolution into a label value is the most useful
+          # observable side-effect for tests: PR-S-TT-OK asserts that the
+          # produced PipelineRun carries
+          #   test.krci-cli-e2e/seeded-message: from-pipeline-default
+          # which proves Pass 1 of the TT walker ran (the value comes from
+          # the Pipeline's param default, not from this TT's spec.params).
+          test.krci-cli-e2e/seeded-message: $(tt.params.message)
+          test.krci-cli-e2e/seeded-revision: $(tt.params.git-revision)
+        annotations:
+          test.krci-cli-e2e/source: tt
+      spec:
+        # Will be overwritten with the user-requested pipeline name by
+        # getPipelineRunFromTriggerTemplate before placeholder resolution.
+        pipelineRef:
+          name: krci-cli-e2e-with-tt
+        params:
+          - name: message
+            value: $(tt.params.message)
+          - name: git-revision
+            value: $(tt.params.git-revision)
+          # Pipeline declares these without TT-side counterparts, so the
+          # walker leaves them as literal strings.
+          - name: count
+            value: "1"
+          - name: should-fail
+            value: "false"

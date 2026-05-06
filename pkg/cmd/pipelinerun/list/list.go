@@ -3,7 +3,6 @@ package list
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"charm.land/lipgloss/v2"
@@ -15,9 +14,9 @@ import (
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
+	pipelineruninternal "github.com/KubeRocketCI/cli/pkg/cmd/pipelinerun/internal"
 )
 
-// ListOptions holds all inputs for the pipelinerun list command.
 type ListOptions struct {
 	IO            *iostreams.IOStreams
 	RestClient    func() (*restapi.ClientWithResponses, error)
@@ -114,11 +113,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		IncludeReason: opts.IncludeReason,
 	})
 	if err != nil {
-		if errors.Is(err, portal.ErrUnauthorized) {
-			return cmdutil.ErrAuthRequired(err)
-		}
-
-		return err
+		return pipelineruninternal.HandleAuthError(err)
 	}
 
 	if opts.IncludeReason {
@@ -138,7 +133,6 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		return err
 	}
 
-	// --reason: pipeline info + task tree + failure details (no summary table).
 	if opts.IncludeReason {
 		if len(result.Tasks) > 0 {
 			return output.RenderReason(opts.IO.Out, result)
@@ -149,12 +143,10 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		}
 	}
 
-	// Summary table (default).
 	if err := renderSummaryTable(opts, result); err != nil {
 		return err
 	}
 
-	// --logs: append logs for the most recent run.
 	if result.Logs != "" {
 		pr := result.PipelineRuns[0]
 		header := fmt.Sprintf("Logs: %s (%s)", pr.Name, pr.Status)
@@ -182,10 +174,8 @@ const (
 	colWidthAuthor  = 14
 )
 
-// renderSummaryTable renders the pipeline run list as a styled/plain table.
 func renderSummaryTable(opts *ListOptions, result *portal.PipelineRunListResult) error {
 	return output.RenderList(opts.IO, opts.OutputFormat, result, func(isTTY bool) ([]string, [][]string) {
-		headers := []string{"NAME", "STATUS", "PROJECT", "PR", "AUTHOR", "TYPE", "STARTED", "DURATION"}
 		rows := make([][]string, 0, len(result.PipelineRuns))
 
 		for _, pr := range result.PipelineRuns {
@@ -218,6 +208,6 @@ func renderSummaryTable(opts *ListOptions, result *portal.PipelineRunListResult)
 			})
 		}
 
-		return headers, rows
+		return pipelineruninternal.Headers, rows
 	})
 }

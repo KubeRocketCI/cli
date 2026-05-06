@@ -98,3 +98,37 @@ func TestIsValidDNS1123Label(t *testing.T) {
 		})
 	}
 }
+
+func TestIsValidDNS1123Subdomain(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   string
+		want bool
+	}{
+		{"single char", "a", true},
+		{"label-style name", "payments-api", true},
+		{"63 chars label shape", strings.Repeat("a", 63), true},
+		{"200 chars with dots", strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("d", 8), true},
+		{"dotted segments", "a.b.c", true},
+		{"segment with digits", "build-1.pipeline-2", true},
+
+		{"empty rejected", "", false},
+		{"uppercase rejected", "UPPER", false},
+		{"leading dash rejected", "-leading", false},
+		{"trailing dash rejected", "trailing-", false},
+		{"leading dot rejected", ".leading", false},
+		{"trailing dot rejected", "trailing.", false},
+		{"underscore rejected", "has_underscore", false},
+		{"254 chars over limit", strings.Repeat("a", 254), false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsValidDNS1123Subdomain(tc.in); got != tc.want {
+				t.Errorf("IsValidDNS1123Subdomain(%q) = %v, want %v", tc.in, got, tc.want)
+			}
+		})
+	}
+}

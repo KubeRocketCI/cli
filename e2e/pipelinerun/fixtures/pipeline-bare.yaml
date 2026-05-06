@@ -1,0 +1,36 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: krci-cli-e2e-bare
+  # No KRCI labels at all. Proves the CLI can start a vanilla Tekton Pipeline
+  # that does not follow the KubeRocketCI labelling convention. Drives
+  # PR-S-BARE — same getTriggerTemplateLabel return value as PIPELINE_OK,
+  # but reaches it via the "label key absent" branch rather than the
+  # "label key present, value empty" branch.
+spec:
+  description: |
+    Test fixture for the krci CLI e2e suite. Carries zero KRCI labels — every
+    well-formed Tekton Pipeline must be startable, regardless of whether it
+    follows the KubeRocketCI labelling convention.
+    Source of truth: source/cli/e2e/pipelinerun/fixtures/pipeline-bare.yaml.
+  params:
+    - name: message
+      type: string
+      default: "hello from bare"
+  tasks:
+    - name: echo
+      params:
+        - name: message
+          value: $(params.message)
+      taskSpec:
+        params:
+          - name: message
+        steps:
+          - name: hello
+            image: docker.io/library/busybox:1.36
+            env:
+              - name: MESSAGE
+                value: $(params.message)
+            script: |
+              #!/bin/sh
+              echo "$MESSAGE"

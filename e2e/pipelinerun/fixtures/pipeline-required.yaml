@@ -1,0 +1,45 @@
+# IMPORTANT — read before editing.
+#
+# spec.description and params[0].description below still claim that omitting
+# --param message=... triggers admission rejection. THAT IS NOT WHAT HAPPENS.
+# The portal's createPipelineRunDraftFromPipeline synthesizes value: "" for
+# every Pipeline-declared param without a default, so the apiserver always
+# sees a complete spec.params list and admission always passes. The fixture
+# now drives PR-S-PARAM-SYNTHESIZED, which asserts on the synthesized value
+# instead. The applied descriptions are left untouched to avoid re-applying
+# this manifest to the cluster — kubectl apply strips YAML # comments, so
+# this block exists only in the source-of-truth file.
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: krci-cli-e2e-required
+  labels:
+    app.edp.epam.com/pipelinetype: tests
+    app.edp.epam.com/triggertemplate: ""
+spec:
+  description: |
+    Test fixture for the krci CLI e2e suite. Declares one required param with
+    no default — submitting a PipelineRun without --param message=... is
+    rejected by the apiserver at admission time. Drives PR-S-PARAM-MISSING.
+    Source of truth: source/cli/e2e/pipelinerun/fixtures/pipeline-required.yaml.
+  params:
+    - name: message
+      type: string
+      description: Required — no default. Omitting --param message=... triggers an admission error.
+  tasks:
+    - name: echo
+      params:
+        - name: message
+          value: $(params.message)
+      taskSpec:
+        params:
+          - name: message
+        steps:
+          - name: hello
+            image: docker.io/library/busybox:1.36
+            env:
+              - name: MESSAGE
+                value: $(params.message)
+            script: |
+              #!/bin/sh
+              echo "$MESSAGE"

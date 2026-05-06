@@ -477,3 +477,81 @@ Common messages:
 | Unknown pull request (404)  | `pull request <id> not found`          |
 | Upstream 5xx / network      | `portal returned HTTP 500: <cause>`    |
 | Invalid flag value          | Flag-specific message (e.g. enum list) |
+
+
+## `krci pipelinerun start`
+
+The start verb reuses the same column shape as `krci pipelinerun list`. Empty
+cells render as `-` in table mode and as `""` in JSON mode (matches list).
+
+### Success envelope
+
+```json
+{
+  "schemaVersion": "1",
+  "data": {
+    "name":     "<apiserver-assigned name, e.g. foo-build-run-x9k2p>",
+    "status":   "Pending|Running|Succeeded|Failed|Cancelled|Timeout",
+    "project":  "<codebase or empty>",
+    "pr":       "<pr number or empty>",
+    "author":   "<git author or empty>",
+    "type":     "<pipelinetype label or empty>",
+    "started":  "<RFC3339 or empty>",
+    "duration": "<m+s or empty>"
+  }
+}
+```
+
+### Error envelope
+
+```json
+{
+  "schemaVersion": "1",
+  "error": { "message": "pipeline 'ghost' not found" }
+}
+```
+
+### Dry-run envelope (-o json)
+
+`data` carries the rendered `PipelineRun` resource as a parsed JSON object —
+not a string. Default and `-o yaml` modes emit the same resource as YAML
+(suitable for piping to `kubectl apply -f -`).
+
+```json
+{
+  "schemaVersion": "1",
+  "data": {
+    "apiVersion": "tekton.dev/v1",
+    "kind": "PipelineRun",
+    "metadata": {
+      "generateName": "foo-build-run-",
+      "labels": { "app.edp.epam.com/codebase": "my-app" }
+    },
+    "spec": {
+      "params": [ { "name": "git-revision", "value": "main" } ]
+    }
+  }
+}
+```
+
+### Common messages
+
+User-facing messages on the not-found path are synthesised CLI-side from a
+stable `error.reason` tag the Portal returns. The Portal deliberately does
+not put resource-identifying text in `error.message` (cluster-hardening
+policy applied uniformly to all REST routes), so the CLI builds the user
+message from the pipeline name it already has plus the reason it received.
+
+All errors exit `1` (per the global rule at the top of this document).
+
+| Condition                                   | Message                                                                                       |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Pipeline not found                          | `pipeline '<name>' not found`                                                                 |
+| TriggerTemplate referenced but missing      | `pipeline '<name>' references a TriggerTemplate that does not exist`                          |
+| Malformed TriggerTemplate label             | `platform rejected request: pipeline '<name>' has malformed TriggerTemplate label`            |
+| Platform admission rejection (400/422)      | `platform rejected request: <HTTP status phrase>` (Portal does not echo K8s admission detail) |
+| RBAC denied                                 | `permission denied`                                                                           |
+| Portal upstream 5xx                         | `upstream service unavailable: <cause>`                                                       |
+| Duplicate / malformed `--param` / `--label` | `duplicate parameter '<k>'` / `parameter must be key=value` / `label key must not be empty`   |
+| `--dry-run` with `-o table`                 | `--dry-run cannot use -o table (use -o json or -o yaml)`                                      |
+
