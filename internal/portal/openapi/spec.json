@@ -514,6 +514,164 @@
         }
       }
     },
+    "/v1/pipelineruns/start": {
+      "post": {
+        "operationId": "pipelineRun-start",
+        "tags": [
+          "pipelinerun"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "namespace": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
+                    "minLength": 1,
+                    "maxLength": 253
+                  },
+                  "pipeline": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
+                    "minLength": 1,
+                    "maxLength": 253
+                  },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "pattern": "^([A-Za-z0-9]([-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?)?$"
+                    }
+                  },
+                  "dryRun": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "namespace",
+                  "pipeline"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/PipelineRunStartCreatedResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PipelineRunStartDryRunResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.BAD_REQUEST"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization not provided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.UNAUTHORIZED"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.FORBIDDEN"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "Kubernetes API request timed out",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.TIMEOUT"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Admission conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.CONFLICT"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Admission rejected the PipelineRun (e.g. missing required Pipeline param)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.UNPROCESSABLE_CONTENT"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Kubernetes API throttled the request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.TOO_MANY_REQUESTS"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error.INTERNAL_SERVER_ERROR"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/pipeline-runs/{resultUid}/logs": {
       "get": {
         "operationId": "tektonResults-getPipelineRunLogs",
@@ -540,7 +698,9 @@
             "name": "namespace",
             "schema": {
               "type": "string",
-              "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$"
+              "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
+              "minLength": 1,
+              "maxLength": 253
             },
             "required": true
           },
@@ -652,7 +812,9 @@
             "name": "namespace",
             "schema": {
               "type": "string",
-              "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$"
+              "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
+              "minLength": 1,
+              "maxLength": 253
             },
             "required": true
           },
@@ -661,7 +823,9 @@
             "name": "taskRunName",
             "schema": {
               "type": "string",
-              "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$"
+              "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
+              "minLength": 1,
+              "maxLength": 253
             },
             "required": true
           },
@@ -670,7 +834,8 @@
             "name": "stepName",
             "schema": {
               "type": "string",
-              "pattern": "^[a-z0-9][a-z0-9-]*$"
+              "pattern": "^[a-z0-9][a-z0-9-]*$",
+              "maxLength": 63
             }
           }
         ],
@@ -682,9 +847,6 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "taskName": {
-                      "type": "string"
-                    },
                     "taskRunName": {
                       "type": "string"
                     },
@@ -703,7 +865,6 @@
                     }
                   },
                   "required": [
-                    "taskName",
                     "taskRunName",
                     "logs",
                     "hasLogs",
@@ -792,7 +953,9 @@
             "name": "namespace",
             "schema": {
               "type": "string",
-              "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$"
+              "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
+              "minLength": 1,
+              "maxLength": 253
             },
             "required": true
           }
@@ -878,7 +1041,9 @@
             "name": "namespace",
             "schema": {
               "type": "string",
-              "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$"
+              "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
+              "minLength": 1,
+              "maxLength": 253
             },
             "required": true
           },
@@ -2034,213 +2199,430 @@
     "schemas": {
       "error.INTERNAL_SERVER_ERROR": {
         "type": "object",
+        "title": "INTERNAL_SERVER_ERROR error envelope (500)",
+        "description": "REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.",
+        "required": [
+          "error"
+        ],
         "properties": {
-          "message": {
-            "type": "string",
-            "description": "The error message",
-            "example": "Internal server error"
-          },
-          "code": {
-            "type": "string",
-            "description": "The error code",
-            "example": "INTERNAL_SERVER_ERROR"
-          },
-          "issues": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "message": {
-                  "type": "string"
-                }
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "tRPC error code (string literal)",
+                "example": "INTERNAL_SERVER_ERROR"
               },
-              "required": [
-                "message"
-              ]
-            },
-            "description": "An array of issues that were responsible for the error",
-            "example": []
+              "reason": {
+                "type": "string",
+                "description": "Stable machine-readable disambiguator (omitted when none applies)"
+              },
+              "message": {
+                "type": "string",
+                "description": "Static HTTP status phrase",
+                "example": "Internal Server Error"
+              }
+            }
           }
         },
-        "required": [
-          "message",
-          "code"
-        ],
-        "title": "Internal server error error (500)",
-        "description": "The error information",
         "example": {
-          "code": "INTERNAL_SERVER_ERROR",
-          "message": "Internal server error",
-          "issues": []
+          "error": {
+            "code": "INTERNAL_SERVER_ERROR",
+            "message": "Internal Server Error"
+          }
         }
       },
       "error.UNAUTHORIZED": {
         "type": "object",
+        "title": "UNAUTHORIZED error envelope (401)",
+        "description": "REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.",
+        "required": [
+          "error"
+        ],
         "properties": {
-          "message": {
-            "type": "string",
-            "description": "The error message",
-            "example": "Authorization not provided"
-          },
-          "code": {
-            "type": "string",
-            "description": "The error code",
-            "example": "UNAUTHORIZED"
-          },
-          "issues": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "message": {
-                  "type": "string"
-                }
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "tRPC error code (string literal)",
+                "example": "UNAUTHORIZED"
               },
-              "required": [
-                "message"
-              ]
-            },
-            "description": "An array of issues that were responsible for the error",
-            "example": []
+              "reason": {
+                "type": "string",
+                "description": "Stable machine-readable disambiguator (omitted when none applies)"
+              },
+              "message": {
+                "type": "string",
+                "description": "Static HTTP status phrase",
+                "example": "Unauthorized"
+              }
+            }
           }
         },
-        "required": [
-          "message",
-          "code"
-        ],
-        "title": "Authorization not provided error (401)",
-        "description": "The error information",
         "example": {
-          "code": "UNAUTHORIZED",
-          "message": "Authorization not provided",
-          "issues": []
+          "error": {
+            "code": "UNAUTHORIZED",
+            "message": "Unauthorized"
+          }
         }
       },
       "error.FORBIDDEN": {
         "type": "object",
+        "title": "FORBIDDEN error envelope (403)",
+        "description": "REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.",
+        "required": [
+          "error"
+        ],
         "properties": {
-          "message": {
-            "type": "string",
-            "description": "The error message",
-            "example": "Insufficient access"
-          },
-          "code": {
-            "type": "string",
-            "description": "The error code",
-            "example": "FORBIDDEN"
-          },
-          "issues": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "message": {
-                  "type": "string"
-                }
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "tRPC error code (string literal)",
+                "example": "FORBIDDEN"
               },
-              "required": [
-                "message"
-              ]
-            },
-            "description": "An array of issues that were responsible for the error",
-            "example": []
+              "reason": {
+                "type": "string",
+                "description": "Stable machine-readable disambiguator (omitted when none applies)"
+              },
+              "message": {
+                "type": "string",
+                "description": "Static HTTP status phrase",
+                "example": "Forbidden"
+              }
+            }
           }
         },
-        "required": [
-          "message",
-          "code"
-        ],
-        "title": "Insufficient access error (403)",
-        "description": "The error information",
         "example": {
-          "code": "FORBIDDEN",
-          "message": "Insufficient access",
-          "issues": []
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Forbidden"
+          }
         }
       },
       "error.BAD_REQUEST": {
         "type": "object",
+        "title": "BAD_REQUEST error envelope (400)",
+        "description": "REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.",
+        "required": [
+          "error"
+        ],
         "properties": {
-          "message": {
-            "type": "string",
-            "description": "The error message",
-            "example": "Invalid input data"
-          },
-          "code": {
-            "type": "string",
-            "description": "The error code",
-            "example": "BAD_REQUEST"
-          },
-          "issues": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "message": {
-                  "type": "string"
-                }
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "tRPC error code (string literal)",
+                "example": "BAD_REQUEST"
               },
-              "required": [
-                "message"
-              ]
-            },
-            "description": "An array of issues that were responsible for the error",
-            "example": []
+              "reason": {
+                "type": "string",
+                "description": "Stable machine-readable disambiguator (omitted when none applies)"
+              },
+              "message": {
+                "type": "string",
+                "description": "Static HTTP status phrase",
+                "example": "Bad Request"
+              }
+            }
           }
         },
-        "required": [
-          "message",
-          "code"
-        ],
-        "title": "Invalid input data error (400)",
-        "description": "The error information",
         "example": {
-          "code": "BAD_REQUEST",
-          "message": "Invalid input data",
-          "issues": []
+          "error": {
+            "code": "BAD_REQUEST",
+            "message": "Bad Request"
+          }
         }
       },
       "error.NOT_FOUND": {
         "type": "object",
+        "title": "NOT_FOUND error envelope (404)",
+        "description": "REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.",
+        "required": [
+          "error"
+        ],
         "properties": {
-          "message": {
-            "type": "string",
-            "description": "The error message",
-            "example": "Not found"
-          },
-          "code": {
-            "type": "string",
-            "description": "The error code",
-            "example": "NOT_FOUND"
-          },
-          "issues": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "message": {
-                  "type": "string"
-                }
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "tRPC error code (string literal)",
+                "example": "NOT_FOUND"
               },
-              "required": [
-                "message"
-              ]
+              "reason": {
+                "type": "string",
+                "description": "Stable machine-readable disambiguator (omitted when none applies)"
+              },
+              "message": {
+                "type": "string",
+                "description": "Static HTTP status phrase",
+                "example": "Not Found"
+              }
+            }
+          }
+        },
+        "example": {
+          "error": {
+            "code": "NOT_FOUND",
+            "message": "Not Found"
+          }
+        }
+      },
+      "error.TIMEOUT": {
+        "type": "object",
+        "title": "TIMEOUT error envelope (408)",
+        "description": "REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "tRPC error code (string literal)",
+                "example": "TIMEOUT"
+              },
+              "reason": {
+                "type": "string",
+                "description": "Stable machine-readable disambiguator (omitted when none applies)"
+              },
+              "message": {
+                "type": "string",
+                "description": "Static HTTP status phrase",
+                "example": "Request Timeout"
+              }
+            }
+          }
+        },
+        "example": {
+          "error": {
+            "code": "TIMEOUT",
+            "message": "Request Timeout"
+          }
+        }
+      },
+      "error.CONFLICT": {
+        "type": "object",
+        "title": "CONFLICT error envelope (409)",
+        "description": "REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "tRPC error code (string literal)",
+                "example": "CONFLICT"
+              },
+              "reason": {
+                "type": "string",
+                "description": "Stable machine-readable disambiguator (omitted when none applies)"
+              },
+              "message": {
+                "type": "string",
+                "description": "Static HTTP status phrase",
+                "example": "Conflict"
+              }
+            }
+          }
+        },
+        "example": {
+          "error": {
+            "code": "CONFLICT",
+            "message": "Conflict"
+          }
+        }
+      },
+      "error.UNPROCESSABLE_CONTENT": {
+        "type": "object",
+        "title": "UNPROCESSABLE_CONTENT error envelope (422)",
+        "description": "REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "tRPC error code (string literal)",
+                "example": "UNPROCESSABLE_CONTENT"
+              },
+              "reason": {
+                "type": "string",
+                "description": "Stable machine-readable disambiguator (omitted when none applies)"
+              },
+              "message": {
+                "type": "string",
+                "description": "Static HTTP status phrase",
+                "example": "Unprocessable Content"
+              }
+            }
+          }
+        },
+        "example": {
+          "error": {
+            "code": "UNPROCESSABLE_CONTENT",
+            "message": "Unprocessable Content"
+          }
+        }
+      },
+      "error.TOO_MANY_REQUESTS": {
+        "type": "object",
+        "title": "TOO_MANY_REQUESTS error envelope (429)",
+        "description": "REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "tRPC error code (string literal)",
+                "example": "TOO_MANY_REQUESTS"
+              },
+              "reason": {
+                "type": "string",
+                "description": "Stable machine-readable disambiguator (omitted when none applies)"
+              },
+              "message": {
+                "type": "string",
+                "description": "Static HTTP status phrase",
+                "example": "Too Many Requests"
+              }
+            }
+          }
+        },
+        "example": {
+          "error": {
+            "code": "TOO_MANY_REQUESTS",
+            "message": "Too Many Requests"
+          }
+        }
+      },
+      "PipelineRunStartCreatedResponse": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "created"
+            ]
+          },
+          "row": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "project": {
+                "type": "string"
+              },
+              "pr": {
+                "type": "string"
+              },
+              "author": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "started": {
+                "type": "string"
+              },
+              "duration": {
+                "type": "string"
+              }
             },
-            "description": "An array of issues that were responsible for the error",
-            "example": []
+            "required": [
+              "name",
+              "status",
+              "project",
+              "pr",
+              "author",
+              "type",
+              "started",
+              "duration"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
-          "message",
-          "code"
+          "kind",
+          "row"
         ],
-        "title": "Not found error (404)",
-        "description": "The error information",
-        "example": {
-          "code": "NOT_FOUND",
-          "message": "Not found",
-          "issues": []
-        }
+        "additionalProperties": false
+      },
+      "PipelineRunStartDryRunResponse": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "dryRun"
+            ]
+          },
+          "manifest": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "kind",
+          "manifest"
+        ],
+        "additionalProperties": false
       },
       "TaskRunRecordsResponse": {
         "type": "object",

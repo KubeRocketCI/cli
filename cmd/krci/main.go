@@ -1,4 +1,3 @@
-// Package main is the entry point for the krci CLI.
 package main
 
 import (

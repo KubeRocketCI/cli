@@ -7,9 +7,9 @@ import (
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/pkg/cmd/pipelinerun/get"
 	"github.com/KubeRocketCI/cli/pkg/cmd/pipelinerun/list"
+	"github.com/KubeRocketCI/cli/pkg/cmd/pipelinerun/start"
 )
 
-// NewCmdPipelineRun returns the "pipelinerun" group cobra.Command with all subcommands attached.
 func NewCmdPipelineRun(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "pipelinerun",
@@ -20,6 +20,7 @@ func NewCmdPipelineRun(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(
 		list.NewCmdList(f, nil),
 		get.NewCmdGet(f, nil),
+		start.NewCmdStart(f, nil),
 	)
 
 	return cmd

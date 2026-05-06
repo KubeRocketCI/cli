@@ -9,16 +9,43 @@ Every row is a self-contained contract a Haiku agent can execute. See
 
 ## Placeholders resolved per run
 
+The orchestrator loads `fixtures.env` and substitutes every `{{NAME}}` in the
+tables below before dispatching agents. Rows whose placeholders are unset are
+SKIPped, not failed.
+
+**Generic discovery placeholders** (used by `list` / `get` rows; populate from
+your own portal):
+
 | Placeholder  | Meaning                                           | Example               |
 |--------------|---------------------------------------------------|-----------------------|
-| `{{PROJECT}}` | An existing codebase name visible to the caller. | `keycloak-operator`   |
-| `{{PR}}`      | A PR number with at least one run for PROJECT.   | `336`                 |
-| `{{AUTHOR}}`  | An author with at least one run.                 | `jane-doe`            |
-| `{{BRANCH}}`  | A source branch with at least one run.           | `refactor-kc-client`  |
-| `{{RUN_NAME}}` | A real run name (copy from `list -o json`).     | `build-…-m8z4m`       |
-| `{{FAILED_RUN_NAME}}` | A run whose status is Failed.               | `review-…-a1b2c3`     |
+| `{{PROJECT}}` | A codebase name visible to the caller.           | `krci-cli-e2e`        |
+| `{{PR}}`      | A PR number with at least one run for PROJECT.   | `1`                   |
+| `{{AUTHOR}}`  | An author with at least one run.                 | `krci-cli-e2e-bot`    |
+| `{{BRANCH}}`  | A source branch with at least one run.           | `main`                |
+| `{{RUN_NAME}}` | A real run name (copy from `list -o json`).     | `krci-cli-e2e-noop-run-m8z4m` |
+| `{{FAILED_RUN_NAME}}` | A run whose status is Failed.            | `krci-cli-e2e-noop-run-a1b2c` |
+| `{{NONCE}}`   | Random suffix for "definitely-doesn't-exist" assertions. | `test-999zzz` |
 
-The orchestrator fills these; the table never hard-codes them.
+**Start-feature placeholders** (point at the manifests in `fixtures/*.yaml`;
+apply once with `kubectl apply -n <namespace> -f fixtures/`):
+
+> Note: pipelines whose params lack defaults are submitted with `value: ""`
+> (or `[]` for arrays), so "missing required param" is not a reachable
+> failure mode through this client — do not write rows expecting one.
+
+| Placeholder                          | Meaning                                                  | Example                       |
+|--------------------------------------|----------------------------------------------------------|-------------------------------|
+| `{{PIPELINE_OK}}`                    | Pipeline that runs cleanly with all-defaulted params.    | `krci-cli-e2e-noop`           |
+| `{{PIPELINE_REQUIRED_PARAM}}`        | Pipeline declaring a required param (no default).        | `krci-cli-e2e-required`       |
+| `{{PIPELINE_REQUIRED_PARAM_NAME}}`   | Name of that required param.                             | `message`                     |
+| `{{PIPELINE_BROKEN_TT}}`             | Pipeline whose TT label points at a missing TT.          | `krci-cli-e2e-broken-tt`      |
+| `{{PIPELINE_BARE}}`                  | Tekton Pipeline carrying no KRCI labels at all.          | `krci-cli-e2e-bare`           |
+| `{{PIPELINE_WITH_TT}}`               | Pipeline paired with a real, resolvable TriggerTemplate. | `krci-cli-e2e-with-tt`        |
+| `{{TRIGGER_TEMPLATE}}`               | The TT referenced by `{{PIPELINE_WITH_TT}}`.             | `krci-cli-e2e-tt`             |
+| `{{PARAM_KNOWN_KEY}}`                | Param accepted by `{{PIPELINE_OK}}`.                     | `git-revision`                |
+| `{{PARAM_KNOWN_VALUE}}`              | Override value for `{{PARAM_KNOWN_KEY}}`.                | `develop`                     |
+| `{{PIPELINE_LABEL_KEY}}`             | Codebase label key used by `--label`.                    | `app.edp.epam.com/codebase`   |
+| `{{PIPELINE_LABEL_VALUE}}`           | Codebase label value used by `--label`.                  | `krci-cli-e2e`                |
 
 ---
 
@@ -191,3 +218,47 @@ Each of the following must be covered by ≥1 row above. Tick as you add.
 - [x] `get` nonexistent name
 - [x] JSON envelope field contract for `list` and `get`
 - [x] auth-required error path
+
+### `pipelinerun start`
+
+Source: `pkg/cmd/pipelinerun/start/start.go` and `internal/portal/start.go`.
+Fixtures: `fixtures/*.yaml` (Pipelines + TriggerTemplate); see
+`fixtures/README.md` for the apply procedure.
+
+| ID                  | Class      | Run as  | Title                                                                                                                                                                | Expect                                                                                                                |
+|---------------------|------------|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| PR-S-HELP           | help       | offline | `start --help` lists `--param`, `--label`, `--dry-run`, `-o`                                                                                                          | exit 0; help text mentions `escape hatch`                                                                             |
+| PR-S-DNS-1          | validation | offline | reject uppercase positional `Foo_Build`                                                                                                                              | exit 1; stderr `must be a valid DNS-1123 name`                                                                        |
+| PR-S-OUT-1          | validation | offline | reject `-o xml`                                                                                                                                                      | exit 1; stderr `unknown output format`                                                                                |
+| PR-S-DRY-MUTEX      | validation | offline | reject `--dry-run -o table`                                                                                                                                          | exit 1; stderr `--dry-run cannot use -o table`                                                                        |
+| PR-S-PARAM-DUP      | validation | offline | reject `--param k=v1 --param k=v2`                                                                                                                                   | exit 1; stderr `duplicate parameter 'k'`                                                                              |
+| PR-S-PARAM-EMPTY    | validation | offline | reject `--param =value`                                                                                                                                              | exit 1; stderr `parameter key must not be empty`                                                                      |
+| PR-S-PARAM-MAL      | validation | offline | reject `--param keywithoutvalue`                                                                                                                                     | exit 1; stderr `parameter must be key=value`                                                                          |
+| PR-S-LABEL-DUP      | validation | offline | reject `--label k=v1 --label k=v2`                                                                                                                                   | exit 1; stderr `duplicate label 'k'`                                                                                  |
+| PR-S-PARAM-EQ       | parser     | offline | accept `--param token=abc=def==` (split on first `=`)                                                                                                                | exit 0 (capture); param `token=abc=def==`                                                                             |
+| PR-S-PARAM-WS       | parser     | offline | accept `--param "  k  =  v  "` (whitespace trimmed)                                                                                                                  | exit 0 (capture); param `k=v`                                                                                         |
+| PR-S-1              | happy      | portal  | `start {{PIPELINE_OK}}` (no params)                                                                                                                                  | exit 0; stdout row with columns `NAME, STATUS, PROJECT, PR, AUTHOR, TYPE, STARTED, DURATION`                          |
+| PR-S-2              | happy      | portal  | `start {{PIPELINE_OK}} --param {{PARAM_KNOWN_KEY}}={{PARAM_KNOWN_VALUE}}`                                                                                            | exit 0; resulting PipelineRun's `spec.params` carries the override                                                    |
+| PR-S-3              | happy      | portal  | `start {{PIPELINE_OK}} -o json`                                                                                                                                      | exit 0; stdout `{"schemaVersion":"1","data":{"name":"...","status":"...",...}}` (StartResult fields, flat — no `row`) |
+| PR-S-LABEL          | happy      | portal  | `start {{PIPELINE_OK}} --label {{PIPELINE_LABEL_KEY}}={{PIPELINE_LABEL_VALUE}}`; then `pipelinerun list --project {{PIPELINE_LABEL_VALUE}}`                          | exit 0 from both; the new run is discoverable in the list output                                                      |
+| PR-S-FAIL           | happy      | portal  | `start {{PIPELINE_OK}} --param should-fail=true -o json`                                                                                                             | exit 0; `data.name` populated. Run will eventually fail — useful as deterministic seed for `FAILED_RUN_NAME`.         |
+| PR-S-BARE           | happy      | portal  | `start {{PIPELINE_BARE}}` (Pipeline carries zero KRCI labels)                                                                                                        | exit 0; standard row; proves CLI does not require KubeRocketCI labelling convention                                   |
+| PR-S-TT-OK          | happy      | portal  | `start {{PIPELINE_WITH_TT}} -o json`; then read back `kubectl get pipelinerun <data.name> -o jsonpath='{.metadata.labels.test\.krci-cli-e2e/seeded-message}'`         | exit 0; label value equals `from-pipeline-default` (proves TriggerTemplate placeholder resolution ran)                |
+| PR-S-DRY-YAML       | dry-run    | portal  | `start {{PIPELINE_OK}} --dry-run` (default → YAML manifest)                                                                                                          | exit 0; stdout valid YAML containing `metadata.generateName: {{PIPELINE_OK}}-run-`                                    |
+| PR-S-DRY-JSON       | dry-run    | portal  | `start {{PIPELINE_OK}} --dry-run -o json`                                                                                                                            | exit 0; stdout `{"schemaVersion":"1","data":{...PipelineRun manifest...}}`; `data.metadata.generateName` starts with `{{PIPELINE_OK}}-run-` |
+| PR-S-TT-DRY         | dry-run    | portal  | `start {{PIPELINE_WITH_TT}} --dry-run -o json`                                                                                                                       | exit 0; `data.metadata.labels."test.krci-cli-e2e/seeded-message"` equals `from-pipeline-default` (resolved before K8s submission) |
+| PR-S-NOT-FOUND      | error      | portal  | `start ghost` (no such Pipeline)                                                                                                                                     | exit 1; stderr `pipeline 'ghost' not found`                                                                           |
+| PR-S-TT-MISSING     | error      | portal  | `start {{PIPELINE_BROKEN_TT}}`                                                                                                                                       | exit 1; stderr `references a TriggerTemplate that does not exist`                                                     |
+| PR-S-PARAM-SYNTHESIZED | regression | portal | `start {{PIPELINE_REQUIRED_PARAM}}` (omit `--param {{PIPELINE_REQUIRED_PARAM_NAME}}=...`); then read back `kubectl get pipelinerun <data.name> -o jsonpath='{.spec.params[0].value}'` | exit 0 from start; the synthesized param value is the empty string. Documents the portal's "always submit a complete manifest" behavior — admission cannot reject for missing required params via this client. |
+| PR-S-COL-EQ         | regression | portal  | header row of `start {{PIPELINE_OK}}` matches header row of `pipelinerun list` byte-for-byte                                                                          | identical header strings                                                                                              |
+| PR-S-RACE           | edge       | portal  | immediately after `start {{PIPELINE_OK}}`, run `pipelinerun get <data.name>`                                                                                         | start exit 0 with stderr note `controller may briefly 404`; the subsequent `get` may briefly 404                       |
+| PR-S-GENNAME        | regression | portal  | `start {{PIPELINE_OK}} -o json`; assert `data.name` matches `^{{PIPELINE_OK}}-run-[a-z0-9]{5}$`                                                                       | name shape conforms (`generateName` round-trip)                                                                       |
+
+#### Coverage notes
+
+- **Validation rows** (`PR-S-DNS-1` through `PR-S-PARAM-WS`) run offline and only need a built `dist/krci` — no portal, no fixtures.
+- **Portal rows** require the manifests in `fixtures/*.yaml` to be applied to the cluster, and the fixture-specific placeholders (`PIPELINE_OK`, `PIPELINE_REQUIRED_PARAM`, `PIPELINE_BROKEN_TT`, `PIPELINE_BARE`, `PIPELINE_WITH_TT`, etc.) to be set in `fixtures.env`. Apply with `kubectl apply -n <namespace> -f fixtures/`; copy `fixtures.env.example` and fill in the values for your namespace.
+- **Cluster-side assertions** (`PR-S-TT-OK`'s seeded-label check) require the agent to read the resulting PipelineRun back from K8s after `start` returns — the CLI does not surface labels in its output. Use `kubectl` against the same namespace the start used.
+- **All `start` errors exit with code 1.** `cmd/krci/main.go` does not map error types to distinct codes; differentiation is via stderr text only. Earlier "exit 2" / "exit 3" rows have been corrected.
+- **No "missing required param" admission rejection is reachable via this client.** The portal's `createPipelineRunDraftFromPipeline` synthesizes `value: ""` (or `[]` for arrays) for every Pipeline-declared param without a default, so the K8s apiserver always sees a complete `spec.params` list. PR-S-PARAM-SYNTHESIZED documents this property; we removed the earlier PR-S-PARAM-MISSING row that asserted the opposite. The CLI's 422 → `ErrPlatformReject` mapping is still exercised by other admission failure classes (resource quota, conflicting names, unrelated webhook rejections) — covered by `internal/portal/start_test.go`.
+- **Out of scope for e2e, covered by unit tests:** `PR-S-RBAC` (HTTP 403 → `permission denied`) and `PR-S-5XX` (HTTP 502/503/500/504 → `upstream service unavailable`) require infrastructure (low-privilege user, fault-injecting proxy) that the self-contained fixture suite does not provision. The mappings live in `internal/portal/start.go:checkStartResponse` and are validated by `internal/portal/start_test.go`.

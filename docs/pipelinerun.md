@@ -7,12 +7,15 @@ deploy, release). Also surfaces logs and a focused failure-diagnosis view.
 
 ## Subcommands
 
-| Command                       | Purpose                                  |
-|-------------------------------|------------------------------------------|
-| `pipelinerun list` (`ls`)     | List and filter runs                     |
-| `pipelinerun get <name>`      | Inspect a specific run                   |
+| Command                       | Purpose                                       |
+|-------------------------------|-----------------------------------------------|
+| `pipelinerun list` (`ls`)     | List and filter runs                          |
+| `pipelinerun get <name>`      | Inspect a specific run                        |
+| `pipelinerun start <pipeline>` | Create a new run from a Tekton pipeline name |
 
-Both accept `-o, --output` (`table` | `json`), `--logs`, and `--reason`.
+`list` and `get` accept `-o, --output` (`table` | `json`), `--logs`, and
+`--reason`. `start` has its own flag set (`--param`, `--label`, `--dry-run`,
+`-o`) — see below.
 
 ## `pipelinerun list`
 
@@ -73,6 +76,80 @@ Project:     keycloak-operator
 
 Add `--logs` for full logs or `--reason` for focused failure diagnosis.
 
+## `pipelinerun start`
+
+Create a new run of a Tekton pipeline by name. The pipeline name is the
+required argument; everything else is optional. The new run uses Kubernetes
+`metadata.generateName`, so the apiserver assigns the random suffix and the
+resolved name is read back and printed.
+
+```bash
+krci pipelinerun start foo-build
+```
+
+```
+NAME                  STATUS    PROJECT   PR   AUTHOR   TYPE    STARTED                DURATION
+foo-build-run-zhqvj   Pending   -         -    -        build   2026-05-07T06:14:04Z   -
+```
+
+### Flags
+
+| Flag           | Description                                                                  |
+|----------------|------------------------------------------------------------------------------|
+| `--param`      | Pipeline parameter as `key=value` (repeatable; split on first `=`)           |
+| `--label`      | Label to attach to the resulting PipelineRun as `key=value` (repeatable)     |
+| `--dry-run`    | Render the would-be PipelineRun without creating it (needs `-o json`/`yaml`) |
+| `-o, --output` | `table` (default), `json`, or `yaml` (yaml only with `--dry-run`)            |
+
+> **Params without a default** are submitted with `value: ""` (or `[]` for
+> arrays). Pass `--param k=v` for any values your pipeline actually needs.
+
+### Examples
+
+```bash
+# Override a single param
+krci pipelinerun start foo-build --param git-revision=develop
+
+# Multiple params plus a discoverability label
+krci pipelinerun start foo-build --param k=v --param k2=v2 \
+  --label app.edp.epam.com/codebase=my-app
+
+# Render the would-be PipelineRun without creating it
+krci pipelinerun start foo-build --dry-run -o yaml
+
+# JSON output (for AI agents / scripting)
+krci pipelinerun start foo-build -o json
+```
+
+### JSON output
+
+`start` uses a wrapped envelope (different from `list` / `get`):
+
+```json
+{
+  "schemaVersion": "1",
+  "data": {
+    "name": "foo-build-run-zhqvj",
+    "status": "Pending",
+    "project": "my-app",
+    "pr": "",
+    "author": "",
+    "type": "build",
+    "started": "2026-05-07T06:14:04Z",
+    "duration": ""
+  }
+}
+```
+
+For `--dry-run`, `data` is the rendered PipelineRun manifest itself instead
+of the result row.
+
+### Finding the run you just started
+
+```bash
+krci pipelinerun list --project my-app
+```
+
 ## Failure diagnosis (`--reason`)
 
 Works on both `list` (targets the most recent matching run) and `get`:
@@ -100,7 +177,9 @@ Logs: sonar
   [sonar-scanner] ERROR: QUALITY GATE STATUS: FAILED
 ```
 
-## JSON output
+## JSON output (`list` / `get`)
+
+`start` uses a different envelope — see the [`start` section](#pipelinerun-start) above.
 
 ```bash
 krci run list --project keycloak-operator -o json

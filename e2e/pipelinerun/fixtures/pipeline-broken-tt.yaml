@@ -1,0 +1,37 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: krci-cli-e2e-broken-tt
+  labels:
+    app.edp.epam.com/pipelinetype: tests
+    # Points at a TriggerTemplate that does NOT exist. The portal start
+    # procedure looks the TT up before building the PipelineRun draft and
+    # returns trigger_template_not_found. Drives PR-S-TT-MISSING.
+    app.edp.epam.com/triggertemplate: krci-cli-e2e-tt-does-not-exist
+spec:
+  description: |
+    Test fixture for the krci CLI e2e suite. Carries a TriggerTemplate label
+    pointing at a non-existent TT so that `pipelinerun start` exercises the
+    portal's TT-lookup error branch.
+    Source of truth: source/cli/e2e/pipelinerun/fixtures/pipeline-broken-tt.yaml.
+  params:
+    - name: message
+      type: string
+      default: "unreachable"
+  tasks:
+    - name: echo
+      params:
+        - name: message
+          value: $(params.message)
+      taskSpec:
+        params:
+          - name: message
+        steps:
+          - name: hello
+            image: docker.io/library/busybox:1.36
+            env:
+              - name: MESSAGE
+                value: $(params.message)
+            script: |
+              #!/bin/sh
+              echo "$MESSAGE - this should never run; TT lookup fails first"

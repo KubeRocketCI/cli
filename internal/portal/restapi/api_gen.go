@@ -22,6 +22,16 @@ const (
 	BearerAuthScopes = "bearerAuth.Scopes"
 )
 
+// Defines values for PipelineRunStartCreatedResponseKind.
+const (
+	Created PipelineRunStartCreatedResponseKind = "created"
+)
+
+// Defines values for PipelineRunStartDryRunResponseKind.
+const (
+	DryRun PipelineRunStartDryRunResponseKind = "dryRun"
+)
+
 // Defines values for SCAComponentsResponseStatus.
 const (
 	SCAComponentsResponseStatusNONE SCAComponentsResponseStatus = "NONE"
@@ -148,6 +158,33 @@ const (
 	False SonarIssuesParamsAsc = "false"
 	True  SonarIssuesParamsAsc = "true"
 )
+
+// PipelineRunStartCreatedResponse defines model for PipelineRunStartCreatedResponse.
+type PipelineRunStartCreatedResponse struct {
+	Kind PipelineRunStartCreatedResponseKind `json:"kind"`
+	Row  struct {
+		Author   string `json:"author"`
+		Duration string `json:"duration"`
+		Name     string `json:"name"`
+		Pr       string `json:"pr"`
+		Project  string `json:"project"`
+		Started  string `json:"started"`
+		Status   string `json:"status"`
+		Type     string `json:"type"`
+	} `json:"row"`
+}
+
+// PipelineRunStartCreatedResponseKind defines model for PipelineRunStartCreatedResponse.Kind.
+type PipelineRunStartCreatedResponseKind string
+
+// PipelineRunStartDryRunResponse defines model for PipelineRunStartDryRunResponse.
+type PipelineRunStartDryRunResponse struct {
+	Kind     PipelineRunStartDryRunResponseKind `json:"kind"`
+	Manifest map[string]interface{}             `json:"manifest"`
+}
+
+// PipelineRunStartDryRunResponseKind defines model for PipelineRunStartDryRunResponse.Kind.
+type PipelineRunStartDryRunResponseKind string
 
 // SCAComponent defines model for SCAComponent.
 type SCAComponent struct {
@@ -501,74 +538,130 @@ type TaskRunStep struct {
 	} `json:"waiting,omitempty"`
 }
 
-// ErrorBADREQUEST The error information
+// ErrorBADREQUEST REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
 type ErrorBADREQUEST struct {
-	// Code The error code
-	Code string `json:"code"`
+	Error struct {
+		// Code tRPC error code (string literal)
+		Code string `json:"code"`
 
-	// Issues An array of issues that were responsible for the error
-	Issues *[]struct {
+		// Message Static HTTP status phrase
 		Message string `json:"message"`
-	} `json:"issues,omitempty"`
 
-	// Message The error message
-	Message string `json:"message"`
+		// Reason Stable machine-readable disambiguator (omitted when none applies)
+		Reason *string `json:"reason,omitempty"`
+	} `json:"error"`
 }
 
-// ErrorFORBIDDEN The error information
+// ErrorCONFLICT REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
+type ErrorCONFLICT struct {
+	Error struct {
+		// Code tRPC error code (string literal)
+		Code string `json:"code"`
+
+		// Message Static HTTP status phrase
+		Message string `json:"message"`
+
+		// Reason Stable machine-readable disambiguator (omitted when none applies)
+		Reason *string `json:"reason,omitempty"`
+	} `json:"error"`
+}
+
+// ErrorFORBIDDEN REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
 type ErrorFORBIDDEN struct {
-	// Code The error code
-	Code string `json:"code"`
+	Error struct {
+		// Code tRPC error code (string literal)
+		Code string `json:"code"`
 
-	// Issues An array of issues that were responsible for the error
-	Issues *[]struct {
+		// Message Static HTTP status phrase
 		Message string `json:"message"`
-	} `json:"issues,omitempty"`
 
-	// Message The error message
-	Message string `json:"message"`
+		// Reason Stable machine-readable disambiguator (omitted when none applies)
+		Reason *string `json:"reason,omitempty"`
+	} `json:"error"`
 }
 
-// ErrorINTERNALSERVERERROR The error information
+// ErrorINTERNALSERVERERROR REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
 type ErrorINTERNALSERVERERROR struct {
-	// Code The error code
-	Code string `json:"code"`
+	Error struct {
+		// Code tRPC error code (string literal)
+		Code string `json:"code"`
 
-	// Issues An array of issues that were responsible for the error
-	Issues *[]struct {
+		// Message Static HTTP status phrase
 		Message string `json:"message"`
-	} `json:"issues,omitempty"`
 
-	// Message The error message
-	Message string `json:"message"`
+		// Reason Stable machine-readable disambiguator (omitted when none applies)
+		Reason *string `json:"reason,omitempty"`
+	} `json:"error"`
 }
 
-// ErrorNOTFOUND The error information
+// ErrorNOTFOUND REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
 type ErrorNOTFOUND struct {
-	// Code The error code
-	Code string `json:"code"`
+	Error struct {
+		// Code tRPC error code (string literal)
+		Code string `json:"code"`
 
-	// Issues An array of issues that were responsible for the error
-	Issues *[]struct {
+		// Message Static HTTP status phrase
 		Message string `json:"message"`
-	} `json:"issues,omitempty"`
 
-	// Message The error message
-	Message string `json:"message"`
+		// Reason Stable machine-readable disambiguator (omitted when none applies)
+		Reason *string `json:"reason,omitempty"`
+	} `json:"error"`
 }
 
-// ErrorUNAUTHORIZED The error information
-type ErrorUNAUTHORIZED struct {
-	// Code The error code
-	Code string `json:"code"`
+// ErrorTIMEOUT REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
+type ErrorTIMEOUT struct {
+	Error struct {
+		// Code tRPC error code (string literal)
+		Code string `json:"code"`
 
-	// Issues An array of issues that were responsible for the error
-	Issues *[]struct {
+		// Message Static HTTP status phrase
 		Message string `json:"message"`
-	} `json:"issues,omitempty"`
 
-	// Message The error message
-	Message string `json:"message"`
+		// Reason Stable machine-readable disambiguator (omitted when none applies)
+		Reason *string `json:"reason,omitempty"`
+	} `json:"error"`
+}
+
+// ErrorTOOMANYREQUESTS REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
+type ErrorTOOMANYREQUESTS struct {
+	Error struct {
+		// Code tRPC error code (string literal)
+		Code string `json:"code"`
+
+		// Message Static HTTP status phrase
+		Message string `json:"message"`
+
+		// Reason Stable machine-readable disambiguator (omitted when none applies)
+		Reason *string `json:"reason,omitempty"`
+	} `json:"error"`
+}
+
+// ErrorUNAUTHORIZED REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
+type ErrorUNAUTHORIZED struct {
+	Error struct {
+		// Code tRPC error code (string literal)
+		Code string `json:"code"`
+
+		// Message Static HTTP status phrase
+		Message string `json:"message"`
+
+		// Reason Stable machine-readable disambiguator (omitted when none applies)
+		Reason *string `json:"reason,omitempty"`
+	} `json:"error"`
+}
+
+// ErrorUNPROCESSABLECONTENT REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
+type ErrorUNPROCESSABLECONTENT struct {
+	Error struct {
+		// Code tRPC error code (string literal)
+		Code string `json:"code"`
+
+		// Message Static HTTP status phrase
+		Message string `json:"message"`
+
+		// Reason Stable machine-readable disambiguator (omitted when none applies)
+		Reason *string `json:"reason,omitempty"`
+	} `json:"error"`
 }
 
 // TektonResultsGetPipelineRunResultsParams defines parameters for TektonResultsGetPipelineRunResults.
@@ -588,6 +681,15 @@ type TektonResultsGetPipelineRunLogsParams struct {
 // TektonResultsGetTaskRunRecordsParams defines parameters for TektonResultsGetTaskRunRecords.
 type TektonResultsGetTaskRunRecordsParams struct {
 	Namespace string `form:"namespace" json:"namespace"`
+}
+
+// PipelineRunStartJSONBody defines parameters for PipelineRunStart.
+type PipelineRunStartJSONBody struct {
+	DryRun    *bool              `json:"dryRun,omitempty"`
+	Labels    *map[string]string `json:"labels,omitempty"`
+	Namespace string             `json:"namespace"`
+	Params    *map[string]string `json:"params,omitempty"`
+	Pipeline  string             `json:"pipeline"`
 }
 
 // K8sGetJSONBody defines parameters for K8sGet.
@@ -727,6 +829,9 @@ type TektonResultsGetTaskRunLogsParams struct {
 	StepName    *string `form:"stepName,omitempty" json:"stepName,omitempty"`
 }
 
+// PipelineRunStartJSONRequestBody defines body for PipelineRunStart for application/json ContentType.
+type PipelineRunStartJSONRequestBody PipelineRunStartJSONBody
+
 // K8sGetJSONRequestBody defines body for K8sGet for application/json ContentType.
 type K8sGetJSONRequestBody K8sGetJSONBody
 
@@ -821,6 +926,11 @@ type ClientInterface interface {
 	// TektonResultsGetTaskRunRecords request
 	TektonResultsGetTaskRunRecords(ctx context.Context, resultUid openapi_types.UUID, params *TektonResultsGetTaskRunRecordsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// PipelineRunStartWithBody request with any body
+	PipelineRunStartWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PipelineRunStart(ctx context.Context, body PipelineRunStartJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// K8sGetWithBody request with any body
 	K8sGetWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -909,6 +1019,30 @@ func (c *Client) TektonResultsGetPipelineRunLogs(ctx context.Context, resultUid 
 
 func (c *Client) TektonResultsGetTaskRunRecords(ctx context.Context, resultUid openapi_types.UUID, params *TektonResultsGetTaskRunRecordsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewTektonResultsGetTaskRunRecordsRequest(c.Server, resultUid, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PipelineRunStartWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPipelineRunStartRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PipelineRunStart(ctx context.Context, body PipelineRunStartJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPipelineRunStartRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1334,6 +1468,46 @@ func NewTektonResultsGetTaskRunRecordsRequest(server string, resultUid openapi_t
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewPipelineRunStartRequest calls the generic PipelineRunStart builder with application/json body
+func NewPipelineRunStartRequest(server string, body PipelineRunStartJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPipelineRunStartRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPipelineRunStartRequestWithBody generates requests for PipelineRunStart with any type of body
+func NewPipelineRunStartRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/pipelineruns/start")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -2420,6 +2594,11 @@ type ClientWithResponsesInterface interface {
 	// TektonResultsGetTaskRunRecordsWithResponse request
 	TektonResultsGetTaskRunRecordsWithResponse(ctx context.Context, resultUid openapi_types.UUID, params *TektonResultsGetTaskRunRecordsParams, reqEditors ...RequestEditorFn) (*TektonResultsGetTaskRunRecordsResponse, error)
 
+	// PipelineRunStartWithBodyWithResponse request with any body
+	PipelineRunStartWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PipelineRunStartResponse, error)
+
+	PipelineRunStartWithResponse(ctx context.Context, body PipelineRunStartJSONRequestBody, reqEditors ...RequestEditorFn) (*PipelineRunStartResponse, error)
+
 	// K8sGetWithBodyWithResponse request with any body
 	K8sGetWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*K8sGetResponse, error)
 
@@ -2609,6 +2788,38 @@ func (r TektonResultsGetTaskRunRecordsResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r TektonResultsGetTaskRunRecordsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type PipelineRunStartResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		union json.RawMessage
+	}
+	JSON400 *ErrorBADREQUEST
+	JSON401 *ErrorUNAUTHORIZED
+	JSON403 *ErrorFORBIDDEN
+	JSON408 *ErrorTIMEOUT
+	JSON409 *ErrorCONFLICT
+	JSON422 *ErrorUNPROCESSABLECONTENT
+	JSON429 *ErrorTOOMANYREQUESTS
+	JSON500 *ErrorINTERNALSERVERERROR
+}
+
+// Status returns HTTPResponse.Status
+func (r PipelineRunStartResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PipelineRunStartResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -2932,7 +3143,6 @@ type TektonResultsGetTaskRunLogsResponse struct {
 		HasLogs      bool                      `json:"hasLogs"`
 		Logs         string                    `json:"logs"`
 		StepFiltered *bool                     `json:"stepFiltered,omitempty"`
-		TaskName     string                    `json:"taskName"`
 		TaskRunName  string                    `json:"taskRunName"`
 	}
 	JSON400 *ErrorBADREQUEST
@@ -3001,6 +3211,23 @@ func (c *ClientWithResponses) TektonResultsGetTaskRunRecordsWithResponse(ctx con
 		return nil, err
 	}
 	return ParseTektonResultsGetTaskRunRecordsResponse(rsp)
+}
+
+// PipelineRunStartWithBodyWithResponse request with arbitrary body returning *PipelineRunStartResponse
+func (c *ClientWithResponses) PipelineRunStartWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PipelineRunStartResponse, error) {
+	rsp, err := c.PipelineRunStartWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePipelineRunStartResponse(rsp)
+}
+
+func (c *ClientWithResponses) PipelineRunStartWithResponse(ctx context.Context, body PipelineRunStartJSONRequestBody, reqEditors ...RequestEditorFn) (*PipelineRunStartResponse, error) {
+	rsp, err := c.PipelineRunStart(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePipelineRunStartResponse(rsp)
 }
 
 // K8sGetWithBodyWithResponse request with arbitrary body returning *K8sGetResponse
@@ -3395,6 +3622,90 @@ func ParseTektonResultsGetTaskRunRecordsResponse(rsp *http.Response) (*TektonRes
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePipelineRunStartResponse parses an HTTP response from a PipelineRunStartWithResponse call
+func ParsePipelineRunStartResponse(rsp *http.Response) (*PipelineRunStartResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PipelineRunStartResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			union json.RawMessage
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorBADREQUEST
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorUNAUTHORIZED
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorFORBIDDEN
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 408:
+		var dest ErrorTIMEOUT
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON408 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorCONFLICT
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorUNPROCESSABLECONTENT
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest ErrorTOOMANYREQUESTS
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorINTERNALSERVERERROR
@@ -4057,7 +4368,6 @@ func ParseTektonResultsGetTaskRunLogsResponse(rsp *http.Response) (*TektonResult
 			HasLogs      bool                      `json:"hasLogs"`
 			Logs         string                    `json:"logs"`
 			StepFiltered *bool                     `json:"stepFiltered,omitempty"`
-			TaskName     string                    `json:"taskName"`
 			TaskRunName  string                    `json:"taskRunName"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {

@@ -188,15 +188,6 @@ func checkSCAResponse(statusCode int, body []byte) error {
 	return checkResponse(statusCode, body)
 }
 
-// scaNotFoundError wraps ErrNotFound with a user-facing message. Unlike a
-// plain fmt.Errorf(...: %w, ErrNotFound), its Error() omits the sentinel
-// "resource not found" suffix so the CLI emits only the rich disambiguation
-// message. errors.Is(err, ErrNotFound) still matches via Unwrap.
-type scaNotFoundError struct{ msg string }
-
-func (e *scaNotFoundError) Error() string { return e.msg }
-func (e *scaNotFoundError) Unwrap() error { return ErrNotFound }
-
 // scaBranchNotFoundErr decodes the 404 body returned by the resolveBranch
 // helper on the Portal side. The body distinguishes `codebase_not_found` vs
 // `default_branch_missing`; the CLI surfaces a matching human-readable message
@@ -214,14 +205,15 @@ func scaBranchNotFoundErr(err error, body []byte, codebase, branch string) error
 	bodyLower := strings.ToLower(string(body))
 	switch {
 	case branch != "":
-		return &scaNotFoundError{msg: fmt.Sprintf("project %s not found", codebase)}
+		return newNotFoundErr(fmt.Sprintf("project %s not found", codebase), ErrNotFound)
 	case strings.Contains(bodyLower, "default_branch_missing"):
-		return &scaNotFoundError{msg: fmt.Sprintf(
-			"project %s has no spec.defaultBranch configured — pass --branch explicitly", codebase)}
+		return newNotFoundErr(fmt.Sprintf(
+			"project %s has no spec.defaultBranch configured — pass --branch explicitly", codebase),
+			ErrNotFound)
 	default:
-		return &scaNotFoundError{msg: fmt.Sprintf(
+		return newNotFoundErr(fmt.Sprintf(
 			"project %s not found — use 'krci sca list --search=%s' to find projects known to Dep-Track",
-			codebase, codebase)}
+			codebase, codebase), ErrNotFound)
 	}
 }
 

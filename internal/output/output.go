@@ -11,6 +11,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/table"
+	"gopkg.in/yaml.v3"
 
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/portal"
@@ -19,6 +20,7 @@ import (
 const (
 	FormatTable = "table"
 	FormatJSON  = "json"
+	FormatYAML  = "yaml"
 )
 
 // ANSI color code used for borders and header accents.
@@ -196,6 +198,15 @@ func PrintJSON(w io.Writer, v any) error {
 	enc.SetIndent("", "  ")
 
 	return enc.Encode(v)
+}
+
+func PrintYAML(w io.Writer, v any) error {
+	enc := yaml.NewEncoder(w)
+	if err := enc.Encode(v); err != nil {
+		return err
+	}
+
+	return enc.Close()
 }
 
 // JSONEnvelope wraps a success payload with the shared schemaVersion/data contract.

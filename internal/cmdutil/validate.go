@@ -41,16 +41,24 @@ func ValidateStringFlags(cmd *cobra.Command) error {
 	return nil
 }
 
-// DNS-1123 label: lowercase alphanumerics and '-', must start and end with an
-// alphanumeric, 1..63 chars. Used for Kubernetes namespaces, KubeRocketCI
-// codebase names, and SonarQube projectKeys (which by Portal convention equal
-// the codebase name). Single source of truth for the whole CLI.
+// DNS-1123 label: lowercase alphanumerics and '-', 1..63 chars, start/end with
+// alphanumeric. Single source of truth across the CLI — do not duplicate.
 var dns1123LabelRegexp = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 
-// DNS1123SubdomainMaxLength is the maximum length of a DNS-1123 subdomain.
 const DNS1123SubdomainMaxLength = 253
 
-// IsValidDNS1123Label reports whether s matches the DNS-1123 label shape.
 func IsValidDNS1123Label(s string) bool {
 	return dns1123LabelRegexp.MatchString(s)
+}
+
+// DNS-1123 subdomain: dot-separated label segments, up to 253 chars.
+// Kubernetes resource names use the subdomain shape — not the 63-char label cap.
+var dns1123SubdomainRegexp = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`)
+
+func IsValidDNS1123Subdomain(s string) bool {
+	if len(s) == 0 || len(s) > DNS1123SubdomainMaxLength {
+		return false
+	}
+
+	return dns1123SubdomainRegexp.MatchString(s)
 }
