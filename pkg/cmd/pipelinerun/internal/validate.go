@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/output"
 )
 
@@ -13,23 +12,6 @@ const (
 	KindParameter = "parameter"
 	KindLabel     = "label"
 )
-
-// ValidatePipelineName returns an error when name does not match the DNS-1123
-// subdomain shape. Tekton Pipeline objects follow Kubernetes resource-name
-// conventions, which allow up to 253 chars (subdomain shape), not the tighter
-// 63-char label ceiling used for codebase/sonar names.
-func ValidatePipelineName(name string) error {
-	if name == "" {
-		return fmt.Errorf("<pipeline> must not be empty")
-	}
-
-	if !cmdutil.IsValidDNS1123Subdomain(name) {
-		return fmt.Errorf(
-			"<pipeline> must be a valid DNS-1123 subdomain (max 253 chars, lowercase alphanumeric, '-' and '.')")
-	}
-
-	return nil
-}
 
 // ValidateOutputAndDryRun enforces the joint contract between -o and --dry-run.
 //

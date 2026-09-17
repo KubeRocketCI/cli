@@ -63,7 +63,7 @@ Rows are sorted by deployment ascending, then by Stage.spec.order ascending.`,
 				return err
 			}
 
-			if err := discovery.ValidateProject(opts.Project); err != nil {
+			if err := cmdutil.ValidateK8sName("<project>", opts.Project); err != nil {
 				return err
 			}
 

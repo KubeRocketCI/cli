@@ -200,6 +200,6 @@ krci project deployments payments-api -o json |
   jq '.data.rows | group_by(.deployed) | map({deployed: .[0].deployed, count: length})'
 ```
 
-`<project>` is positional, required, single, and must be a DNS-1123 label
-(lowercase alphanumerics + hyphens, ≤ 63 chars). Invalid input fails with
+`<project>` is positional, required, single, and must be a DNS-1123 name
+(lowercase alphanumerics + hyphens, no dots, ≤ 253 chars). Invalid input fails with
 exit `1` before contacting the Portal.

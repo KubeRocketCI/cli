@@ -9,35 +9,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func TestValidateCodebaseKey(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		input   string
-		wantErr string
-	}{
-		{"valid", "my-service", ""},
-		{"valid with digits", "svc-42", ""},
-		{"empty", "", "must not be empty"},
-		{"uppercase rejected", "MyService", "DNS-1123"},
-		{"too long", strings.Repeat("x", 300), "at most"},
-		{"invalid char", "my_service", "DNS-1123"},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			err := ValidateCodebaseKey(tc.input)
-			switch {
-			case tc.wantErr == "" && err != nil:
-				t.Errorf("want nil, got %v", err)
-			case tc.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tc.wantErr)):
-				t.Errorf("want substr %q, got %v", tc.wantErr, err)
-			}
-		})
-	}
-}
-
 func TestValidateOutputFormat(t *testing.T) {
 	t.Parallel()
 

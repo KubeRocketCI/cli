@@ -42,7 +42,8 @@ func ValidateStringFlags(cmd *cobra.Command) error {
 }
 
 // DNS-1123 label: lowercase alphanumerics and '-', 1..63 chars, start/end with
-// alphanumeric. Single source of truth across the CLI — do not duplicate.
+// alphanumeric. Boolean check for discovered config values; user-typed
+// resource names go through ValidateK8sName.
 var dns1123LabelRegexp = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 
 const DNS1123SubdomainMaxLength = 253
@@ -51,14 +52,28 @@ func IsValidDNS1123Label(s string) bool {
 	return dns1123LabelRegexp.MatchString(s)
 }
 
-// DNS-1123 subdomain: dot-separated label segments, up to 253 chars.
-// Kubernetes resource names use the subdomain shape — not the 63-char label cap.
-var dns1123SubdomainRegexp = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`)
+// K8sNamePattern is the portal's tektonInputSchemas.k8sName shape: lowercase
+// alphanumerics and '-', no dots, start/end alphanumeric. Length is bounded
+// separately by DNS1123SubdomainMaxLength.
+const K8sNamePattern = `^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`
 
-func IsValidDNS1123Subdomain(s string) bool {
-	if len(s) == 0 || len(s) > DNS1123SubdomainMaxLength {
-		return false
+var k8sNameRegexp = regexp.MustCompile(K8sNamePattern)
+
+// ValidateK8sName is the single validator for a Kubernetes resource name the
+// user types: project, pipeline, deployment, env, cluster. placeholder names
+// the argument in the error, e.g. "<project>" or "--cluster".
+func ValidateK8sName(placeholder, value string) error {
+	if value == "" {
+		return fmt.Errorf("%s must not be empty", placeholder)
 	}
 
-	return dns1123SubdomainRegexp.MatchString(s)
+	if len(value) > DNS1123SubdomainMaxLength {
+		return fmt.Errorf("%s must be at most %d characters (DNS-1123)", placeholder, DNS1123SubdomainMaxLength)
+	}
+
+	if !k8sNameRegexp.MatchString(value) {
+		return fmt.Errorf("%s must be a valid DNS-1123 name: lowercase alphanumeric and '-', no dots", placeholder)
+	}
+
+	return nil
 }

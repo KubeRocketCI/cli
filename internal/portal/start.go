@@ -12,7 +12,7 @@ import (
 )
 
 type StartInput struct {
-	Pipeline string            // DNS-1123 subdomain name of the Tekton Pipeline (max 253 chars)
+	Pipeline string            // Kubernetes name of the Tekton Pipeline
 	Params   map[string]string // user-supplied parameter overrides (may be nil)
 	Labels   map[string]string // labels to attach to metadata.labels (may be nil)
 	DryRun   bool              // true → render manifest without create

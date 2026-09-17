@@ -61,13 +61,15 @@ ascending, then by Stage.spec.order ascending.`,
 			}
 
 			if cmd.Flags().Changed("deployment") {
-				if err := discovery.ValidateDeployment(opts.Deployment); err != nil {
+				if err := cmdutil.ValidateK8sName("<deployment>", opts.Deployment); err != nil {
 					return err
 				}
 			}
 
-			if err := discovery.ValidateCluster(opts.Cluster); err != nil {
-				return err
+			if opts.Cluster != "" {
+				if err := cmdutil.ValidateK8sName("--cluster", opts.Cluster); err != nil {
+					return err
+				}
 			}
 
 			if runF != nil {

@@ -99,35 +99,53 @@ func TestIsValidDNS1123Label(t *testing.T) {
 	}
 }
 
-func TestIsValidDNS1123Subdomain(t *testing.T) {
+func TestValidateK8sName(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-		in   string
-		want bool
+		name    string
+		in      string
+		wantErr string // empty = expect no error
 	}{
-		{"single char", "a", true},
-		{"label-style name", "payments-api", true},
-		{"63 chars label shape", strings.Repeat("a", 63), true},
-		{"200 chars with dots", strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("d", 8), true},
-		{"dotted segments", "a.b.c", true},
-		{"segment with digits", "build-1.pipeline-2", true},
+		{"simple name", "my-app", ""},
+		{"single char", "a", ""},
+		{"digits allowed", "app-123", ""},
+		{"63 chars ok", strings.Repeat("a", 63), ""},
+		{"64 chars ok", strings.Repeat("a", 64), ""},
+		{"253 chars ok", strings.Repeat("a", 253), ""},
 
-		{"empty rejected", "", false},
-		{"uppercase rejected", "UPPER", false},
-		{"leading dash rejected", "-leading", false},
-		{"trailing dash rejected", "trailing-", false},
-		{"leading dot rejected", ".leading", false},
-		{"trailing dot rejected", "trailing.", false},
-		{"underscore rejected", "has_underscore", false},
-		{"254 chars over limit", strings.Repeat("a", 254), false},
+		{"empty rejected", "", "must not be empty"},
+		{"dot rejected", "my.app", "must be a valid DNS-1123 name: lowercase alphanumeric and '-', no dots"},
+		{"uppercase rejected", "My-App", "must be a valid DNS-1123 name: lowercase alphanumeric and '-', no dots"},
+		{"underscore rejected", "my_app", "must be a valid DNS-1123 name: lowercase alphanumeric and '-', no dots"},
+		{"leading hyphen rejected", "-my-app", "must be a valid DNS-1123 name: lowercase alphanumeric and '-', no dots"},
+		{"trailing hyphen rejected", "my-app-", "must be a valid DNS-1123 name: lowercase alphanumeric and '-', no dots"},
+		{"254 chars rejected", strings.Repeat("a", 254), "must be at most 253 characters"},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := IsValidDNS1123Subdomain(tc.in); got != tc.want {
-				t.Errorf("IsValidDNS1123Subdomain(%q) = %v, want %v", tc.in, got, tc.want)
+			t.Parallel()
+
+			err := ValidateK8sName("<project>", tc.in)
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Fatalf("expected no error, got: %v", err)
+				}
+
+				return
+			}
+
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tc.wantErr)
+			}
+
+			if !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("expected error to contain %q, got: %v", tc.wantErr, err)
+			}
+
+			if !strings.HasPrefix(err.Error(), "<project>") {
+				t.Fatalf("expected error to carry the placeholder, got: %v", err)
 			}
 		})
 	}

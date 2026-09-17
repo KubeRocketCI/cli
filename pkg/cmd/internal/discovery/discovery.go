@@ -1,6 +1,6 @@
 // Package discovery holds helpers shared by the deployment-discovery verbs
 // (`krci env list`, `krci env get`, `krci project deployments`):
-// DNS-1123 validation, output-format dispatch, JSON envelope rendering, and
+// output-format dispatch, JSON envelope rendering, table cells, and
 // shared error promotion. Placed under `pkg/cmd/internal/` so Go enforces
 // package visibility: only packages below `pkg/cmd/...` may import it.
 package discovery
@@ -30,56 +30,6 @@ const ShortDigestLen = 15
 // mode (mirrors the pipelinerun-list approach of truncating long names).
 // The OSC 8 hyperlink target carries the full URL regardless.
 const MaxIngressHostLen = 50
-
-// validateDNS1123Label rejects empty / over-length / non-DNS-1123 values,
-// formatting messages with the supplied placeholder (e.g. `<deployment>`,
-// `--cluster`).
-func validateDNS1123Label(placeholder, value string) error {
-	if value == "" {
-		return fmt.Errorf("%s must not be empty", placeholder)
-	}
-
-	if len(value) > cmdutil.DNS1123SubdomainMaxLength {
-		return fmt.Errorf("%s must be at most %d characters (DNS-1123)", placeholder, cmdutil.DNS1123SubdomainMaxLength)
-	}
-
-	if !cmdutil.IsValidDNS1123Label(value) {
-		return fmt.Errorf("%s must be a valid DNS-1123 label", placeholder)
-	}
-
-	return nil
-}
-
-// ValidateDeployment rejects values that fail DNS-1123 label validation. Used
-// by both the positional `<deployment>` (env get) and the `--deployment` flag
-// value (env list).
-func ValidateDeployment(deployment string) error {
-	return validateDNS1123Label("<deployment>", deployment)
-}
-
-// ValidateEnv rejects values that fail DNS-1123 label validation. <env> maps
-// to Stage.spec.name (a short user-facing identifier like "dev", "stage",
-// "prod").
-func ValidateEnv(env string) error {
-	return validateDNS1123Label("<env>", env)
-}
-
-// ValidateCluster rejects values that fail DNS-1123 label validation when the
-// `--cluster` flag is supplied with a non-empty value. Empty is allowed since
-// the flag is optional.
-func ValidateCluster(cluster string) error {
-	if cluster == "" {
-		return nil
-	}
-
-	return validateDNS1123Label("--cluster", cluster)
-}
-
-// ValidateProject rejects project names that fail DNS-1123 label validation.
-// Used by `krci project deployments <project>`.
-func ValidateProject(project string) error {
-	return validateDNS1123Label("<project>", project)
-}
 
 // ValidateOutputFormat rejects `-o` values other than "", "table", or "json".
 func ValidateOutputFormat(format string) error {

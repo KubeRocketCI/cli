@@ -68,11 +68,11 @@ short user-facing identifier such as "dev", "stage", "prod").`,
 				return err
 			}
 
-			if err := discovery.ValidateDeployment(opts.Deployment); err != nil {
+			if err := cmdutil.ValidateK8sName("<deployment>", opts.Deployment); err != nil {
 				return err
 			}
 
-			if err := discovery.ValidateEnv(opts.Env); err != nil {
+			if err := cmdutil.ValidateK8sName("<env>", opts.Env); err != nil {
 				return err
 			}
 
