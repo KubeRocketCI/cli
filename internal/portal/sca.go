@@ -205,13 +205,13 @@ func scaBranchNotFoundErr(err error, body []byte, codebase, branch string) error
 	bodyLower := strings.ToLower(string(body))
 	switch {
 	case branch != "":
-		return newNotFoundErr(fmt.Sprintf("project %s not found", codebase), ErrNotFound)
+		return newRichErr(fmt.Sprintf("project %s not found", codebase), ErrNotFound)
 	case strings.Contains(bodyLower, "default_branch_missing"):
-		return newNotFoundErr(fmt.Sprintf(
+		return newRichErr(fmt.Sprintf(
 			"project %s has no spec.defaultBranch configured — pass --branch explicitly", codebase),
 			ErrNotFound)
 	default:
-		return newNotFoundErr(fmt.Sprintf(
+		return newRichErr(fmt.Sprintf(
 			"project %s not found — use 'krci sca list --search=%s' to find projects known to Dep-Track",
 			codebase, codebase), ErrNotFound)
 	}

@@ -1,11 +1,9 @@
 package portal
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/internal/ptr"
@@ -36,18 +34,32 @@ type StartResult struct {
 	DryRunManifest map[string]any `json:"dryRunManifest,omitempty"`
 }
 
-// Stable machine-readable error reasons surfaced by the Portal under
-// `error.reason` (see `apps/server/src/config/openapi.ts handleTRPCError`).
-// The Portal deliberately does not put resource-identifying text in
-// `error.message` — `message` is always the static HTTP status phrase. The
-// CLI must therefore key error mapping off `reason`, not the message.
-//
-// `reason=pipeline_not_found` and an absent reason both fall through to the
-// default pipeline-not-found branch, so no constant is declared for it.
+// Stable machine-readable reasons the portal reports under `error.reason` for
+// `POST /rest/v1/pipelineruns/start` (see `apps/server/src/config/openapi.ts
+// handleTRPCError`). `error.message` is always the static HTTP status phrase;
+// map on the reason. trigger_template_not_found is shared with
+// build.
 const (
+	reasonPipelineNotFound        = "pipeline_not_found"
 	reasonTriggerTemplateNotFound = "trigger_template_not_found"
 	reasonMalformedTTLabel        = "malformed_trigger_template_label"
 )
+
+// startReasons renders with %[1]s = pipeline name.
+var startReasons = reasonTable{
+	reasonPipelineNotFound: {
+		sentinel: ErrPipelineNotFound,
+		format:   "pipeline '%[1]s' not found",
+	},
+	reasonTriggerTemplateNotFound: {
+		sentinel: ErrTriggerTemplateNotFound,
+		format:   "pipeline '%[1]s' references a TriggerTemplate that does not exist",
+	},
+	reasonMalformedTTLabel: {
+		sentinel: ErrPlatformReject,
+		format:   "pipeline '%[1]s' has malformed TriggerTemplate label",
+	},
+}
 
 // Discriminator values for the start-response oneOf body.
 const (
@@ -64,19 +76,9 @@ func NewPipelineRunStartService(client *restapi.ClientWithResponses, namespace s
 	return &PipelineRunStartService{client: client, namespace: namespace}
 }
 
-// Start calls `POST /rest/v1/pipelineruns/start`.
-//
-// Error mapping (Portal stable-reason contract):
-//   - 200: returns *StartResult
-//   - 400 reason=malformed_trigger_template_label: ErrPlatformReject (synthesised message)
-//   - 400 default: ErrPlatformReject (generic — Portal hardening strips K8s admission detail)
-//   - 401: ErrUnauthorized
-//   - 403: ErrPermissionDenied (no resource metadata leak)
-//   - 404 reason=trigger_template_not_found: ErrTriggerTemplateNotFound
-//   - 404 default (incl. reason=pipeline_not_found): ErrPipelineNotFound
-//   - 408/409/422/429: ErrPlatformReject (K8s admission classes; 422 covers
-//     the common "missing required Pipeline param" case)
-//   - 5xx: ErrUpstreamUnavailable
+// Start calls `POST /rest/v1/pipelineruns/start`. Errors: startReasons by
+// reason tag; a 404 without a reason is ErrPipelineNotFound; the rest per
+// checkReasonedResponse.
 func (s *PipelineRunStartService) Start(ctx context.Context, in StartInput) (*StartResult, error) {
 	body := restapi.PipelineRunStartJSONRequestBody{
 		Namespace: s.namespace,
@@ -107,81 +109,10 @@ func (s *PipelineRunStartService) Start(ctx context.Context, in StartInput) (*St
 	return decodeStartBody(resp.Body)
 }
 
-// checkStartResponse extends checkResponse with start-specific status mapping.
-// Uses error.reason (not error.message) — Portal's handleTRPCError replaces
-// message with the static HTTP phrase, stripping all resource names.
+// checkStartResponse maps a start response. A 404 without a reason tag (e.g.
+// a plain-text 404 from a proxy) maps to ErrPipelineNotFound.
 func checkStartResponse(statusCode int, body []byte, pipeline string) error {
-	switch statusCode {
-	case http.StatusBadRequest:
-		reason, message := parseErrorEnvelope(body)
-
-		if reason == reasonMalformedTTLabel {
-			return fmt.Errorf("%w: pipeline '%s' has malformed TriggerTemplate label",
-				ErrPlatformReject, pipeline)
-		}
-		// Portal strips K8s admission messages. Surface the generic
-		// status phrase so the user knows to inspect the Pipeline
-		// definition for missing required params or other admission-time
-		// errors.
-		return fmt.Errorf("%w: %s", ErrPlatformReject,
-			cmp.Or(message, http.StatusText(http.StatusBadRequest)))
-	case http.StatusForbidden:
-		return ErrPermissionDenied
-	case http.StatusNotFound:
-		reason, _ := parseErrorEnvelope(body)
-		if reason == reasonTriggerTemplateNotFound {
-			return newNotFoundErr(
-				fmt.Sprintf("pipeline '%s' references a TriggerTemplate that does not exist", pipeline),
-				ErrTriggerTemplateNotFound,
-			)
-		}
-
-		// reason=pipeline_not_found OR reason absent (e.g. plain-text 404
-		// from a misbehaving proxy): default to pipeline-not-found with a
-		// synthesised message. The pipeline name is known client-side, so we
-		// never need the Portal to echo it.
-		return newNotFoundErr(
-			fmt.Sprintf("pipeline '%s' not found", pipeline),
-			ErrPipelineNotFound,
-		)
-	case http.StatusRequestTimeout, http.StatusConflict,
-		http.StatusUnprocessableEntity, http.StatusTooManyRequests:
-		// K8s admission rejection. Portal's handleK8sError forwards
-		// these without a stable reason tag, so we discriminate on
-		// status code alone and surface the static HTTP phrase.
-		_, message := parseErrorEnvelope(body)
-		return fmt.Errorf("%w: %s", ErrPlatformReject,
-			cmp.Or(message, http.StatusText(statusCode)))
-	case http.StatusBadGateway, http.StatusServiceUnavailable,
-		http.StatusInternalServerError, http.StatusGatewayTimeout:
-		return fmt.Errorf("%w: %s", ErrUpstreamUnavailable, truncateBody(body))
-	}
-
-	return checkResponse(statusCode, body)
-}
-
-// parseErrorEnvelope reads error.reason and the user-facing message from a
-// Portal error body. Returns ("", "") on parse failure. message prefers
-// error.message, falling back to top-level message.
-func parseErrorEnvelope(body []byte) (reason, message string) {
-	var env struct {
-		Error struct {
-			Reason  string `json:"reason"`
-			Message string `json:"message"`
-		} `json:"error"`
-		Message string `json:"message"`
-	}
-
-	if err := json.Unmarshal(body, &env); err != nil {
-		return "", ""
-	}
-
-	message = env.Error.Message
-	if message == "" {
-		message = env.Message
-	}
-
-	return env.Error.Reason, message
+	return checkReasonedResponse(statusCode, body, startReasons, startReasons[reasonPipelineNotFound], pipeline)
 }
 
 // decodeStartBody projects the discriminated-union 200 body into the flat
