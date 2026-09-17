@@ -51,8 +51,8 @@ non-zero exit. Catches DNS-1123, output-format, and arg-count regressions.
 |------------|------------------------------------------------------|---------|-------|-------------------------------------------------------------------------|
 | PROJ-D-V-01 | `krci project deployments`                          | offline | —     | `exit=1; stderr~/requires a project \(codebase\) name/`                 |
 | PROJ-D-V-02 | `krci project deployments a b`                      | offline | —     | `exit=1; stderr~/requires a project \(codebase\) name/`                 |
-| PROJ-D-V-03 | `krci project deployments BAD_NAME`                 | offline | —     | `exit=1; stderr~/<project> must be a valid DNS-1123 label/`             |
-| PROJ-D-V-04 | `krci project deployments UPPER`                    | offline | —     | `exit=1; stderr~/<project> must be a valid DNS-1123 label/`             |
+| PROJ-D-V-03 | `krci project deployments BAD_NAME`                 | offline | —     | `exit=1; stderr~/<project> must be a valid DNS-1123 name/`             |
+| PROJ-D-V-04 | `krci project deployments UPPER`                    | offline | —     | `exit=1; stderr~/<project> must be a valid DNS-1123 name/`             |
 | PROJ-D-V-05 | `krci project deployments my-app -o yaml`           | offline | —     | `exit=1; stderr~/unknown output format/`                                |
 | PROJ-D-V-06 | `krci project deployments my-app --unknown-flag`    | offline | —     | `exit=1; stderr~/unknown flag: --unknown-flag/`                         |
 | PROJ-D-V-07 | `krci project deployments -o`                       | offline | —     | `exit=1; stderr~/flag needs an argument/`                               |

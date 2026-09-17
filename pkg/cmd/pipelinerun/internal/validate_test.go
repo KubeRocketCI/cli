@@ -5,49 +5,6 @@ import (
 	"testing"
 )
 
-func TestValidatePipelineName(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name    string
-		input   string
-		wantErr string
-	}{
-		{"valid", "foo-build", ""},
-		{"valid digits", "build-1", ""},
-		{"valid 64 chars", strings.Repeat("a", 64), ""},
-		{"empty", "", "must not be empty"},
-		{"uppercase", "Foo-Build", "valid DNS-1123 subdomain"},
-		{"underscore", "foo_build", "valid DNS-1123 subdomain"},
-		{"leading dash", "-foo", "valid DNS-1123 subdomain"},
-		{"trailing dash", "foo-", "valid DNS-1123 subdomain"},
-		{"too long", strings.Repeat("a", 254), "valid DNS-1123 subdomain"},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			err := ValidatePipelineName(tc.input)
-			if tc.wantErr == "" {
-				if err != nil {
-					t.Fatalf("expected no error, got: %v", err)
-				}
-
-				return
-			}
-
-			if err == nil {
-				t.Fatalf("expected error containing %q, got nil", tc.wantErr)
-			}
-
-			if !strings.Contains(err.Error(), tc.wantErr) {
-				t.Fatalf("expected error to contain %q, got: %v", tc.wantErr, err)
-			}
-		})
-	}
-}
-
 func TestValidateOutputAndDryRun(t *testing.T) {
 	t.Parallel()
 

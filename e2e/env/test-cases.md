@@ -52,10 +52,10 @@ non-zero exit. Catches DNS-1123, output-format, and arg-count regressions.
 | ENV-V-01 | `krci env get`                                       | offline | —     | `exit=1; stderr~/requires a deployment and an env/`                     |
 | ENV-V-02 | `krci env get only-one`                              | offline | —     | `exit=1; stderr~/requires a deployment and an env/`                     |
 | ENV-V-03 | `krci env get a b c`                                 | offline | —     | `exit=1; stderr~/requires a deployment and an env/`                     |
-| ENV-V-04 | `krci env get BAD_NAME prod`                         | offline | —     | `exit=1; stderr~/<deployment> must be a valid DNS-1123 label/`          |
-| ENV-V-05 | `krci env get my-pipeline Bad_Env`                   | offline | —     | `exit=1; stderr~/<env> must be a valid DNS-1123 label/`                 |
-| ENV-V-06 | `krci env list --deployment Bad_Name`                | offline | —     | `exit=1; stderr~/<deployment> must be a valid DNS-1123 label/`          |
-| ENV-V-07 | `krci env list --cluster Bad_Cluster`                | offline | —     | `exit=1; stderr~/--cluster must be a valid DNS-1123 label/`             |
+| ENV-V-04 | `krci env get BAD_NAME prod`                         | offline | —     | `exit=1; stderr~/<deployment> must be a valid DNS-1123 name/`          |
+| ENV-V-05 | `krci env get my-pipeline Bad_Env`                   | offline | —     | `exit=1; stderr~/<env> must be a valid DNS-1123 name/`                 |
+| ENV-V-06 | `krci env list --deployment Bad_Name`                | offline | —     | `exit=1; stderr~/<deployment> must be a valid DNS-1123 name/`          |
+| ENV-V-07 | `krci env list --cluster Bad_Cluster`                | offline | —     | `exit=1; stderr~/--cluster must be a valid DNS-1123 name/`             |
 | ENV-V-08 | `krci env list -o yaml`                              | offline | —     | `exit=1; stderr~/unknown output format/`                                |
 | ENV-V-09 | `krci env get my-pipeline prod -o yaml`              | offline | —     | `exit=1; stderr~/unknown output format/`                                |
 | ENV-V-10 | `krci env list --unknown-flag`                       | offline | —     | `exit=1; stderr~/unknown flag: --unknown-flag/`                         |

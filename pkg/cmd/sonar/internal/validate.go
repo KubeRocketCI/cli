@@ -18,25 +18,6 @@ import (
 // verb, mirroring the shared Zod schema cap on portal-side.
 const MaxPageSize = 500
 
-// ValidateProjectKey returns an error when project does not match DNS-1123.
-// Codebase names (by Portal convention, also the SonarQube projectKey) follow
-// the same shape as Kubernetes namespaces — see internal/cmdutil/validate.go.
-func ValidateProjectKey(project string) error {
-	if project == "" {
-		return fmt.Errorf("<project> must not be empty")
-	}
-
-	if len(project) > cmdutil.DNS1123SubdomainMaxLength {
-		return fmt.Errorf("<project> must be at most %d characters", cmdutil.DNS1123SubdomainMaxLength)
-	}
-
-	if !cmdutil.IsValidDNS1123Label(project) {
-		return fmt.Errorf("<project> must be a valid DNS-1123 name")
-	}
-
-	return nil
-}
-
 // ValidateNonEmptyFlag rejects a flag that was explicitly supplied with an
 // empty value. changed is true when the flag was set on the command line.
 func ValidateNonEmptyFlag(name string, changed bool, value string) error {
@@ -69,15 +50,15 @@ func ValidateOutputFormat(format string) error {
 }
 
 // ValidateProjectCommand runs the standard validator chain used by the three
-// project-scoped verbs (get, gate, issues): output format → DNS-1123 project
-// key → non-empty --pr / --branch (when supplied) → mutual exclusion of the
+// project-scoped verbs (get, gate, issues): output format → Kubernetes-name
+// project key → non-empty --pr / --branch (when supplied) → mutual exclusion of the
 // two scope flags.
 func ValidateProjectCommand(cmd *cobra.Command, outputFormat, project, pullRequest, branch string) error {
 	if err := ValidateOutputFormat(outputFormat); err != nil {
 		return err
 	}
 
-	if err := ValidateProjectKey(project); err != nil {
+	if err := cmdutil.ValidateK8sName("<project>", project); err != nil {
 		return err
 	}
 

@@ -40,24 +40,6 @@ const SeverityFlagUsage = "minimum severity to include (inclusive). " +
 	"'high' returns high+critical; 'medium' returns medium+high+critical; etc. " +
 	"INFO includes UNASSIGNED."
 
-// ValidateCodebaseKey mirrors sonarinternal.ValidateProjectKey — codebase
-// names by platform convention follow DNS-1123.
-func ValidateCodebaseKey(codebase string) error {
-	if codebase == "" {
-		return fmt.Errorf("<project> must not be empty")
-	}
-
-	if len(codebase) > cmdutil.DNS1123SubdomainMaxLength {
-		return fmt.Errorf("<project> must be at most %d characters", cmdutil.DNS1123SubdomainMaxLength)
-	}
-
-	if !cmdutil.IsValidDNS1123Label(codebase) {
-		return fmt.Errorf("<project> must be a valid DNS-1123 name")
-	}
-
-	return nil
-}
-
 // ValidateNonEmptyFlag rejects a flag that was explicitly supplied with an
 // empty value. changed is true when the flag was set on the command line.
 func ValidateNonEmptyFlag(name string, changed bool, value string) error {
@@ -92,7 +74,7 @@ func ValidateOutputFormat(format string) error {
 }
 
 // ValidateCodebaseCommand runs the validator chain used by every per-codebase
-// sca verb (get, components, findings): output format → DNS-1123 codebase
+// sca verb (get, components, findings): output format → Kubernetes-name codebase
 // → non-empty --branch (when explicitly supplied). Unlike sonar, sca never
 // takes --pr, so there is no scope-mutex step.
 func ValidateCodebaseCommand(cmd *cobra.Command, outputFormat, codebase, branch string) error {
@@ -100,7 +82,7 @@ func ValidateCodebaseCommand(cmd *cobra.Command, outputFormat, codebase, branch 
 		return err
 	}
 
-	if err := ValidateCodebaseKey(codebase); err != nil {
+	if err := cmdutil.ValidateK8sName("<project>", codebase); err != nil {
 		return err
 	}
 

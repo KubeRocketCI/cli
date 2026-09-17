@@ -16,44 +16,6 @@ func TestMaxPageSize(t *testing.T) {
 	}
 }
 
-func TestValidateProjectKey(t *testing.T) {
-	t.Parallel()
-
-	valid := []string{
-		"a",
-		"payments-api",
-		"krci-portal",
-		"service-123",
-	}
-	for _, v := range valid {
-		if err := ValidateProjectKey(v); err != nil {
-			t.Errorf("ValidateProjectKey(%q) unexpected error: %v", v, err)
-		}
-	}
-
-	invalid := []struct {
-		in  string
-		msg string
-	}{
-		{"", "empty"},
-		{"UPPER_CASE_BAD", "DNS-1123"},
-		{"-leading-dash", "DNS-1123"},
-		{"trailing-dash-", "DNS-1123"},
-		{"has_underscore", "DNS-1123"},
-		{strings.Repeat("a", 300), "at most 253"},
-	}
-	for _, tc := range invalid {
-		err := ValidateProjectKey(tc.in)
-		if err == nil {
-			t.Errorf("ValidateProjectKey(%q) expected error", tc.in)
-			continue
-		}
-		if !strings.Contains(err.Error(), tc.msg) {
-			t.Errorf("ValidateProjectKey(%q): want error containing %q, got %v", tc.in, tc.msg, err)
-		}
-	}
-}
-
 func TestValidateEnumCSV(t *testing.T) {
 	t.Parallel()
 

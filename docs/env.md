@@ -53,8 +53,8 @@ krci env list --deployment my-pipeline --cluster in-cluster
 
 | Flag            | Purpose                                                       |
 |-----------------|---------------------------------------------------------------|
-| `--deployment`  | Filter by parent CDPipeline name (DNS-1123 label)             |
-| `--cluster`     | Filter by `Stage.spec.clusterName` (DNS-1123 label)           |
+| `--deployment`  | Filter by parent CDPipeline name (DNS-1123 name)              |
+| `--cluster`     | Filter by `Stage.spec.clusterName` (DNS-1123 name)            |
 | `-o, --output`  | `table` (default) or `json`                                   |
 
 Empty result is success: `data.stages: []`, exit `0`, with
@@ -124,7 +124,7 @@ baz      -         -           -         -                  -
 ```
 
 `<deployment>` and `<env>` are **both positional and both required**. Both
-must be DNS-1123 labels (lowercase alphanumerics + hyphens, ≤ 63 chars).
+must be DNS-1123 names (lowercase alphanumerics + hyphens, no dots, ≤ 253 chars).
 Invalid input fails with exit `1` before contacting the Portal.
 
 ### Output blocks

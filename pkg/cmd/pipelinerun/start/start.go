@@ -96,7 +96,7 @@ returned in the output.`,
 }
 
 func (opts *StartOptions) validate() error {
-	if err := pipelineruninternal.ValidatePipelineName(opts.Pipeline); err != nil {
+	if err := cmdutil.ValidateK8sName("<pipeline>", opts.Pipeline); err != nil {
 		return err
 	}
 
