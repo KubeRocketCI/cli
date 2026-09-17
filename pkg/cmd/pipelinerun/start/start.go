@@ -3,18 +3,15 @@ package start
 
 import (
 	"context"
-	"fmt"
 
-	"charm.land/lipgloss/v2"
 	"github.com/spf13/cobra"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
-	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
-	pipelineruninternal "github.com/KubeRocketCI/cli/pkg/cmd/pipelinerun/internal"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/pipelinerun"
 )
 
 type StartOptions struct {
@@ -100,18 +97,18 @@ func (opts *StartOptions) validate() error {
 		return err
 	}
 
-	if err := pipelineruninternal.ValidateOutputAndDryRun(opts.OutputFormat, opts.DryRun); err != nil {
+	if err := pipelinerun.ValidateOutputAndDryRun(opts.OutputFormat, opts.DryRun); err != nil {
 		return err
 	}
 
-	params, err := pipelineruninternal.ParseKeyValueList(opts.Params, pipelineruninternal.KindParameter)
+	params, err := pipelinerun.ParseKeyValueList(opts.Params, pipelinerun.KindParameter)
 	if err != nil {
 		return err
 	}
 
 	opts.parsedParams = params
 
-	labels, err := pipelineruninternal.ParseKeyValueList(opts.Labels, pipelineruninternal.KindLabel)
+	labels, err := pipelinerun.ParseKeyValueList(opts.Labels, pipelinerun.KindLabel)
 	if err != nil {
 		return err
 	}
@@ -141,74 +138,8 @@ func startRun(ctx context.Context, opts *StartOptions) error {
 		DryRun:   opts.DryRun,
 	})
 	if err != nil {
-		return pipelineruninternal.HandleAuthError(err)
+		return pipelinerun.HandleAuthError(err)
 	}
 
-	if opts.DryRun {
-		return renderDryRun(opts, result)
-	}
-
-	if output.ResolveFormat(opts.OutputFormat) == output.FormatJSON {
-		return output.PrintJSONEnvelope(opts.IO.Out, pipelineruninternal.SchemaVersion, result)
-	}
-
-	if err := renderRow(opts, result); err != nil {
-		return err
-	}
-
-	// Controller race window: warn that the new run may briefly 404 if
-	// queried immediately, until labels reconcile.
-	if result.Name != "" {
-		msg := fmt.Sprintf(
-			"note: the controller may briefly 404 on 'krci pipelinerun get %s' until labels reconcile",
-			result.Name)
-		_, _ = lipgloss.Fprintln(opts.IO.ErrOut, output.DimStyle.Render(msg))
-	}
-
-	return nil
-}
-
-func renderRow(opts *StartOptions, result *portal.StartResult) error {
-	return output.RenderList(opts.IO, opts.OutputFormat, result, func(isTTY bool) ([]string, [][]string) {
-		status := cellOrDash(result.Status)
-		if isTTY && result.Status != "" {
-			status = output.PipelineStatusColor(result.Status)
-		}
-
-		row := []string{
-			cellOrDash(result.Name),
-			status,
-			cellOrDash(result.Project),
-			cellOrDash(result.PR),
-			cellOrDash(result.Author),
-			cellOrDash(result.Type),
-			cellOrDash(result.Started),
-			cellOrDash(result.Duration),
-		}
-
-		return pipelineruninternal.Headers, [][]string{row}
-	})
-}
-
-// renderDryRun emits YAML by default for direct use with `kubectl apply -f -`,
-// or a schemaVersion-wrapped JSON envelope under -o json. ValidateOutputAndDryRun
-// has already restricted opts.OutputFormat to "", "json", or "yaml" on this path.
-func renderDryRun(opts *StartOptions, result *portal.StartResult) error {
-	if len(result.DryRunManifest) == 0 {
-		return fmt.Errorf("portal returned empty dry-run manifest")
-	}
-
-	if opts.OutputFormat == output.FormatJSON {
-		return output.PrintJSONEnvelope(opts.IO.Out, pipelineruninternal.SchemaVersion, result.DryRunManifest)
-	}
-
-	return output.PrintYAML(opts.IO.Out, result.DryRunManifest)
-}
-
-func cellOrDash(s string) string {
-	if s == "" {
-		return "-"
-	}
-
-	return s
+	return pipelinerun.PresentResult(opts.IO, opts.OutputFormat, opts.DryRun, result)
 }

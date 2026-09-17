@@ -15,6 +15,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
+	"github.com/KubeRocketCI/cli/internal/ptr"
 )
 
 // SchemaVersion is the shared JSON envelope version for every deployment-
@@ -86,35 +87,29 @@ func PrintTable(w io.Writer, isTTY bool, headers []string, rows [][]string) erro
 	return output.PrintTable(w, headers, rows)
 }
 
-// OptCell renders an optional string field as the dereferenced value, or "-"
-// when the pointer is nil or the value is empty.
+// OptCell renders an optional string field, output.EmptyCell when the pointer
+// is nil or the value is empty.
 func OptCell(s *string) string {
-	if s == nil || *s == "" {
-		return "-"
-	}
-	return *s
+	return output.OrDash(ptr.Deref(s, ""))
 }
 
-// OptStatusCell renders an ArgoCD health-status cell with optional TTY color.
-// "-" when the pointer is nil or the value is empty.
+// OptStatusCell renders an ArgoCD health-status cell with optional TTY color,
+// output.EmptyCell when the pointer is nil or the value is empty.
 func OptStatusCell(s *string, isTTY bool) string {
-	if s == nil || *s == "" {
-		return "-"
+	v := ptr.Deref(s, "")
+	if isTTY && v != "" {
+		return ColorForArgoStatus(v)
 	}
 
-	if isTTY {
-		return ColorForArgoStatus(*s)
-	}
-
-	return *s
+	return output.OrDash(v)
 }
 
 // ShortDigestCell shortens a sha256 digest for table display: keeps the
 // `sha256:` prefix plus the first 8 hex chars (ShortDigestLen visible chars).
-// Returns "-" when the pointer is nil or the value is empty.
+// output.EmptyCell when the pointer is nil or the value is empty.
 func ShortDigestCell(digest *string) string {
 	if digest == nil || *digest == "" {
-		return "-"
+		return output.EmptyCell
 	}
 
 	d := *digest
@@ -161,7 +156,7 @@ func ExpandIngressRows(cells []string, ingressLines []string) [][]string {
 	if len(ingressLines) == 0 {
 		row := make([]string, 0, len(cells)+1)
 		row = append(row, cells...)
-		row = append(row, "-")
+		row = append(row, output.EmptyCell)
 		return [][]string{row}
 	}
 

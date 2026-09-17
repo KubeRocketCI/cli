@@ -1,4 +1,4 @@
-package pipelineruninternal
+package pipelinerun
 
 import (
 	"fmt"

@@ -117,6 +117,18 @@ func RelativeTime(t time.Time) string {
 	}
 }
 
+// EmptyCell is the table placeholder for an absent value.
+const EmptyCell = "-"
+
+// OrDash returns s, or EmptyCell when s is empty.
+func OrDash(s string) string {
+	if s == "" {
+		return EmptyCell
+	}
+
+	return s
+}
+
 // Truncate shortens s to maxWidth characters, appending "..." if truncated.
 // Returns s unchanged if it fits within maxWidth or maxWidth is 0 (no limit).
 func Truncate(s string, maxWidth int) string {
