@@ -35,26 +35,28 @@ var (
 	// request (e.g. missing required Pipeline param).
 	ErrPlatformReject = errors.New("platform rejected request")
 
-	// ErrPermissionDenied is returned for HTTP 403 from the portal start
-	// endpoint. The message must not leak resource metadata.
+	// ErrPermissionDenied is returned for HTTP 403 from the portal. The
+	// message must not leak resource metadata.
 	ErrPermissionDenied = errors.New("permission denied")
+
+	// ErrPortalUnsupported is returned when the portal has no route for the
+	// command at all (Fastify route-not-found): it predates the feature.
+	ErrPortalUnsupported = errors.New("portal does not support this command")
 )
 
-// richNotFoundError carries a user-facing message while still matching
-// errors.Is(err, sentinel) via Unwrap. Use it when the platform supplies a
-// disambiguating message that should be shown verbatim instead of the bare
-// sentinel text.
-type richNotFoundError struct {
+// richError carries a user-facing message while still matching
+// errors.Is(err, sentinel) via Unwrap.
+type richError struct {
 	msg      string
 	sentinel error
 }
 
-func (e *richNotFoundError) Error() string { return e.msg }
-func (e *richNotFoundError) Unwrap() error { return e.sentinel }
+func (e *richError) Error() string { return e.msg }
+func (e *richError) Unwrap() error { return e.sentinel }
 
-// sentinel must be ErrNotFound or a sentinel that wraps it (e.g.
-// ErrPipelineNotFound) so generic not-found callers continue to match via
-// errors.Is.
-func newNotFoundErr(msg string, sentinel error) error {
-	return &richNotFoundError{msg: msg, sentinel: sentinel}
+// newRichErr replaces the sentinel text with msg; errors.Is(err, sentinel)
+// still matches. Sentinels for a missing resource must wrap ErrNotFound
+// (e.g. ErrPipelineNotFound).
+func newRichErr(msg string, sentinel error) error {
+	return &richError{msg: msg, sentinel: sentinel}
 }

@@ -548,7 +548,7 @@ All errors exit `1` (per the global rule at the top of this document).
 | ------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | Pipeline not found                          | `pipeline '<name>' not found`                                                                 |
 | TriggerTemplate referenced but missing      | `pipeline '<name>' references a TriggerTemplate that does not exist`                          |
-| Malformed TriggerTemplate label             | `platform rejected request: pipeline '<name>' has malformed TriggerTemplate label`            |
+| Malformed TriggerTemplate label             | `pipeline '<name>' has malformed TriggerTemplate label`                                       |
 | Platform admission rejection (400/422)      | `platform rejected request: <HTTP status phrase>` (Portal does not echo K8s admission detail) |
 | RBAC denied                                 | `permission denied`                                                                           |
 | Portal upstream 5xx                         | `upstream service unavailable: <cause>`                                                       |
