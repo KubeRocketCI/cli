@@ -39,6 +39,32 @@ var (
 	// message must not leak resource metadata.
 	ErrPermissionDenied = errors.New("permission denied")
 
+	// ErrProjectNotFound is returned by `project build` when the named
+	// Codebase does not exist. Wraps ErrNotFound for generic-not-found
+	// handling.
+	ErrProjectNotFound = fmt.Errorf("project %w", ErrNotFound)
+
+	// ErrBranchNotFound is returned by `project build` when no CodebaseBranch
+	// of the project carries the requested git branch.
+	ErrBranchNotFound = fmt.Errorf("branch %w", ErrNotFound)
+
+	// ErrBranchNotReady is returned by `project build` when the CodebaseBranch
+	// status is not 'created'.
+	ErrBranchNotReady = errors.New("branch not ready")
+
+	// ErrBuildInProgress is returned by `project build` when a build run for
+	// the branch is already active. Best effort: the check is list-then-create,
+	// so two concurrent callers can both pass it.
+	ErrBuildInProgress = errors.New("build already in progress")
+
+	// ErrGitLabCIUnsupported is returned by `project build` for codebases whose
+	// spec.ciTool is 'gitlab'; those builds are triggered through GitLab CI.
+	ErrGitLabCIUnsupported = errors.New("GitLab CI builds are not supported")
+
+	// ErrManagedParam is returned when --param targets a parameter the portal
+	// derives from the project and branch (see BuildManagedParams).
+	ErrManagedParam = errors.New("managed parameter cannot be overridden")
+
 	// ErrPortalUnsupported is returned when the portal has no route for the
 	// command at all (Fastify route-not-found): it predates the feature.
 	ErrPortalUnsupported = errors.New("portal does not support this command")
