@@ -683,6 +683,15 @@ type TektonResultsGetTaskRunRecordsParams struct {
 	Namespace string `form:"namespace" json:"namespace"`
 }
 
+// PipelineRunBuildJSONBody defines parameters for PipelineRunBuild.
+type PipelineRunBuildJSONBody struct {
+	Branch    *string            `json:"branch,omitempty"`
+	Codebase  string             `json:"codebase"`
+	DryRun    *bool              `json:"dryRun,omitempty"`
+	Namespace string             `json:"namespace"`
+	Params    *map[string]string `json:"params,omitempty"`
+}
+
 // PipelineRunStartJSONBody defines parameters for PipelineRunStart.
 type PipelineRunStartJSONBody struct {
 	DryRun    *bool              `json:"dryRun,omitempty"`
@@ -829,6 +838,9 @@ type TektonResultsGetTaskRunLogsParams struct {
 	StepName    *string `form:"stepName,omitempty" json:"stepName,omitempty"`
 }
 
+// PipelineRunBuildJSONRequestBody defines body for PipelineRunBuild for application/json ContentType.
+type PipelineRunBuildJSONRequestBody PipelineRunBuildJSONBody
+
 // PipelineRunStartJSONRequestBody defines body for PipelineRunStart for application/json ContentType.
 type PipelineRunStartJSONRequestBody PipelineRunStartJSONBody
 
@@ -926,6 +938,11 @@ type ClientInterface interface {
 	// TektonResultsGetTaskRunRecords request
 	TektonResultsGetTaskRunRecords(ctx context.Context, resultUid openapi_types.UUID, params *TektonResultsGetTaskRunRecordsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// PipelineRunBuildWithBody request with any body
+	PipelineRunBuildWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PipelineRunBuild(ctx context.Context, body PipelineRunBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// PipelineRunStartWithBody request with any body
 	PipelineRunStartWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -1019,6 +1036,30 @@ func (c *Client) TektonResultsGetPipelineRunLogs(ctx context.Context, resultUid 
 
 func (c *Client) TektonResultsGetTaskRunRecords(ctx context.Context, resultUid openapi_types.UUID, params *TektonResultsGetTaskRunRecordsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewTektonResultsGetTaskRunRecordsRequest(c.Server, resultUid, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PipelineRunBuildWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPipelineRunBuildRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PipelineRunBuild(ctx context.Context, body PipelineRunBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPipelineRunBuildRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1468,6 +1509,46 @@ func NewTektonResultsGetTaskRunRecordsRequest(server string, resultUid openapi_t
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewPipelineRunBuildRequest calls the generic PipelineRunBuild builder with application/json body
+func NewPipelineRunBuildRequest(server string, body PipelineRunBuildJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPipelineRunBuildRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPipelineRunBuildRequestWithBody generates requests for PipelineRunBuild with any type of body
+func NewPipelineRunBuildRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/pipelineruns/build")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -2594,6 +2675,11 @@ type ClientWithResponsesInterface interface {
 	// TektonResultsGetTaskRunRecordsWithResponse request
 	TektonResultsGetTaskRunRecordsWithResponse(ctx context.Context, resultUid openapi_types.UUID, params *TektonResultsGetTaskRunRecordsParams, reqEditors ...RequestEditorFn) (*TektonResultsGetTaskRunRecordsResponse, error)
 
+	// PipelineRunBuildWithBodyWithResponse request with any body
+	PipelineRunBuildWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PipelineRunBuildResponse, error)
+
+	PipelineRunBuildWithResponse(ctx context.Context, body PipelineRunBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*PipelineRunBuildResponse, error)
+
 	// PipelineRunStartWithBodyWithResponse request with any body
 	PipelineRunStartWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PipelineRunStartResponse, error)
 
@@ -2788,6 +2874,55 @@ func (r TektonResultsGetTaskRunRecordsResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r TektonResultsGetTaskRunRecordsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type PipelineRunBuildResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		union json.RawMessage
+	}
+	JSON400 *ErrorBADREQUEST
+	JSON401 *ErrorUNAUTHORIZED
+	JSON403 *ErrorFORBIDDEN
+	JSON404 *ErrorNOTFOUND
+	JSON409 *ErrorCONFLICT
+	JSON500 *ErrorINTERNALSERVERERROR
+}
+type PipelineRunBuild2000 struct {
+	Kind PipelineRunBuild2000Kind `json:"kind"`
+	Row  struct {
+		Author   string `json:"author"`
+		Duration string `json:"duration"`
+		Name     string `json:"name"`
+		Pr       string `json:"pr"`
+		Project  string `json:"project"`
+		Started  string `json:"started"`
+		Status   string `json:"status"`
+		Type     string `json:"type"`
+	} `json:"row"`
+}
+type PipelineRunBuild2000Kind string
+type PipelineRunBuild2001 struct {
+	Kind     PipelineRunBuild2001Kind `json:"kind"`
+	Manifest map[string]interface{}   `json:"manifest"`
+}
+type PipelineRunBuild2001Kind string
+
+// Status returns HTTPResponse.Status
+func (r PipelineRunBuildResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PipelineRunBuildResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3213,6 +3348,23 @@ func (c *ClientWithResponses) TektonResultsGetTaskRunRecordsWithResponse(ctx con
 	return ParseTektonResultsGetTaskRunRecordsResponse(rsp)
 }
 
+// PipelineRunBuildWithBodyWithResponse request with arbitrary body returning *PipelineRunBuildResponse
+func (c *ClientWithResponses) PipelineRunBuildWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PipelineRunBuildResponse, error) {
+	rsp, err := c.PipelineRunBuildWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePipelineRunBuildResponse(rsp)
+}
+
+func (c *ClientWithResponses) PipelineRunBuildWithResponse(ctx context.Context, body PipelineRunBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*PipelineRunBuildResponse, error) {
+	rsp, err := c.PipelineRunBuild(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePipelineRunBuildResponse(rsp)
+}
+
 // PipelineRunStartWithBodyWithResponse request with arbitrary body returning *PipelineRunStartResponse
 func (c *ClientWithResponses) PipelineRunStartWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PipelineRunStartResponse, error) {
 	rsp, err := c.PipelineRunStartWithBody(ctx, contentType, body, reqEditors...)
@@ -3622,6 +3774,76 @@ func ParseTektonResultsGetTaskRunRecordsResponse(rsp *http.Response) (*TektonRes
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePipelineRunBuildResponse parses an HTTP response from a PipelineRunBuildWithResponse call
+func ParsePipelineRunBuildResponse(rsp *http.Response) (*PipelineRunBuildResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PipelineRunBuildResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			union json.RawMessage
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorBADREQUEST
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorUNAUTHORIZED
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorFORBIDDEN
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorNOTFOUND
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorCONFLICT
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorINTERNALSERVERERROR
