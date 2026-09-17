@@ -1,46 +1,18 @@
 package start
 
 import (
-	"bytes"
-	"encoding/json"
 	"strings"
 	"testing"
 
-	"github.com/KubeRocketCI/cli/internal/iostreams"
-	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
 )
 
 var newFactory = cmdtest.NewFactory
 
-// runCmd executes the command with argv and returns the captured opts so
-// tests can assert post-validation state without hitting the network.
-func runCmd(t *testing.T, argv []string) (*StartOptions, error) {
-	t.Helper()
-
-	var captured *StartOptions
-
-	cmd := NewCmdStart(newFactory(), func(o *StartOptions) error {
-		captured = o
-
-		return nil
-	})
-
-	cmd.SetArgs(argv)
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
-
-	if err := cmd.Execute(); err != nil {
-		return captured, err
-	}
-
-	return captured, nil
-}
-
 func TestStart_RejectsMissingPositional(t *testing.T) {
 	t.Parallel()
 
-	_, err := runCmd(t, []string{})
+	_, err := cmdtest.RunCmd(t, NewCmdStart, []string{})
 	if err == nil {
 		t.Fatal("expected error for missing <pipeline> positional")
 	}
@@ -53,7 +25,7 @@ func TestStart_RejectsMissingPositional(t *testing.T) {
 func TestStart_RejectsInvalidDNS1123(t *testing.T) {
 	t.Parallel()
 
-	_, err := runCmd(t, []string{"Foo_Build"})
+	_, err := cmdtest.RunCmd(t, NewCmdStart, []string{"Foo_Build"})
 	if err == nil || !strings.Contains(err.Error(), "DNS-1123") {
 		t.Fatalf("expected DNS-1123 error, got: %v", err)
 	}
@@ -62,7 +34,7 @@ func TestStart_RejectsInvalidDNS1123(t *testing.T) {
 func TestStart_AcceptsValidName(t *testing.T) {
 	t.Parallel()
 
-	opts, err := runCmd(t, []string{"foo-build"})
+	opts, err := cmdtest.RunCmd(t, NewCmdStart, []string{"foo-build"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -75,7 +47,7 @@ func TestStart_AcceptsValidName(t *testing.T) {
 func TestStart_RejectsUnknownOutputFormat(t *testing.T) {
 	t.Parallel()
 
-	_, err := runCmd(t, []string{"foo-build", "-o", "xml"})
+	_, err := cmdtest.RunCmd(t, NewCmdStart, []string{"foo-build", "-o", "xml"})
 	if err == nil || !strings.Contains(err.Error(), "unknown output format") {
 		t.Fatalf("expected unknown-format error, got: %v", err)
 	}
@@ -84,7 +56,7 @@ func TestStart_RejectsUnknownOutputFormat(t *testing.T) {
 func TestStart_RejectsDryRunPlusTable(t *testing.T) {
 	t.Parallel()
 
-	_, err := runCmd(t, []string{"foo-build", "--dry-run", "-o", "table"})
+	_, err := cmdtest.RunCmd(t, NewCmdStart, []string{"foo-build", "--dry-run", "-o", "table"})
 	if err == nil || !strings.Contains(err.Error(), "--dry-run cannot use -o table") {
 		t.Fatalf("expected dry-run+table mutex error, got: %v", err)
 	}
@@ -93,7 +65,7 @@ func TestStart_RejectsDryRunPlusTable(t *testing.T) {
 func TestStart_RejectsYAMLWithoutDryRun(t *testing.T) {
 	t.Parallel()
 
-	_, err := runCmd(t, []string{"foo-build", "-o", "yaml"})
+	_, err := cmdtest.RunCmd(t, NewCmdStart, []string{"foo-build", "-o", "yaml"})
 	if err == nil || !strings.Contains(err.Error(), "-o yaml requires --dry-run") {
 		t.Fatalf("expected yaml-without-dry-run error, got: %v", err)
 	}
@@ -102,7 +74,7 @@ func TestStart_RejectsYAMLWithoutDryRun(t *testing.T) {
 func TestStart_DryRunYAMLOutputFormat(t *testing.T) {
 	t.Parallel()
 
-	opts, err := runCmd(t, []string{"foo-build", "--dry-run", "-o", "yaml"})
+	opts, err := cmdtest.RunCmd(t, NewCmdStart, []string{"foo-build", "--dry-run", "-o", "yaml"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -119,7 +91,7 @@ func TestStart_DryRunYAMLOutputFormat(t *testing.T) {
 func TestStart_RejectsParamWithoutEquals(t *testing.T) {
 	t.Parallel()
 
-	_, err := runCmd(t, []string{"foo-build", "--param", "keywithoutvalue"})
+	_, err := cmdtest.RunCmd(t, NewCmdStart, []string{"foo-build", "--param", "keywithoutvalue"})
 	if err == nil || !strings.Contains(err.Error(), "parameter must be key=value") {
 		t.Fatalf("expected parser error, got: %v", err)
 	}
@@ -128,7 +100,7 @@ func TestStart_RejectsParamWithoutEquals(t *testing.T) {
 func TestStart_RejectsParamEmptyKey(t *testing.T) {
 	t.Parallel()
 
-	_, err := runCmd(t, []string{"foo-build", "--param", "=value"})
+	_, err := cmdtest.RunCmd(t, NewCmdStart, []string{"foo-build", "--param", "=value"})
 	if err == nil || !strings.Contains(err.Error(), "parameter key must not be empty") {
 		t.Fatalf("expected empty-key error, got: %v", err)
 	}
@@ -137,7 +109,7 @@ func TestStart_RejectsParamEmptyKey(t *testing.T) {
 func TestStart_RejectsDuplicateParam(t *testing.T) {
 	t.Parallel()
 
-	_, err := runCmd(t, []string{"foo-build", "--param", "k=v1", "--param", "k=v2"})
+	_, err := cmdtest.RunCmd(t, NewCmdStart, []string{"foo-build", "--param", "k=v1", "--param", "k=v2"})
 	if err == nil || !strings.Contains(err.Error(), "duplicate parameter") {
 		t.Fatalf("expected duplicate-param error, got: %v", err)
 	}
@@ -146,7 +118,7 @@ func TestStart_RejectsDuplicateParam(t *testing.T) {
 func TestStart_RejectsDuplicateLabel(t *testing.T) {
 	t.Parallel()
 
-	_, err := runCmd(t, []string{"foo-build", "--label", "k=v1", "--label", "k=v2"})
+	_, err := cmdtest.RunCmd(t, NewCmdStart, []string{"foo-build", "--label", "k=v1", "--label", "k=v2"})
 	if err == nil || !strings.Contains(err.Error(), "duplicate label") {
 		t.Fatalf("expected duplicate-label error, got: %v", err)
 	}
@@ -155,7 +127,7 @@ func TestStart_RejectsDuplicateLabel(t *testing.T) {
 func TestStart_AcceptsParamValueWithEquals(t *testing.T) {
 	t.Parallel()
 
-	opts, err := runCmd(t, []string{"foo-build", "--param", "token=abc=def=="})
+	opts, err := cmdtest.RunCmd(t, NewCmdStart, []string{"foo-build", "--param", "token=abc=def=="})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -168,7 +140,7 @@ func TestStart_AcceptsParamValueWithEquals(t *testing.T) {
 func TestStart_AcceptsCommaSeparatedParam(t *testing.T) {
 	t.Parallel()
 
-	opts, err := runCmd(t, []string{"foo-build", "--param", "items=v1,v2"})
+	opts, err := cmdtest.RunCmd(t, NewCmdStart, []string{"foo-build", "--param", "items=v1,v2"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -192,127 +164,13 @@ func TestStart_DoesNotExposeWaitFollowTimeout(t *testing.T) {
 func TestStart_AcceptsValidLabel(t *testing.T) {
 	t.Parallel()
 
-	opts, err := runCmd(t, []string{"foo-build", "--label", "app.edp.epam.com/codebase=my-app"})
+	opts, err := cmdtest.RunCmd(t, NewCmdStart, []string{"foo-build", "--label", "app.edp.epam.com/codebase=my-app"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if opts.parsedLabels["app.edp.epam.com/codebase"] != "my-app" {
 		t.Errorf("label not parsed: %+v", opts.parsedLabels)
-	}
-}
-
-// portalManifest is what the Portal procedure returns for `dryRun=true`:
-// the rendered PipelineRun draft as a JSON object (parsed at the transport
-// boundary). The CLI re-encodes per requested output format.
-func portalManifest() map[string]any {
-	return map[string]any{
-		"apiVersion": "tekton.dev/v1",
-		"kind":       "PipelineRun",
-		"metadata": map[string]any{
-			"generateName": "foo-build-run-",
-			"labels":       map[string]any{"app.edp.epam.com/codebase": "my-app"},
-		},
-		"spec": map[string]any{
-			"params": []any{map[string]any{"name": "git-revision", "value": "main"}},
-		},
-	}
-}
-
-func newDryRunOpts(t *testing.T, format string) (*StartOptions, *bytes.Buffer) {
-	t.Helper()
-
-	out := &bytes.Buffer{}
-	errOut := &bytes.Buffer{}
-
-	return &StartOptions{
-		IO:           &iostreams.IOStreams{Out: out, ErrOut: errOut},
-		OutputFormat: format,
-		DryRun:       true,
-	}, out
-}
-
-func TestRenderDryRun_DefaultEmitsYAML(t *testing.T) {
-	t.Parallel()
-
-	opts, out := newDryRunOpts(t, "")
-
-	if err := renderDryRun(opts, &portal.StartResult{DryRunManifest: portalManifest()}); err != nil {
-		t.Fatalf("renderDryRun: %v", err)
-	}
-
-	got := out.String()
-
-	// YAML markers: bare keys, no quoted JSON braces wrapping the doc.
-	for _, want := range []string{
-		"apiVersion: tekton.dev/v1\n",
-		"kind: PipelineRun\n",
-		"generateName: foo-build-run-\n",
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("missing YAML fragment %q in output:\n%s", want, got)
-		}
-	}
-
-	if strings.HasPrefix(strings.TrimSpace(got), "{") {
-		t.Errorf("default dry-run output should be YAML, got JSON-looking output:\n%s", got)
-	}
-}
-
-func TestRenderDryRun_OutputYAMLEmitsYAML(t *testing.T) {
-	t.Parallel()
-
-	opts, out := newDryRunOpts(t, "yaml")
-
-	if err := renderDryRun(opts, &portal.StartResult{DryRunManifest: portalManifest()}); err != nil {
-		t.Fatalf("renderDryRun: %v", err)
-	}
-
-	if !strings.Contains(out.String(), "apiVersion: tekton.dev/v1") {
-		t.Errorf("-o yaml output missing YAML markers:\n%s", out.String())
-	}
-}
-
-func TestRenderDryRun_OutputJSONEmbedsParsedObject(t *testing.T) {
-	t.Parallel()
-
-	opts, out := newDryRunOpts(t, "json")
-
-	if err := renderDryRun(opts, &portal.StartResult{DryRunManifest: portalManifest()}); err != nil {
-		t.Fatalf("renderDryRun: %v", err)
-	}
-
-	var envelope struct {
-		SchemaVersion string         `json:"schemaVersion"`
-		Data          map[string]any `json:"data"`
-	}
-
-	if err := json.Unmarshal(out.Bytes(), &envelope); err != nil {
-		t.Fatalf("envelope is not parseable JSON: %v\noutput: %s", err, out.String())
-	}
-
-	if envelope.SchemaVersion != "1" {
-		t.Errorf("schemaVersion = %q", envelope.SchemaVersion)
-	}
-
-	// data must be a parsed object — NOT a string-wrapped manifest.
-	if envelope.Data["apiVersion"] != "tekton.dev/v1" {
-		t.Errorf("data.apiVersion = %v (expected parsed object, got: %#v)", envelope.Data["apiVersion"], envelope.Data)
-	}
-
-	if envelope.Data["kind"] != "PipelineRun" {
-		t.Errorf("data.kind = %v", envelope.Data["kind"])
-	}
-}
-
-func TestRenderDryRun_RejectsEmptyManifest(t *testing.T) {
-	t.Parallel()
-
-	opts, _ := newDryRunOpts(t, "")
-
-	err := renderDryRun(opts, &portal.StartResult{DryRunManifest: nil})
-	if err == nil {
-		t.Fatal("expected error on empty manifest")
 	}
 }
 

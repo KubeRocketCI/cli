@@ -14,7 +14,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
-	pipelineruninternal "github.com/KubeRocketCI/cli/pkg/cmd/pipelinerun/internal"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/pipelinerun"
 )
 
 type ListOptions struct {
@@ -113,7 +113,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		IncludeReason: opts.IncludeReason,
 	})
 	if err != nil {
-		return pipelineruninternal.HandleAuthError(err)
+		return pipelinerun.HandleAuthError(err)
 	}
 
 	if opts.IncludeReason {
@@ -208,6 +208,6 @@ func renderSummaryTable(opts *ListOptions, result *portal.PipelineRunListResult)
 			})
 		}
 
-		return pipelineruninternal.Headers, rows
+		return pipelinerun.Headers, rows
 	})
 }

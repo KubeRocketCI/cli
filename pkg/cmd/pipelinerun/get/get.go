@@ -15,7 +15,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
-	pipelineruninternal "github.com/KubeRocketCI/cli/pkg/cmd/pipelinerun/internal"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/pipelinerun"
 )
 
 // GetOptions holds all inputs for the pipelinerun get command.
@@ -92,7 +92,7 @@ func getRun(ctx context.Context, opts *GetOptions) error {
 			return fmt.Errorf("pipeline run %q not found", opts.Name)
 		}
 
-		return pipelineruninternal.HandleAuthError(err)
+		return pipelinerun.HandleAuthError(err)
 	}
 
 	if opts.IncludeReason {
