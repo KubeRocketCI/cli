@@ -1,10 +1,11 @@
 # `krci project` — e2e test cases
 
 Covers the `project` command group (alias `proj`). Source:
-`pkg/cmd/project/`. This file presently exercises the **`deployments`**
-verb only — `list` and `get` are out of scope here and may be added in a
-future iteration. Row IDs use a verb-segmented prefix
-(`PROJ-D-NN` = project / deployments / NN) so siblings can co-exist.
+`pkg/cmd/project/`. This file exercises the **`deployments`** and
+**`build`** verbs — `list` and `get` are out of scope here and may be added
+in a future iteration. Row IDs use a verb-segmented prefix
+(`PROJ-D-NN` = project / deployments / NN, `PROJ-B-NN` = project / build /
+NN) so siblings can co-exist.
 
 `krci project deployments <project>` returns every (deployment, env) row
 in the configured namespace where the given project is registered, with
@@ -12,6 +13,12 @@ current health/sync/version/image-digest/cluster/namespace/ingress.
 Rows for stages where the project is registered (`CDPipeline.spec.applications`)
 but no `Application` exists yet are emitted with `-` placeholders (table)
 or `null` values (JSON, with `deployed: false`).
+
+`krci project build <name>` starts the build pipeline of a project branch,
+resolving the pipeline, params, labels, and service account from the project
+and the branch. `--branch` defaults to the project's default branch, the
+project-derived params are reserved, and `--dry-run` renders the manifest
+without creating anything.
 
 Every row is a self-contained contract a Haiku agent can execute. See
 `../runner.md` for the agent brief and the **expect grammar** reference.
@@ -26,6 +33,9 @@ Every row is a self-contained contract a Haiku agent can execute. See
 | `{{PROJECT_MISSING}}`  | A name that does not exist anywhere in the cluster.                                         | `does-not-exist`|
 | `{{DEPLOYMENT_OK}}`    | A deployment that registers `{{PROJECT_DEPLOYED}}` in `spec.applications`.                  | `krci-portal`   |
 | `{{ENV_OK}}`           | An env on `{{DEPLOYMENT_OK}}` where `{{PROJECT_DEPLOYED}}` has a deployed Application.       | `dev`           |
+| `{{PROJECT_BUILD}}`    | A codebase with a build pipeline whose branch status is `created` (buildable).               | `test-go-app`   |
+| `{{PROJECT_BUILD_BRANCH}}` | The git branch of `{{PROJECT_BUILD}}` to build.                                         | `main`          |
+| `{{PROJECT_NOT_READY}}` | A codebase whose CodebaseBranch status is not `created`.                                    | `test-dotnet-app` |
 
 The orchestrator fills these; the table never hard-codes them.
 
@@ -101,3 +111,47 @@ in place, and multi-ingress rows stack across visual rows.
 |------------|------------------------------------------------------------------|--------|------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
 | PROJ-D-T-01 | `krci project deployments {{PROJECT_DEPLOYED}}`                 | portal | project deployed somewhere         | `exit=0; stdout~/IMAGE_SHA/; stdout!~/^IMAGE\s/`                                                                       |
 | PROJ-D-T-02 | `krci project deployments {{PROJECT_DEPLOYED}} -o json`         | portal | project has multiple deployed rows | `exit=0; stdout_json.data.rows.0.ingressUrls:exists`                                                                  |
+
+## 7. `project build` (env: `offline`)
+
+Validation runs before any network call, so these rows need only a built
+binary. `--label` must stay absent: `build` resolves labels itself.
+
+| ID         | Command                                                     | Env     | Setup | Expect                                                                                                                                  |
+|------------|-------------------------------------------------------------|---------|-------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| PROJ-B-01  | `krci project build --help`                                 | offline | —     | `exit=0; stdout~/--branch string/; stdout~/--param stringArray/; stdout~/--dry-run/; stdout~/-o, --output string/; stdout!~/--label/`      |
+| PROJ-B-02  | `krci project build`                                        | offline | —     | `exit=1; stderr~/requires a project name/`                                                                                               |
+| PROJ-B-03  | `krci project build My.App`                                 | offline | —     | `exit=1; stderr~/lowercase alphanumeric/`                                                                                                |
+| PROJ-B-04  | `krci project build my-app --param git-source-url=x`        | offline | —     | `exit=1; stderr~/managed|set from the project/`                                                                                          |
+| PROJ-B-05  | `krci project build my-app --dry-run -o table`              | offline | —     | `exit=1; stderr~/--dry-run cannot use -o table/`                                                                                         |
+| PROJ-B-06  | `krci project build my-app -o yaml`                         | offline | —     | `exit=1; stderr~/-o yaml requires --dry-run/`                                                                                            |
+
+## 8. `project build` (env: `portal`)
+
+Every row here is independent and creates nothing: dry-run rows render
+without a create, and the error rows are rejected before a create.
+
+| ID         | Command                                                                                          | Env    | Setup                                                  | Expect                                                                                                    |
+|------------|--------------------------------------------------------------------------------------------------|--------|--------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| PROJ-B-07  | `krci project build {{PROJECT_BUILD}} --branch {{PROJECT_BUILD_BRANCH}} --dry-run -o yaml`      | portal | buildable project                                      | `exit=0; stdout~/generateName: build-/; stdout~/app.edp.epam.com\/codebase: {{PROJECT_BUILD}}/`            |
+| PROJ-B-08  | `krci project build {{PROJECT_BUILD}} --dry-run -o json`                                        | portal | buildable project, default branch resolves             | `exit=0; stdout_json.schemaVersion=1; stdout_json.data.metadata.generateName:exists`                      |
+| PROJ-B-09  | `krci project build {{PROJECT_MISSING}}`                                                        | portal | name does not exist                                    | `exit=1; stderr~/not found/`                                                                              |
+| PROJ-B-10  | `krci project build {{PROJECT_BUILD}} --branch does-not-exist-branch-xyz`                       | portal | project exists, branch does not                        | `exit=1; stderr~/not found/`                                                                              |
+| PROJ-B-11  | `krci project build {{PROJECT_NOT_READY}}`                                                      | portal | CodebaseBranch status is not `created`                 | `exit=1; stderr~/not ready/`                                                                              |
+
+## 9. `project build` — create then reject (env: `portal`, serial)
+
+PROJ-B-12 creates a real PipelineRun. PROJ-B-13 runs immediately after it,
+while that run is still active. The in-progress check is best effort — a
+list-then-create check over every build run of the branch — so PROJ-B-13
+asserts the sequential contract only and says nothing about concurrent
+callers.
+
+| ID         | Command                                          | Env    | Setup                                                 | Expect                                                                            |
+|------------|--------------------------------------------------|--------|-------------------------------------------------------|-----------------------------------------------------------------------------------|
+| PROJ-B-12  | `krci project build {{PROJECT_BUILD}} -o json`   | portal | no build running for the branch                       | `exit=0; stdout_json.data.type=build; stdout_json.data.project={{PROJECT_BUILD}}` |
+| PROJ-B-13  | `krci project build {{PROJECT_BUILD}}`           | portal | run immediately after PROJ-B-12, its run still active | `exit=1; stderr~/already running/`                                                |
+
+> Rows in section 9 depend on each other and create a PipelineRun — the
+> orchestrator must run them serially, in order, **after** all other
+> sections.
