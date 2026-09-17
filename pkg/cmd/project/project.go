@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
+	"github.com/KubeRocketCI/cli/pkg/cmd/project/build"
 	"github.com/KubeRocketCI/cli/pkg/cmd/project/deployments"
 	"github.com/KubeRocketCI/cli/pkg/cmd/project/get"
 	"github.com/KubeRocketCI/cli/pkg/cmd/project/list"
@@ -22,6 +23,7 @@ func NewCmdProject(f *cmdutil.Factory) *cobra.Command {
 		list.NewCmdList(f, nil),
 		get.NewCmdGet(f, nil),
 		deployments.NewCmdDeployments(f, nil),
+		build.NewCmdBuild(f, nil),
 	)
 
 	return cmd

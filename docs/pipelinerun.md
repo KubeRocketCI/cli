@@ -83,6 +83,10 @@ required argument; everything else is optional. The new run uses Kubernetes
 `metadata.generateName`, so the apiserver assigns the random suffix and the
 resolved name is read back and printed.
 
+> To build a project branch, use [`krci project build`](project.md#project-build)
+> — it resolves the pipeline, params, and labels from the project itself.
+> `start` is the raw escape hatch.
+
 ```bash
 krci pipelinerun start foo-build
 ```
