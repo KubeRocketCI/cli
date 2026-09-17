@@ -80,15 +80,12 @@ func TestGet_BranchFlagUsageStringIsVerbatim(t *testing.T) {
 	t.Parallel()
 
 	cmd := NewCmdGet(scatestutil.NewFactory(), nil)
-	flag := cmd.Flag("branch")
-	if flag == nil {
-		t.Fatal("--branch flag missing")
+	usage := scatestutil.FlagUsage(t, cmd, "branch")
+	if !strings.Contains(usage, "Dep-Track project 'version'") {
+		t.Errorf("--branch usage must reference Dep-Track version field: %q", usage)
 	}
-	if !strings.Contains(flag.Usage, "Dep-Track project 'version'") {
-		t.Errorf("--branch usage must reference Dep-Track version field: %q", flag.Usage)
-	}
-	if !strings.Contains(flag.Usage, "krci sca list --search=<project>") {
-		t.Errorf("--branch usage must hint discovery path: %q", flag.Usage)
+	if !strings.Contains(usage, "krci sca list --search=<project>") {
+		t.Errorf("--branch usage must hint discovery path: %q", usage)
 	}
 }
 

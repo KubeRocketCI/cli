@@ -93,12 +93,9 @@ func TestFindings_SeverityFlagUsageVerbatim(t *testing.T) {
 	t.Parallel()
 
 	cmd := NewCmdFindings(scatestutil.NewFactory(), nil)
-	flag := cmd.Flag("severity")
-	if flag == nil {
-		t.Fatal("--severity missing")
-	}
-	if !strings.Contains(flag.Usage, "inclusive") || !strings.Contains(flag.Usage, "UNASSIGNED") {
-		t.Errorf("--severity usage must document inclusive semantics + UNASSIGNED, got %q", flag.Usage)
+	usage := scatestutil.FlagUsage(t, cmd, "severity")
+	if !strings.Contains(usage, "inclusive") || !strings.Contains(usage, "UNASSIGNED") {
+		t.Errorf("--severity usage must document inclusive semantics + UNASSIGNED, got %q", usage)
 	}
 }
 
