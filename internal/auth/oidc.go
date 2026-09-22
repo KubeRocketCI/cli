@@ -23,6 +23,7 @@ type UserInfo struct {
 	Sub       string    `json:"sub"`
 	Groups    []string  `json:"groups"`
 	ExpiresAt time.Time `json:"-"` // set from token expiry, not from JWT claims
+	FromEnv   bool      `json:"-"` // true when the claims come from KRCI_TOKEN, not the stored session
 }
 
 // ValidateIssuerURL ensures the issuer URL is well-formed and uses HTTPS.

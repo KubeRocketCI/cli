@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
@@ -25,9 +26,13 @@ type TokenProvider interface {
 	Login(ctx context.Context) error
 	// Logout clears stored credentials.
 	Logout() error
-	// UserInfo returns cached user claims from the stored ID token.
+	// UserInfo returns the claims of the token GetToken resolves: KRCI_TOKEN
+	// when set, the stored ID token otherwise.
 	UserInfo() (*UserInfo, error)
 }
+
+// envTokenVar names the environment variable that overrides the stored token.
+const envTokenVar = "KRCI_TOKEN"
 
 type tokenProvider struct {
 	store token.Store
@@ -44,8 +49,14 @@ func NewTokenProvider(store token.Store, cfg *config.Config) *tokenProvider {
 
 // GetToken returns a valid ID token for portal Bearer auth.
 // Precedence: KRCI_TOKEN env → cached ID token → refresh → error.
+// KRCI_TOKEN is rejected only when it is a JWT with an exp claim in the past;
+// an opaque token or one without exp is passed through for the portal to judge.
 func (p *tokenProvider) GetToken(ctx context.Context) (string, error) {
-	if t := os.Getenv("KRCI_TOKEN"); t != "" {
+	if t := os.Getenv(envTokenVar); t != "" {
+		if exp, ok := jwtExpiry(t); ok && !time.Now().Before(exp) {
+			return "", ErrEnvTokenExpired
+		}
+
 		return t, nil
 	}
 
@@ -102,8 +113,25 @@ func (p *tokenProvider) Logout() error {
 	return p.store.Clear()
 }
 
-// UserInfo returns user claims by decoding the stored ID token (unverified, display only).
+// UserInfo returns user claims by decoding the token GetToken resolves
+// (unverified, display only). For KRCI_TOKEN, FromEnv is true and ExpiresAt
+// comes from its exp claim, zero when the token has none.
 func (p *tokenProvider) UserInfo() (*UserInfo, error) {
+	if t := os.Getenv(envTokenVar); t != "" {
+		info, err := decodeIDTokenClaims(t)
+		if err != nil {
+			return nil, err
+		}
+
+		if exp, ok := jwtExpiry(t); ok {
+			info.ExpiresAt = exp
+		}
+
+		info.FromEnv = true
+
+		return info, nil
+	}
+
 	stored, err := p.store.Load()
 	if err != nil {
 		if errors.Is(err, token.ErrNoToken) {
@@ -157,7 +185,41 @@ func (p *tokenProvider) refresh(ctx context.Context, stored *token.StoredToken) 
 
 // decodeIDTokenClaims extracts claims from a JWT without verification (display only).
 func decodeIDTokenClaims(rawIDToken string) (*UserInfo, error) {
-	parts := strings.Split(rawIDToken, ".")
+	payload, err := jwtPayload(rawIDToken)
+	if err != nil {
+		return nil, err
+	}
+
+	var claims UserInfo
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return nil, fmt.Errorf("parsing ID token claims: %w", err)
+	}
+
+	return &claims, nil
+}
+
+// jwtExpiry returns the exp claim of a JWT, unverified. ok is false for a
+// token that is not a JWT or carries no exp.
+func jwtExpiry(rawToken string) (time.Time, bool) {
+	payload, err := jwtPayload(rawToken)
+	if err != nil {
+		return time.Time{}, false
+	}
+
+	var claims struct {
+		Exp float64 `json:"exp"`
+	}
+
+	if err := json.Unmarshal(payload, &claims); err != nil || claims.Exp <= 0 {
+		return time.Time{}, false
+	}
+
+	return time.Unix(int64(claims.Exp), 0), true
+}
+
+// jwtPayload returns the decoded payload segment of a JWT.
+func jwtPayload(rawToken string) ([]byte, error) {
+	parts := strings.Split(rawToken, ".")
 	if len(parts) != 3 {
 		return nil, fmt.Errorf("invalid ID token format")
 	}
@@ -167,10 +229,5 @@ func decodeIDTokenClaims(rawIDToken string) (*UserInfo, error) {
 		return nil, fmt.Errorf("decoding ID token payload: %w", err)
 	}
 
-	var claims UserInfo
-	if err := json.Unmarshal(payload, &claims); err != nil {
-		return nil, fmt.Errorf("parsing ID token claims: %w", err)
-	}
-
-	return &claims, nil
+	return payload, nil
 }

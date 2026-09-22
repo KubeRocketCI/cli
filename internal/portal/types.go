@@ -16,37 +16,42 @@ type Project struct {
 
 // Deployment represents a KubeRocketCI CDPipeline resource.
 type Deployment struct {
-	Name         string   `json:"name"`
-	Namespace    string   `json:"namespace"`
-	Applications []string `json:"applications"`
-	StageNames   []string `json:"stages"`
-	Description  string   `json:"description,omitempty"`
-	Status       string   `json:"status"`
-	Available    bool     `json:"available"`
+	Name            string   `json:"name"`
+	Namespace       string   `json:"namespace"`
+	Applications    []string `json:"applications"`
+	StageNames      []string `json:"stages"`
+	Description     string   `json:"description,omitempty"`
+	Status          string   `json:"status"`
+	DetailedMessage string   `json:"detailedMessage,omitempty"`
+	Available       bool     `json:"available"`
 }
 
 // DeploymentDetail represents a CDPipeline with its associated Stages.
 type DeploymentDetail struct {
-	Name         string   `json:"name"`
-	Namespace    string   `json:"namespace"`
-	Applications []string `json:"applications"`
-	Description  string   `json:"description,omitempty"`
-	Status       string   `json:"status"`
-	Available    bool     `json:"available"`
-	Stages       []Stage  `json:"stages"`
+	Name            string   `json:"name"`
+	Namespace       string   `json:"namespace"`
+	Applications    []string `json:"applications"`
+	Description     string   `json:"description,omitempty"`
+	Status          string   `json:"status"`
+	DetailedMessage string   `json:"detailedMessage,omitempty"`
+	Available       bool     `json:"available"`
+	Stages          []Stage  `json:"stages"`
 }
 
 // Stage represents a KubeRocketCI Stage resource belonging to a CDPipeline.
+// DetailedMessage carries the operator's status.detailed_message, the reason
+// behind a failed status, and is omitted when the resource has none.
 type Stage struct {
-	Name         string        `json:"name"`
-	Order        int64         `json:"order"`
-	TriggerType  string        `json:"triggerType"`
-	QualityGates []QualityGate `json:"qualityGates"`
-	Namespace    string        `json:"namespace"`
-	ClusterName  string        `json:"clusterName,omitempty"`
-	Description  string        `json:"description,omitempty"`
-	Status       string        `json:"status"`
-	Available    bool          `json:"available"`
+	Name            string        `json:"name"`
+	Order           int64         `json:"order"`
+	TriggerType     string        `json:"triggerType"`
+	QualityGates    []QualityGate `json:"qualityGates"`
+	Namespace       string        `json:"namespace"`
+	ClusterName     string        `json:"clusterName,omitempty"`
+	Description     string        `json:"description,omitempty"`
+	Status          string        `json:"status"`
+	DetailedMessage string        `json:"detailedMessage,omitempty"`
+	Available       bool          `json:"available"`
 }
 
 const (
@@ -68,6 +73,25 @@ const (
 	ArgoHealthSuspended   ArgoHealthStatus = "suspended"
 	ArgoHealthUnknown     ArgoHealthStatus = "unknown"
 )
+
+// AppCondition is one entry of an Argo CD Application's status.conditions:
+// the reason a comparison, sync, or health evaluation did not complete, such
+// as an unreachable target cluster or a chart that fails to render.
+type AppCondition struct {
+	Type               string  `json:"type"`
+	Message            string  `json:"message"`
+	LastTransitionTime *string `json:"lastTransitionTime"`
+}
+
+// AppOperation summarizes the last sync operation of an Argo CD Application
+// (status.operationState). Phase is one of Argo CD's operation phases
+// (Running, Succeeded, Failed, Error, Terminating).
+type AppOperation struct {
+	Phase      string  `json:"phase"`
+	Message    *string `json:"message"`
+	StartedAt  *string `json:"startedAt"`
+	FinishedAt *string `json:"finishedAt"`
+}
 
 // QualityGate represents a quality gate step within a Stage.
 type QualityGate struct {
@@ -95,15 +119,18 @@ type EnvListPayload struct {
 }
 
 // EnvDetail is the response for `krci env get <deployment> <env>`.
+// DetailedMessage is the Stage's status.detailed_message, null when the
+// operator reported none.
 type EnvDetail struct {
-	Deployment     string              `json:"deployment"`
-	Env            string              `json:"env"`
-	Status         string              `json:"status"`
-	Description    *string             `json:"description"`
-	Order          int                 `json:"order"`
-	Infrastructure Infrastructure      `json:"infrastructure"`
-	QualityGates   []QualityGateDetail `json:"qualityGates"`
-	Projects       []EnvProject        `json:"projects"`
+	Deployment      string              `json:"deployment"`
+	Env             string              `json:"env"`
+	Status          string              `json:"status"`
+	DetailedMessage *string             `json:"detailedMessage"`
+	Description     *string             `json:"description"`
+	Order           int                 `json:"order"`
+	Infrastructure  Infrastructure      `json:"infrastructure"`
+	QualityGates    []QualityGateDetail `json:"qualityGates"`
+	Projects        []EnvProject        `json:"projects"`
 }
 
 // Infrastructure carries the technical placement of an environment.
@@ -124,36 +151,42 @@ type QualityGateDetail struct {
 	BranchName   *string `json:"branchName"`
 }
 
-// EnvProject is one row in EnvDetail.Projects.
+// EnvProject is one row in EnvDetail.Projects. Conditions is always an array
+// and Operation is null until the Application has been synced once.
 type EnvProject struct {
-	Name           string   `json:"name"`
-	Status         *string  `json:"status"`
-	Sync           *string  `json:"sync"`
-	Version        *string  `json:"version"`
-	ImageTag       *string  `json:"imageTag"`
-	ImageDigest    *string  `json:"imageDigest"`
-	IngressURLs    []string `json:"ingressUrls"`
-	ArgocdURL      *string  `json:"argocdUrl"`
-	DeployedAt     *string  `json:"deployedAt"`
-	ValuesOverride *bool    `json:"valuesOverride"`
+	Name           string         `json:"name"`
+	Status         *string        `json:"status"`
+	Sync           *string        `json:"sync"`
+	Version        *string        `json:"version"`
+	ImageTag       *string        `json:"imageTag"`
+	ImageDigest    *string        `json:"imageDigest"`
+	IngressURLs    []string       `json:"ingressUrls"`
+	ArgocdURL      *string        `json:"argocdUrl"`
+	DeployedAt     *string        `json:"deployedAt"`
+	ValuesOverride *bool          `json:"valuesOverride"`
+	Conditions     []AppCondition `json:"conditions"`
+	Operation      *AppOperation  `json:"operation"`
 }
 
 // ProjectDeploymentRow is one row in `krci project deployments <project>`.
+// Conditions and Operation follow the EnvProject rules.
 type ProjectDeploymentRow struct {
-	Deployment  string   `json:"deployment"`
-	Env         string   `json:"env"`
-	Deployed    bool     `json:"deployed"`
-	Status      *string  `json:"status"`
-	Sync        *string  `json:"sync"`
-	Version     *string  `json:"version"`
-	ImageTag    *string  `json:"imageTag"`
-	ImageDigest *string  `json:"imageDigest"`
-	Cluster     string   `json:"cluster"`
-	Namespace   string   `json:"namespace"`
-	TriggerType string   `json:"triggerType"`
-	DeployedAt  *string  `json:"deployedAt"`
-	IngressURLs []string `json:"ingressUrls"`
-	ArgocdURL   *string  `json:"argocdUrl"`
+	Deployment  string         `json:"deployment"`
+	Env         string         `json:"env"`
+	Deployed    bool           `json:"deployed"`
+	Status      *string        `json:"status"`
+	Sync        *string        `json:"sync"`
+	Version     *string        `json:"version"`
+	ImageTag    *string        `json:"imageTag"`
+	ImageDigest *string        `json:"imageDigest"`
+	Cluster     string         `json:"cluster"`
+	Namespace   string         `json:"namespace"`
+	TriggerType string         `json:"triggerType"`
+	DeployedAt  *string        `json:"deployedAt"`
+	IngressURLs []string       `json:"ingressUrls"`
+	ArgocdURL   *string        `json:"argocdUrl"`
+	Conditions  []AppCondition `json:"conditions"`
+	Operation   *AppOperation  `json:"operation"`
 }
 
 // ProjectDeploymentsPayload is the envelope `data` block for
@@ -161,4 +194,29 @@ type ProjectDeploymentRow struct {
 type ProjectDeploymentsPayload struct {
 	Project string                 `json:"project"`
 	Rows    []ProjectDeploymentRow `json:"rows"`
+}
+
+// ImageVersion is one tag of a CodebaseImageStream: a version the build
+// pipeline pushed for a branch, with its creation time and, when the
+// registry reported one, the image digest.
+type ImageVersion struct {
+	Name    string `json:"name"`
+	Created string `json:"created"`
+	Digest  string `json:"digest,omitempty"`
+}
+
+// ProjectVersionStream is one CodebaseImageStream of a project: the image
+// repository of one git branch and its versions, newest first. Versions is
+// always an array, empty for a branch that has never been built.
+type ProjectVersionStream struct {
+	Branch   string         `json:"branch"`
+	Image    string         `json:"image"`
+	Versions []ImageVersion `json:"versions"`
+}
+
+// ProjectVersionsPayload is the envelope `data` block for
+// `krci project versions <project>`.
+type ProjectVersionsPayload struct {
+	Project string                 `json:"project"`
+	Streams []ProjectVersionStream `json:"streams"`
 }

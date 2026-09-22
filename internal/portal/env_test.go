@@ -625,6 +625,7 @@ type stageStub struct {
 	trigger    string
 	order      int
 	status     string
+	message    string // status.detailed_message, omitted when empty
 }
 
 func stageListJSON(stages []stageStub) string {
@@ -660,7 +661,7 @@ func stageListJSON(stages []stageStub) string {
 				"order":           s.order,
 				"qualityGates":    []any{},
 			},
-			Status: map[string]any{"status": s.status},
+			Status: statusWithMessage(s.status, s.message),
 		})
 	}
 
@@ -684,6 +685,28 @@ type applicationStub struct {
 	imageTag     string
 	imageDigest  string // already in "sha256:..." format; appended to image entry
 	externalURLs []string
+	conditions   []conditionStub // status.conditions, omitted when empty
+	opPhase      string          // status.operationState.phase, omitted when empty
+	opMessage    string          // status.operationState.message
+	opFinishedAt string          // status.operationState.finishedAt
+}
+
+// conditionStub is one status.conditions entry of an Application stub.
+type conditionStub struct {
+	condType string
+	message  string
+	since    string
+}
+
+// statusWithMessage builds a Stage/CDPipeline status block, adding
+// detailed_message only when message is set, like the operator does.
+func statusWithMessage(status, message string) map[string]any {
+	out := map[string]any{"status": status}
+	if message != "" {
+		out["detailed_message"] = message
+	}
+
+	return out
 }
 
 func applicationListJSON(apps []applicationStub) string {
@@ -717,6 +740,35 @@ func applicationListJSON(apps []applicationStub) string {
 			summary["images"] = stringsToAny([]string{a.imageRepo + ":" + a.imageTag + "@" + a.imageDigest})
 		}
 
+		status := map[string]any{
+			"health":  map[string]any{"status": a.health},
+			"sync":    map[string]any{"status": a.sync},
+			"summary": summary,
+		}
+
+		if len(a.conditions) > 0 {
+			conds := make([]any, 0, len(a.conditions))
+			for _, c := range a.conditions {
+				entry := map[string]any{"type": c.condType, "message": c.message}
+				if c.since != "" {
+					entry["lastTransitionTime"] = c.since
+				}
+				conds = append(conds, entry)
+			}
+			status["conditions"] = conds
+		}
+
+		if a.opPhase != "" {
+			op := map[string]any{"phase": a.opPhase}
+			if a.opMessage != "" {
+				op["message"] = a.opMessage
+			}
+			if a.opFinishedAt != "" {
+				op["finishedAt"] = a.opFinishedAt
+			}
+			status["operationState"] = op
+		}
+
 		items = append(items, app{
 			Metadata: metadata{
 				Name:      a.pipeline + "-" + a.stage + "-" + a.appName,
@@ -734,11 +786,7 @@ func applicationListJSON(apps []applicationStub) string {
 					"targetRevision": "main",
 				},
 			},
-			Status: map[string]any{
-				"health":  map[string]any{"status": a.health},
-				"sync":    map[string]any{"status": a.sync},
-				"summary": summary,
-			},
+			Status: status,
 		})
 	}
 
@@ -763,6 +811,7 @@ func stringsToAny(s []string) []any {
 type cdPipelineStub struct {
 	name         string
 	applications []string
+	message      string // status.detailed_message, omitted when empty
 }
 
 func cdPipelineListJSON(items []cdPipelineStub) string {
@@ -784,7 +833,7 @@ func cdPipelineListJSON(items []cdPipelineStub) string {
 			Spec: map[string]any{
 				"applications": stringsToAny(it.applications),
 			},
-			Status: map[string]any{"status": "created"},
+			Status: statusWithMessage("created", it.message),
 		})
 	}
 

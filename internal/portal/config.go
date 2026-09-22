@@ -1,12 +1,15 @@
 package portal
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 )
 
 // ClusterConfig holds configuration returned by the authenticated config endpoint.
@@ -101,6 +104,18 @@ func fetchClusterConfig(portalURL, token string) (*ClusterConfig, error) {
 	}
 
 	return &cfg, nil
+}
+
+// VerifySession calls the authenticated /rest/v1/config endpoint through
+// client, so the portal validates the client's bearer token. ErrUnauthorized
+// means the portal rejected the token.
+func VerifySession(ctx context.Context, client *restapi.ClientWithResponses) error {
+	resp, err := client.ConfigGetWithResponse(ctx)
+	if err != nil {
+		return fmt.Errorf("requesting cluster config: %w", err)
+	}
+
+	return checkResponse(resp.StatusCode(), resp.Body)
 }
 
 func validatePortalURL(portalURL string) error {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -14,9 +15,9 @@ import (
 	"github.com/KubeRocketCI/cli/internal/token"
 )
 
-// fakeJWT builds a test JWT from raw JSON header and payload (alg:none, no signature).
-func fakeJWT(header, payload string) string {
-	h := base64.RawURLEncoding.EncodeToString([]byte(header))
+// fakeJWT builds an unsigned alg:none test JWT from a raw JSON payload.
+func fakeJWT(payload string) string {
+	h := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
 	p := base64.RawURLEncoding.EncodeToString([]byte(payload))
 
 	return h + "." + p + "."
@@ -67,6 +68,60 @@ func TestGetTokenEnvVarTakesPrecedence(t *testing.T) {
 	tok, err := tp.GetToken(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, "env-token-value", tok)
+}
+
+func TestGetTokenEnvVarExpired(t *testing.T) {
+	expired := time.Now().Add(-time.Minute).Unix()
+	t.Setenv("KRCI_TOKEN", fakeJWT(fmt.Sprintf(`{"sub":"ci","exp":%d}`, expired)))
+
+	store := &mockStore{
+		tok: &token.StoredToken{IDToken: "cached-id-token", ExpiresAt: time.Now().Add(time.Hour)},
+	}
+
+	tp := NewTokenProvider(store, &config.Config{})
+	_, err := tp.GetToken(context.Background())
+	require.ErrorIs(t, err, ErrEnvTokenExpired)
+}
+
+func TestGetTokenEnvVarUnexpiredJWT(t *testing.T) {
+	valid := time.Now().Add(time.Hour).Unix()
+	envTok := fakeJWT(fmt.Sprintf(`{"sub":"ci","exp":%d}`, valid))
+	t.Setenv("KRCI_TOKEN", envTok)
+
+	tp := NewTokenProvider(&mockStore{}, &config.Config{})
+	tok, err := tp.GetToken(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, envTok, tok)
+}
+
+func TestUserInfoFromEnvToken(t *testing.T) {
+	exp := time.Now().Add(time.Hour).Truncate(time.Second)
+	t.Setenv("KRCI_TOKEN", fakeJWT(fmt.Sprintf(`{"email":"ci@example.com","groups":["developers"],"exp":%d}`, exp.Unix())))
+
+	store := &mockStore{
+		tok: &token.StoredToken{
+			IDToken:   fakeJWT(`{"email":"stored@example.com"}`),
+			ExpiresAt: time.Now().Add(2 * time.Hour),
+		},
+	}
+
+	tp := NewTokenProvider(store, &config.Config{})
+	info, err := tp.UserInfo()
+	require.NoError(t, err)
+
+	assert.Equal(t, "ci@example.com", info.Email)
+	assert.Equal(t, []string{"developers"}, info.Groups)
+	assert.True(t, exp.Equal(info.ExpiresAt), "ExpiresAt = %v, want %v", info.ExpiresAt, exp)
+	assert.True(t, info.FromEnv, "claims of KRCI_TOKEN must be marked FromEnv")
+}
+
+func TestUserInfoFromOpaqueEnvToken(t *testing.T) {
+	t.Setenv("KRCI_TOKEN", "opaque-token")
+
+	tp := NewTokenProvider(&mockStore{}, &config.Config{})
+	_, err := tp.UserInfo()
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, ErrNotAuthenticated)
 }
 
 func TestGetToken(t *testing.T) {
@@ -167,10 +222,7 @@ func TestUserInfoNotAuthenticated(t *testing.T) {
 func TestUserInfoDecodesIDToken(t *testing.T) {
 	t.Parallel()
 
-	idToken := fakeJWT(
-		`{"alg":"none"}`,
-		`{"email":"test@example.com","name":"Test User","sub":"123","groups":["admin"]}`,
-	)
+	idToken := fakeJWT(`{"email":"test@example.com","name":"Test User","sub":"123","groups":["admin"]}`)
 
 	store := &mockStore{
 		tok: &token.StoredToken{
@@ -187,6 +239,7 @@ func TestUserInfoDecodesIDToken(t *testing.T) {
 	assert.Equal(t, "Test User", info.Name)
 	assert.Equal(t, []string{"admin"}, info.Groups)
 	assert.False(t, info.ExpiresAt.IsZero(), "ExpiresAt should be set from stored token")
+	assert.False(t, info.FromEnv, "claims of the stored session must not be marked FromEnv")
 }
 
 func TestValidateIssuerURL(t *testing.T) {

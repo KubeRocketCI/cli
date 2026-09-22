@@ -59,6 +59,24 @@ Environment columns:
 - **PROMOTE GATES** — number and type of quality gates that must pass
 - **NAMESPACE** — target Kubernetes namespace
 
+When the operator records `status.detailed_message` on the CDPipeline, a
+`Message:` line follows `Available:`; stages with a message are listed under
+a `Messages:` block below the table, `<env>: <message>` per line. Both are
+absent for healthy resources.
+
+```
+Status:       failed
+Available:    false
+Message:      failed to create namespace my-pipeline-dev: quota exceeded
+
+Environments:
+ORDER   ENV    DEPLOY MODE   PROMOTE GATES   NAMESPACE                  STATUS
+0       dev    Manual        1 manual        my-pipeline-dev            failed
+
+Messages:
+  dev: failed to create namespace my-pipeline-dev: quota exceeded
+```
+
 ## JSON output
 
 ```bash
@@ -90,6 +108,11 @@ krci deployment get my-pipeline -o json
   ]
 }
 ```
+
+`detailedMessage` appears on the deployment and on a stage only when the
+resource carries `status.detailed_message` (`"status": "failed",
+"detailedMessage": "failed to create namespace ...: quota exceeded"`);
+`deployment list -o json` carries it on the same terms.
 
 Agent workflow — list namespaces for a pipeline:
 

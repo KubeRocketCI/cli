@@ -236,3 +236,12 @@ func TestPrintJSONErrorEnvelope_WrappedError(t *testing.T) {
 		t.Errorf("error.message = %q, want %q", got.Error.Message, "x: y")
 	}
 }
+
+func TestSingleLine(t *testing.T) {
+	t.Parallel()
+
+	got := SingleLine("  rpc error:\n\tcode = Unknown  desc = chart\r\nfailed \n")
+	if want := "rpc error: code = Unknown desc = chart failed"; got != want {
+		t.Errorf("SingleLine = %q, want %q", got, want)
+	}
+}

@@ -73,7 +73,7 @@ stable enough to treat `krci` as a first-class agent tool.
 | Area          | What you get                                                                     | Docs                                      |
 |---------------|----------------------------------------------------------------------------------|-------------------------------------------|
 | Authentication | OIDC + PKCE browser flow, AES-256-GCM token storage, OS keyring integration      | [`docs/auth.md`](docs/auth.md)            |
-| Projects       | List and inspect projects, and build a project branch                            | [`docs/project.md`](docs/project.md)      |
+| Projects       | List and inspect projects, list their built image versions, build a branch      | [`docs/project.md`](docs/project.md)      |
 | Deployments    | Inspect deployments, their apps, environments, and promotion gates               | [`docs/deployment.md`](docs/deployment.md)|
 | Environments   | Inspect envs — deployed apps, infrastructure, gates, and health                  | [`docs/env.md`](docs/env.md)              |
 | Pipeline runs  | List, filter, stream logs, and diagnose failures across Tekton runs              | [`docs/pipelinerun.md`](docs/pipelinerun.md) |
@@ -117,7 +117,7 @@ start with the area you care about.
 ```
 krci [--portal-url <url>]
   auth        login | status | logout
-  project     list | get <name> | deployments <name> | build <name>
+  project     list | get <name> | deployments <name> | versions <name> | build <name>
   deployment  list | get <name>
   pipelinerun list | get <name>       (also filters, --logs, --reason)
   sonar       list | get | gate | issues <project>

@@ -20,6 +20,10 @@ and the branch. `--branch` defaults to the project's default branch, the
 project-derived params are reserved, and `--dry-run` renders the manifest
 without creating anything.
 
+`krci project versions <project>` lists the image versions the build
+pipeline pushed, one row per branch (`PROJ-V-NN`); `--branch` lists every
+version of one git branch, newest first. Read-only.
+
 Every row is a self-contained contract a Haiku agent can execute. See
 `../runner.md` for the agent brief and the **expect grammar** reference.
 
@@ -36,6 +40,8 @@ Every row is a self-contained contract a Haiku agent can execute. See
 | `{{PROJECT_BUILD}}`    | A codebase with a build pipeline whose branch status is `created` (buildable).               | `test-go-app`   |
 | `{{PROJECT_BUILD_BRANCH}}` | The git branch of `{{PROJECT_BUILD}}` to build.                                         | `main`          |
 | `{{PROJECT_NOT_READY}}` | A codebase whose CodebaseBranch status is not `created`.                                    | `test-dotnet-app` |
+| `{{PROJECT_WITH_VERSIONS}}` | A codebase with at least one CodebaseImageStream that carries tags (a built branch).    | `payments-api`  |
+| `{{PROJECT_VERSIONS_BRANCH}}` | A git branch of `{{PROJECT_WITH_VERSIONS}}` that has been built at least once.        | `main`          |
 
 The orchestrator fills these; the table never hard-codes them.
 
@@ -78,6 +84,7 @@ code is 0 and the JSON envelope matches the documented shape
 | PROJ-D-P-01 | `krci project deployments {{PROJECT_DEPLOYED}}`                 | portal | project deployed somewhere                     | `exit=0; stdout~/^DEPLOYMENT/; stdout~/ENV/; stdout~/STATUS/; stdout~/SYNC/; stdout~/VERSION/; stdout~/IMAGE_SHA/; stdout~/CLUSTER/; stdout~/NAMESPACE/; stdout~/INGRESS/` |
 | PROJ-D-P-02 | `krci project deployments {{PROJECT_DEPLOYED}} -o json`         | portal | project deployed somewhere                     | `exit=0; stdout_json.schemaVersion=1; stdout_json.data.project={{PROJECT_DEPLOYED}}; stdout_json.data.rows:exists`                                    |
 | PROJ-D-P-03 | `krci project deployments {{PROJECT_DEPLOYED}} -o json`         | portal | project deployed in DEPLOYMENT_OK/ENV_OK       | `exit=0; stdout_json.data.rows.0.deployment:exists; stdout_json.data.rows.0.env:exists; stdout_json.data.rows.0.deployed:exists; stdout_json.data.rows.0.cluster:exists; stdout_json.data.rows.0.namespace:exists; stdout_json.data.rows.0.triggerType:exists` |
+| PROJ-D-P-04 | `krci project deployments {{PROJECT_DEPLOYED}} -o json`         | portal | project deployed somewhere                     | `exit=0; stdout_json.data.rows.0.conditions:exists; stdout_json.data.rows.0.operation:exists`                                                                        |
 
 ## 4. Empty results (env: `portal`)
 
@@ -155,3 +162,30 @@ callers.
 > Rows in section 9 depend on each other and create a PipelineRun — the
 > orchestrator must run them serially, in order, **after** all other
 > sections.
+
+## 10. `project versions` (env: `offline`)
+
+| ID         | Command                                                     | Env     | Setup | Expect                                                                                                              |
+|------------|-------------------------------------------------------------|---------|-------|---------------------------------------------------------------------------------------------------------------------|
+| PROJ-V-01  | `krci project versions --help`                              | offline | —     | `exit=0; stdout~/^\s+krci project versions <project> \[flags\]$/; stdout~/--branch string/; stdout~/-o, --output string/` |
+| PROJ-V-02  | `krci project versions`                                     | offline | —     | `exit=1; stderr~/requires a project name/`                                                                          |
+| PROJ-V-03  | `krci project versions a b`                                 | offline | —     | `exit=1; stderr~/requires a project name/`                                                                          |
+| PROJ-V-04  | `krci project versions BAD_NAME`                            | offline | —     | `exit=1; stderr~/<project> must be a valid DNS-1123 name/`                                                         |
+| PROJ-V-05  | `krci project versions my-app -o yaml`                      | offline | —     | `exit=1; stderr~/unknown output format/`                                                                            |
+| PROJ-V-06  | `krci project versions my-app --branch $(printf 'b%.0s' $(seq 254))` | offline | — | `exit=1; stderr~/--branch must be at most 253 characters/`                                                          |
+| PROJ-V-07  | `krci project`                                              | offline | —     | `exit=0; stdout~/^\s+versions\s/`                                                                                   |
+
+## 11. `project versions` (env: `portal`)
+
+Read-only: every row lists existing image streams and creates nothing.
+
+| ID         | Command                                                                                               | Env    | Setup                                          | Expect                                                                                                                                                  |
+|------------|-------------------------------------------------------------------------------------------------------|--------|------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
+| PROJ-V-08  | `krci project versions {{PROJECT_WITH_VERSIONS}}`                                                     | portal | project has a built branch                     | `exit=0; stdout~/^BRANCH/; stdout~/VERSIONS/; stdout~/LATEST/; stdout~/CREATED/; stdout~/IMAGE/; stdout~/{{PROJECT_VERSIONS_BRANCH}}/`                  |
+| PROJ-V-09  | `krci project versions {{PROJECT_WITH_VERSIONS}} -o json`                                             | portal | project has a built branch                     | `exit=0; stdout_json.schemaVersion=1; stdout_json.data.project={{PROJECT_WITH_VERSIONS}}; stdout_json.data.streams:exists; stdout_json.data.streams.0.branch:exists; stdout_json.data.streams.0.image:exists; stdout_json.data.streams.0.versions:exists` |
+| PROJ-V-10  | `krci project versions {{PROJECT_WITH_VERSIONS}} --branch {{PROJECT_VERSIONS_BRANCH}}`                | portal | branch built at least once                     | `exit=0; stdout~/^VERSION/; stdout~/CREATED/; stdout~/DIGEST/; stdout~/IMAGE/`                                                                          |
+| PROJ-V-11  | `krci project versions {{PROJECT_WITH_VERSIONS}} --branch {{PROJECT_VERSIONS_BRANCH}} -o json`        | portal | branch built at least once                     | `exit=0; stdout_json.data.streams:len=1; stdout_json.data.streams.0.branch={{PROJECT_VERSIONS_BRANCH}}; stdout_json.data.streams.0.versions.0.name:exists; stdout_json.data.streams.0.versions.0.created:exists` |
+| PROJ-V-12  | `krci project versions {{PROJECT_WITH_VERSIONS}} --branch does-not-exist-branch-xyz`                  | portal | project exists, branch does not                | `exit=0; stderr~/No versions found for branch does-not-exist-branch-xyz of project {{PROJECT_WITH_VERSIONS}}\./`                                        |
+| PROJ-V-13  | `krci project versions {{PROJECT_WITH_VERSIONS}} --branch does-not-exist-branch-xyz -o json`          | portal | project exists, branch does not                | `exit=0; stdout_json.data.streams:len=0`                                                                                                                |
+| PROJ-V-14  | `krci project versions {{PROJECT_MISSING}}`                                                           | portal | name does not exist                            | `exit=1; stderr~/project '{{PROJECT_MISSING}}' not found/`                                                                                              |
+| PROJ-V-15  | `krci project versions {{PROJECT_MISSING}} -o json`                                                   | portal | name does not exist                            | `exit=1; stdout_json.schemaVersion=1; stdout_json.error.message:exists`                                                                                 |

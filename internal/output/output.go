@@ -143,6 +143,12 @@ func Truncate(s string, maxWidth int) string {
 	return s[:maxWidth-3] + "..."
 }
 
+// SingleLine collapses every whitespace run, newlines included, into one
+// space so a multi-line operator message fits one display row.
+func SingleLine(s string) string {
+	return strings.Join(strings.Fields(s), " ")
+}
+
 func Hyperlink(text, url string) string {
 	if url == "" {
 		return text
