@@ -164,7 +164,11 @@ func renderDetail(w io.Writer, isTTY bool, d *portal.EnvDetail) error {
 		return err
 	}
 
-	return renderProjects(w, isTTY, d.Projects)
+	if err := renderProjects(w, isTTY, d.Projects); err != nil {
+		return err
+	}
+
+	return renderConditions(w, isTTY, d.Projects)
 }
 
 func buildHeaderPairs(d *portal.EnvDetail, isTTY bool) []labelValue {
@@ -178,13 +182,77 @@ func buildHeaderPairs(d *portal.EnvDetail, isTTY bool) []labelValue {
 		statusValue = output.StatusColor(d.Status)
 	}
 
-	return []labelValue{
+	pairs := []labelValue{
 		{Label: "Environment", Value: d.Env},
 		{Label: "Deployment", Value: d.Deployment},
 		{Label: "Status", Value: statusValue},
-		{Label: "Description", Value: desc},
-		{Label: "Order", Value: strconv.Itoa(d.Order)},
 	}
+
+	if d.DetailedMessage != nil && *d.DetailedMessage != "" {
+		pairs = append(pairs, labelValue{Label: "Message", Value: output.SingleLine(*d.DetailedMessage)})
+	}
+
+	return append(pairs,
+		labelValue{Label: "Description", Value: desc},
+		labelValue{Label: "Order", Value: strconv.Itoa(d.Order)},
+	)
+}
+
+// renderConditions prints the Conditions block below the projects table: one
+// line per Argo CD condition and one per sync operation that did not succeed,
+// so the reason behind an unknown or degraded status is readable without
+// opening Argo CD. Nothing is printed when no project carries a diagnostic.
+func renderConditions(w io.Writer, isTTY bool, projects []portal.EnvProject) error {
+	lines := conditionLines(projects)
+	if len(lines) == 0 {
+		return nil
+	}
+
+	if _, err := fmt.Fprintln(w); err != nil {
+		return err
+	}
+
+	if err := printSectionHeading(w, isTTY, fmt.Sprintf("Conditions (%d)", len(lines))); err != nil {
+		return err
+	}
+
+	for _, line := range lines {
+		if _, err := fmt.Fprintln(w, line); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// conditionLines flattens the diagnostics of every project into display rows:
+//
+//	"  - <project>: <condition type>: <message>"
+//	"  - <project>: operation <phase>: <message>"
+//
+// The operation line appears only for a phase other than Succeeded.
+func conditionLines(projects []portal.EnvProject) []string {
+	lines := make([]string, 0, len(projects))
+
+	for _, p := range projects {
+		for _, c := range p.Conditions {
+			lines = append(lines, fmt.Sprintf("  - %s: %s: %s", p.Name, c.Type, output.SingleLine(c.Message)))
+		}
+
+		op := p.Operation
+		if op == nil || op.Phase == "" || op.Phase == "Succeeded" {
+			continue
+		}
+
+		line := fmt.Sprintf("  - %s: operation %s", p.Name, op.Phase)
+		if op.Message != nil && *op.Message != "" {
+			line += ": " + output.SingleLine(*op.Message)
+		}
+
+		lines = append(lines, line)
+	}
+
+	return lines
 }
 
 func buildInfraPairs(i portal.Infrastructure) []labelValue {

@@ -133,12 +133,27 @@ The TTY view is layered top-to-bottom:
 
 1. **Header** — `Environment / Deployment / Status / Description / Order`. Status
    uses `output.StatusColor` (`created` → green, `failed` → red, `in_progress` → yellow).
+   A `Message` line follows `Status` when the Stage reports
+   `status.detailed_message`, the operator's reason behind a `failed` status.
 2. **Infrastructure** — indented block with the Stage's static placement.
    `Clean Pipeline: —` when no `cleanTemplate` is set.
 3. **Quality Gates** — one bullet per gate; `autotests` gates show their
    autotest name and branch (e.g. `autotests: smoke-tests (branch: main)`).
 4. **Projects sub-table** — column order: `PROJECT`, `STATUS`, `SYNC`,
    `VERSION`, `IMAGE_SHA`, `INGRESS`. Sorted by project name ascending.
+5. **Conditions** — printed only when a project carries an Argo CD condition
+   or a sync operation that did not succeed:
+
+   ```
+   Conditions (2):
+     - foo: ComparisonError: Failed to load live state: failed to get cluster info for "https://k8s.example.com": dial tcp: i/o timeout
+     - foo: operation Error: ComparisonError: Failed to load target state
+   ```
+
+   This is where the reason behind an `unknown` or `degraded` status lives:
+   an unreachable target cluster, a chart that fails to render, a
+   `build/<version>` revision that does not exist. Multi-line messages are
+   collapsed to one row.
 
 Projects sub-table semantics:
 
@@ -181,6 +196,7 @@ krci env get my-pipeline prod -o json
     "deployment": "my-pipeline",
     "env": "prod",
     "status": "created",
+    "detailedMessage": null,
     "description": "Production environment",
     "order": 2,
     "infrastructure": {
@@ -205,7 +221,34 @@ krci env get my-pipeline prod -o json
         "ingressUrls": ["https://foo.prod.example.com"],
         "argocdUrl": "/applications/my-pipeline-my-pipeline-prod-foo",
         "deployedAt": "2026-04-25T08:00:00Z",
-        "valuesOverride": false
+        "valuesOverride": false,
+        "conditions": [],
+        "operation": {
+          "phase": "Succeeded",
+          "message": "successfully synced (all tasks run)",
+          "startedAt": "2026-04-25T07:59:40Z",
+          "finishedAt": "2026-04-25T08:00:00Z"
+        }
+      },
+      {
+        "name": "bar",
+        "status": "unknown",
+        "sync": "unknown",
+        "version": "2.0.1",
+        "imageTag": "2.0.1",
+        "imageDigest": null,
+        "ingressUrls": [],
+        "argocdUrl": "/applications/my-pipeline-my-pipeline-prod-bar",
+        "deployedAt": null,
+        "valuesOverride": false,
+        "conditions": [
+          {
+            "type": "ComparisonError",
+            "message": "Failed to load live state: failed to get cluster info for \"https://k8s.example.com\": dial tcp: i/o timeout",
+            "lastTransitionTime": "2026-04-25T08:03:12Z"
+          }
+        ],
+        "operation": null
       },
       {
         "name": "baz",
@@ -217,7 +260,9 @@ krci env get my-pipeline prod -o json
         "ingressUrls": [],
         "argocdUrl": null,
         "deployedAt": null,
-        "valuesOverride": null
+        "valuesOverride": null,
+        "conditions": [],
+        "operation": null
       }
     ]
   }
@@ -227,10 +272,18 @@ krci env get my-pipeline prod -o json
 Field absence rules:
 
 - `description`, `cleanPipeline` → `null` when the Stage spec omits them.
+- `detailedMessage` → the Stage's `status.detailed_message`, `null` when the
+  operator reported none.
 - Per-project dynamic fields (`status`, `sync`, `version`, `imageTag`,
   `imageDigest`, `argocdUrl`, `deployedAt`, `valuesOverride`) → `null` for
   registered-but-not-deployed projects. `ingressUrls` is always an array,
   `[]` when none.
+- `conditions[]` is always an array, `[]` when the Application has none;
+  each entry carries `type`, `message`, and `lastTransitionTime` (`null`
+  when Argo CD omits it). `operation` → `null` for
+  registered-but-not-deployed projects and for Applications never synced;
+  otherwise `phase`, `message`, `startedAt`, `finishedAt`, each of the last
+  three `null` when absent.
 - `qualityGates[]` is always an array (empty when none).
 - In `-o json`, `imageDigest` is the FULL `sha256:...`. The table view
   shortens it to 15 visible characters under `IMAGE_SHA`.
@@ -245,6 +298,11 @@ krci env get my-pipeline prod -o json |
 # All ingress URLs for one project in this env
 krci env get my-pipeline prod -o json |
   jq -r '.data.projects[] | select(.name=="foo") | .ingressUrls[]'
+
+# Why is a project unknown or degraded? Argo CD conditions and the last operation
+krci env get my-pipeline prod -o json |
+  jq -r '.data.projects[] | .name as $n | (.conditions[] | "\($n): \(.type): \(.message)"),
+         (select(.operation != null and .operation.phase != "Succeeded") | "\($n): operation \(.operation.phase): \(.operation.message)")'
 
 # Quality-gate names + branches
 krci env get my-pipeline prod -o json |

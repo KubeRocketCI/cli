@@ -207,12 +207,13 @@ func mapDeployment(item k8sItem) Deployment {
 	status := ptr.Deref(item.Status, nil)
 
 	return Deployment{
-		Name:         item.Metadata.Name,
-		Namespace:    ptr.Deref(item.Metadata.Namespace, ""),
-		Applications: stringSliceVal(spec, "applications"),
-		Description:  stringVal(spec, "description"),
-		Status:       stringVal(status, "status"),
-		Available:    availableVal(status),
+		Name:            item.Metadata.Name,
+		Namespace:       ptr.Deref(item.Metadata.Namespace, ""),
+		Applications:    stringSliceVal(spec, "applications"),
+		Description:     stringVal(spec, "description"),
+		Status:          stringVal(status, "status"),
+		DetailedMessage: stringVal(status, "detailed_message"),
+		Available:       availableVal(status),
 	}
 }
 
@@ -221,12 +222,13 @@ func mapDeploymentDetail(meta restapi.K8sGet_200_Metadata, spec, status *map[str
 	st := ptr.Deref(status, nil)
 
 	return DeploymentDetail{
-		Name:         meta.Name,
-		Namespace:    ptr.Deref(meta.Namespace, ""),
-		Applications: stringSliceVal(s, "applications"),
-		Description:  stringVal(s, "description"),
-		Status:       stringVal(st, "status"),
-		Available:    availableVal(st),
+		Name:            meta.Name,
+		Namespace:       ptr.Deref(meta.Namespace, ""),
+		Applications:    stringSliceVal(s, "applications"),
+		Description:     stringVal(s, "description"),
+		Status:          stringVal(st, "status"),
+		DetailedMessage: stringVal(st, "detailed_message"),
+		Available:       availableVal(st),
 	}
 }
 
@@ -235,15 +237,16 @@ func mapStage(item k8sItem) Stage {
 	status := ptr.Deref(item.Status, nil)
 
 	return Stage{
-		Name:         stringVal(spec, "name"),
-		Order:        int64Val(spec, "order"),
-		TriggerType:  stringVal(spec, "triggerType"),
-		QualityGates: extractQualityGates(spec),
-		Namespace:    stringVal(spec, "namespace"),
-		ClusterName:  stringVal(spec, "clusterName"),
-		Description:  stringVal(spec, "description"),
-		Status:       stringVal(status, "status"),
-		Available:    availableVal(status),
+		Name:            stringVal(spec, "name"),
+		Order:           int64Val(spec, "order"),
+		TriggerType:     stringVal(spec, "triggerType"),
+		QualityGates:    extractQualityGates(spec),
+		Namespace:       stringVal(spec, "namespace"),
+		ClusterName:     stringVal(spec, "clusterName"),
+		Description:     stringVal(spec, "description"),
+		Status:          stringVal(status, "status"),
+		DetailedMessage: stringVal(status, "detailed_message"),
+		Available:       availableVal(status),
 	}
 }
 

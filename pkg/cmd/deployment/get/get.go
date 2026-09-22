@@ -116,6 +116,10 @@ func deploymentDetailLines(d *portal.DeploymentDetail, styled bool) []output.Det
 
 	lines = append(lines, statusLine, availableLine)
 
+	if d.DetailedMessage != "" {
+		lines = append(lines, output.DetailLine{Label: "Message", Value: output.SingleLine(d.DetailedMessage)})
+	}
+
 	return lines
 }
 
@@ -147,24 +151,69 @@ func printStageSection(w io.Writer, stages []portal.Stage, styled bool) error {
 		return err
 	}
 
-	if styled {
-		if _, err := fmt.Fprintln(w, output.LabelStyle.Render("Environments:")); err != nil {
-			return err
-		}
-	} else {
-		if _, err := fmt.Fprintln(w, "Environments:"); err != nil {
-			return err
-		}
+	if err := printSectionHeading(w, styled, "Environments"); err != nil {
+		return err
 	}
 
 	headers := []string{"ORDER", "ENV", "DEPLOY MODE", "PROMOTE GATES", "NAMESPACE", "STATUS"}
 	rows := stageRows(stages, styled)
 
+	var err error
 	if styled {
-		return output.PrintStyledTable(w, headers, rows)
+		err = output.PrintStyledTable(w, headers, rows)
+	} else {
+		err = output.PrintTable(w, headers, rows)
 	}
 
-	return output.PrintTable(w, headers, rows)
+	if err != nil {
+		return err
+	}
+
+	return printStageMessages(w, stages, styled)
+}
+
+// printStageMessages lists the status message of every stage that carries
+// one, so a failed environment explains itself below the table.
+func printStageMessages(w io.Writer, stages []portal.Stage, styled bool) error {
+	lines := make([]string, 0, len(stages))
+
+	for _, s := range stages {
+		if s.DetailedMessage != "" {
+			lines = append(lines, fmt.Sprintf("  %s: %s", s.Name, output.SingleLine(s.DetailedMessage)))
+		}
+	}
+
+	if len(lines) == 0 {
+		return nil
+	}
+
+	if _, err := fmt.Fprintln(w); err != nil {
+		return err
+	}
+
+	if err := printSectionHeading(w, styled, "Messages"); err != nil {
+		return err
+	}
+
+	for _, line := range lines {
+		if _, err := fmt.Fprintln(w, line); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// printSectionHeading writes "<text>:", in LabelStyle when styled.
+func printSectionHeading(w io.Writer, styled bool, text string) error {
+	heading := text + ":"
+	if styled {
+		heading = output.LabelStyle.Render(heading)
+	}
+
+	_, err := fmt.Fprintln(w, heading)
+
+	return err
 }
 
 // stageRows builds table rows from stages. When styled is true, status is colorized.

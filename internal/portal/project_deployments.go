@@ -187,6 +187,7 @@ func buildProjectDeploymentRow(
 		Namespace:   stringVal(spec, "namespace"),
 		TriggerType: stringVal(spec, "triggerType"),
 		IngressURLs: []string{},
+		Conditions:  []AppCondition{},
 	}
 
 	if appItem, ok := appsByDeployAndEnv[deployEnvKey{deployment, row.Env}]; ok {
@@ -210,6 +211,8 @@ func applyAppFieldsToRow(row *ProjectDeploymentRow, item k8sItem) {
 	row.IngressURLs = f.IngressURLs
 	row.ArgocdURL = f.ArgocdURL
 	row.DeployedAt = f.DeployedAt
+	row.Conditions = f.Conditions
+	row.Operation = f.Operation
 }
 
 // indexStagesByDeployAndEnv groups Stages by parent CDPipeline

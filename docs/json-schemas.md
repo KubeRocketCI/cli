@@ -345,6 +345,7 @@ single `No environments found.` line to stderr.
     "deployment": "my-pipeline",
     "env": "prod",
     "status": "created",
+    "detailedMessage": null,
     "description": "Production environment",
     "order": 2,
     "infrastructure": {
@@ -373,7 +374,20 @@ single `No environments found.` line to stderr.
         "ingressUrls": ["https://foo.prod.example.com"],
         "argocdUrl": "/applications/my-pipeline-prod-foo",
         "deployedAt": "2026-04-25T08:00:00Z",
-        "valuesOverride": false
+        "valuesOverride": false,
+        "conditions": [
+          {
+            "type": "ComparisonError",
+            "message": "Failed to load target state: unable to resolve 'build/1.2.0' to a commit SHA",
+            "lastTransitionTime": "2026-04-25T08:03:12Z"
+          }
+        ],
+        "operation": {
+          "phase": "Error",
+          "message": "ComparisonError: Failed to load target state",
+          "startedAt": "2026-04-25T08:03:00Z",
+          "finishedAt": "2026-04-25T08:03:12Z"
+        }
       }
     ]
   }
@@ -383,10 +397,16 @@ single `No environments found.` line to stderr.
 Field absence rules:
 
 - `description`, `cleanPipeline` may be `null` when absent on the Stage spec.
+- `detailedMessage` is the Stage's `status.detailed_message`, `null` when the
+  operator reported none.
 - Per-project dynamic fields (`status`, `sync`, `version`, `imageTag`,
   `imageDigest`, `argocdUrl`, `deployedAt`, `valuesOverride`) are `null` for
   projects registered in `CDPipeline.spec.applications` but without a matching
   `Application` resource. `ingressUrls` is always an array (`[]` when none).
+- `conditions[]` is always an array (`[]` when none); `lastTransitionTime` is
+  `null` when Argo CD omits it. `operation` is `null` for
+  registered-but-not-deployed projects and for Applications never synced;
+  `message`, `startedAt`, `finishedAt` are `null` when absent.
 - In `-o json`, `imageDigest` carries the FULL `sha256:...` digest. The table
   view shortens it to `sha256:` plus the first 8 hex chars (15 visible chars)
   under the `IMAGE_SHA` column.
@@ -420,7 +440,14 @@ Field absence rules:
         "triggerType": "Auto",
         "deployedAt": "2026-04-25T08:00:00Z",
         "ingressUrls": ["https://foo.dev.example.com"],
-        "argocdUrl": "/applications/my-pipeline-dev-foo"
+        "argocdUrl": "/applications/my-pipeline-dev-foo",
+        "conditions": [],
+        "operation": {
+          "phase": "Succeeded",
+          "message": "successfully synced (all tasks run)",
+          "startedAt": "2026-04-25T07:59:40Z",
+          "finishedAt": "2026-04-25T08:00:00Z"
+        }
       },
       {
         "deployment": "other-pipe",
@@ -436,7 +463,9 @@ Field absence rules:
         "triggerType": "Auto",
         "deployedAt": null,
         "ingressUrls": [],
-        "argocdUrl": null
+        "argocdUrl": null,
+        "conditions": [],
+        "operation": null
       }
     ]
   }
@@ -448,8 +477,9 @@ Rules:
 - Rows are sorted by `deployment` ascending, then by `Stage.spec.order` ascending.
 - `deployed: false` rows still carry `cluster`, `namespace`, and `triggerType`
   from the Stage so the user sees the full footprint of the project even when
-  no `Application` resource exists yet. Dynamic fields are `null` and
-  `ingressUrls` is `[]`.
+  no `Application` resource exists yet. Dynamic fields are `null`,
+  `ingressUrls` and `conditions` are `[]`, `operation` is `null`.
+- `conditions[]` and `operation` follow the `krci env get` rules above.
 - An empty result is success: `data.rows: []`, exit 0, with
   `No deployments found for project <name>.` written to stderr in table mode.
 - "Project missing" and "project deployed nowhere" are indistinguishable from
@@ -458,6 +488,70 @@ Rules:
   (deployment, env) row carries multiple ingresses (deployment/env/etc.
   appear only on the first row). Hostnames are truncated to 50 visible chars;
   the OSC 8 hyperlink target keeps the full URL. JSON output is unaffected.
+
+## `krci project versions <project>`
+
+```json
+{
+  "schemaVersion": "1",
+  "data": {
+    "project": "payments-api",
+    "streams": [
+      {
+        "branch": "main",
+        "image": "registry.example.com/ns/payments-api",
+        "versions": [
+          { "name": "0.1.0-SNAPSHOT.14", "created": "2026-09-08T06:12:40Z", "digest": "sha256:9f1c02ab..." },
+          { "name": "0.1.0-SNAPSHOT.13", "created": "2026-09-05T11:47:02Z" }
+        ]
+      },
+      {
+        "branch": "release/1.2",
+        "image": "registry.example.com/ns/payments-api",
+        "versions": []
+      }
+    ]
+  }
+}
+```
+
+Rules:
+
+- `streams[]` is always an array, one entry per `CodebaseImageStream` of the
+  project, sorted by `branch`; with `--branch` at most one entry.
+- `branch` is the git branch name (`release/1.2`, not the operator's
+  `release-1-2-<hash>` resource name).
+- `versions[]` is always an array (`[]` for a branch never built), newest
+  first by `created`. `digest` is omitted when the registry reported none;
+  in JSON it is the full `sha256:...`.
+- An empty `streams` is success (exit `0`); an unknown project is an error
+  envelope with `project '<name>' not found` and exit `1`.
+
+## `krci auth status`
+
+```json
+{
+  "schemaVersion": "1",
+  "data": {
+    "authenticated": true,
+    "user": "user@example.com",
+    "name": "User Name",
+    "groups": ["admin", "developers"],
+    "expiresAt": "2026-04-22T08:22:00Z"
+  }
+}
+```
+
+Rules:
+
+- `authenticated` is always `true` in a success envelope: a missing or
+  expired session is an error (exit `1`) and produces the error envelope
+  below with `not authenticated: run 'krci auth login'` or
+  `session expired: run 'krci auth login'`.
+- `groups` is always an array (`[]` when none).
+- `expiresAt` is RFC3339 in UTC, `null` when the stored token has no expiry.
+- `user` and `name` are omitted when the token claims cannot be decoded; the
+  session is still valid in that case.
 
 ## Error envelope
 

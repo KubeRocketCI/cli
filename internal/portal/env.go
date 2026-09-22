@@ -235,7 +235,7 @@ func buildEnvDetail(deployment string, stageItem k8sItem, registered []string, a
 
 	projects := make([]EnvProject, 0, len(registered))
 	for _, name := range registered {
-		p := EnvProject{Name: name, IngressURLs: []string{}}
+		p := EnvProject{Name: name, IngressURLs: []string{}, Conditions: []AppCondition{}}
 
 		if appItem, ok := appsByProject[name]; ok {
 			fillEnvProjectFromApp(&p, appItem)
@@ -248,15 +248,21 @@ func buildEnvDetail(deployment string, stageItem k8sItem, registered []string, a
 		return projects[i].Name < projects[j].Name
 	})
 
+	var messagePtr *string
+	if msg := stringVal(status, "detailed_message"); msg != "" {
+		messagePtr = &msg
+	}
+
 	return EnvDetail{
-		Deployment:     deployment,
-		Env:            stringVal(spec, "name"),
-		Status:         stringVal(status, "status"),
-		Description:    descPtr,
-		Order:          stageOrder(spec),
-		Infrastructure: infra,
-		QualityGates:   gates,
-		Projects:       projects,
+		Deployment:      deployment,
+		Env:             stringVal(spec, "name"),
+		Status:          stringVal(status, "status"),
+		DetailedMessage: messagePtr,
+		Description:     descPtr,
+		Order:           stageOrder(spec),
+		Infrastructure:  infra,
+		QualityGates:    gates,
+		Projects:        projects,
 	}
 }
 
@@ -294,6 +300,8 @@ type appFields struct {
 	IngressURLs []string
 	ArgocdURL   *string
 	DeployedAt  *string
+	Conditions  []AppCondition
+	Operation   *AppOperation
 }
 
 // extractAppFields shapes one Application's spec/status/labels into an
@@ -344,6 +352,59 @@ func extractAppFields(item k8sItem) appFields {
 		out.DeployedAt = &v
 	}
 
+	out.Conditions = appConditions(status)
+	out.Operation = appOperation(status)
+
+	return out
+}
+
+// appConditions maps status.conditions[] of an Application to AppCondition
+// entries. The result is never nil so JSON emits [] for an Application
+// without conditions.
+func appConditions(status map[string]any) []AppCondition {
+	raw := sliceVal(status, "conditions")
+	out := make([]AppCondition, 0, len(raw))
+
+	for _, entry := range raw {
+		m, ok := entry.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		c := AppCondition{Type: stringVal(m, "type"), Message: stringVal(m, "message")}
+
+		if v := stringVal(m, "lastTransitionTime"); v != "" {
+			c.LastTransitionTime = &v
+		}
+
+		out = append(out, c)
+	}
+
+	return out
+}
+
+// appOperation maps status.operationState of an Application to an
+// AppOperation, nil when the Application has never been synced.
+func appOperation(status map[string]any) *AppOperation {
+	op := deepGet(status, "operationState")
+	if len(op) == 0 {
+		return nil
+	}
+
+	out := &AppOperation{Phase: stringVal(op, "phase")}
+
+	if v := stringVal(op, "message"); v != "" {
+		out.Message = &v
+	}
+
+	if v := stringVal(op, "startedAt"); v != "" {
+		out.StartedAt = &v
+	}
+
+	if v := stringVal(op, "finishedAt"); v != "" {
+		out.FinishedAt = &v
+	}
+
 	return out
 }
 
@@ -361,6 +422,8 @@ func fillEnvProjectFromApp(p *EnvProject, item k8sItem) {
 	p.IngressURLs = f.IngressURLs
 	p.ArgocdURL = f.ArgocdURL
 	p.DeployedAt = f.DeployedAt
+	p.Conditions = f.Conditions
+	p.Operation = f.Operation
 
 	spec := ptr.Deref(item.Spec, nil)
 	_, hasSources := spec["sources"]

@@ -13,6 +13,7 @@ is currently deployed.
 | `project list` (`ls`)                | List all projects                                                                    |
 | `project get <name>`                 | Show a single project                                                                |
 | `project deployments <project>`      | Every (deployment, env) row where the project is registered, with health/version    |
+| `project versions <project>`         | The image versions the build pipeline has pushed, per branch                        |
 | `project build <name>`               | Start the build pipeline of a project branch — the Portal's Build button           |
 
 All accept `-o, --output` with `table` (default) or `json`; `build` also takes
@@ -154,7 +155,14 @@ krci project deployments payments-api -o json
         "triggerType": "Auto",
         "deployedAt": "2026-04-25T08:00:00Z",
         "ingressUrls": ["https://payments-api.dev.example.com"],
-        "argocdUrl": "/applications/my-pipeline-dev-payments-api"
+        "argocdUrl": "/applications/my-pipeline-dev-payments-api",
+        "conditions": [],
+        "operation": {
+          "phase": "Succeeded",
+          "message": "successfully synced (all tasks run)",
+          "startedAt": "2026-04-25T07:59:40Z",
+          "finishedAt": "2026-04-25T08:00:00Z"
+        }
       },
       {
         "deployment": "legacy",
@@ -170,12 +178,22 @@ krci project deployments payments-api -o json
         "triggerType": "Auto",
         "deployedAt": null,
         "ingressUrls": [],
-        "argocdUrl": null
+        "argocdUrl": null,
+        "conditions": [],
+        "operation": null
       }
     ]
   }
 }
 ```
+
+`conditions[]` is always an array and lists the Argo CD `status.conditions`
+of the row's Application (`type`, `message`, `lastTransitionTime`); this is
+where the reason behind an `unknown` status lives. `operation` summarizes
+the last sync (`phase`, `message`, `startedAt`, `finishedAt`) and is `null`
+for `deployed: false` rows and for Applications never synced. The table view
+does not show either; use `krci env get <deployment> <env>` for the
+Conditions block.
 
 Empty result is success: `data.rows: []`, exit `0`, with
 `No deployments found for project <name>.` written to stderr in table mode.
@@ -205,6 +223,106 @@ krci project deployments payments-api -o json |
 `<project>` is positional, required, single, and must be a DNS-1123 name
 (lowercase alphanumerics + hyphens, no dots, ≤ 253 chars). Invalid input fails with
 exit `1` before contacting the Portal.
+
+## `project versions`
+
+Answers "which versions of my project exist, and what is the newest one?" —
+the image tags the build pipeline pushed for each branch, read from the
+project's `CodebaseImageStream` resources. A version listed here is what a
+deployment can pick; a branch that has never been built shows `0`.
+
+```bash
+krci project versions payments-api
+```
+
+```
+BRANCH         VERSIONS   LATEST              CREATED                IMAGE
+feature/login  0          -                   -                      registry.example.com/ns/payments-api
+main           14         0.1.0-SNAPSHOT.14   2026-09-08T06:12:40Z   registry.example.com/ns/payments-api
+release/1.2    3          1.2.0-SNAPSHOT.3    2026-08-21T14:03:11Z   registry.example.com/ns/payments-api
+```
+
+Rows are sorted by branch name. `--branch` narrows the output to one git
+branch and switches to one row per version, newest first:
+
+```bash
+krci project versions payments-api --branch main
+```
+
+```
+VERSION             CREATED                DIGEST            IMAGE
+0.1.0-SNAPSHOT.14   2026-09-08T06:12:40Z   sha256:9f1c02ab   registry.example.com/ns/payments-api
+0.1.0-SNAPSHOT.13   2026-09-05T11:47:02Z   sha256:7b2e11cd   registry.example.com/ns/payments-api
+```
+
+`--branch` takes the git branch name as it is (slashes included); the
+mapping to the operator's branch resource name happens inside the command.
+`DIGEST` is shortened like `IMAGE_SHA` elsewhere (`sha256:` + 8 hex chars);
+`-o json` carries the full digest, and no `digest` at all when the registry
+did not report one.
+
+### JSON envelope
+
+```bash
+krci project versions payments-api -o json
+```
+
+```json
+{
+  "schemaVersion": "1",
+  "data": {
+    "project": "payments-api",
+    "streams": [
+      {
+        "branch": "feature/login",
+        "image": "registry.example.com/ns/payments-api",
+        "versions": []
+      },
+      {
+        "branch": "main",
+        "image": "registry.example.com/ns/payments-api",
+        "versions": [
+          {
+            "name": "0.1.0-SNAPSHOT.14",
+            "created": "2026-09-08T06:12:40Z",
+            "digest": "sha256:9f1c02ab..."
+          },
+          {
+            "name": "0.1.0-SNAPSHOT.13",
+            "created": "2026-09-05T11:47:02Z"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+`streams[]` is sorted by `branch`; `versions[]` is newest first and always an
+array. With `--branch`, `streams[]` holds at most one entry.
+
+Empty result is success: `data.streams: []`, exit `0`, with
+`No versions found for project <name>.` written to stderr in table mode.
+With `--branch`, the note `No versions found for branch <branch> of project
+<name>.` also covers a branch that exists but has never been built. An
+unknown project is an error: exit `1` with `project '<name>' not found`, so a
+typo is not mistaken for a project that was never built.
+
+### Scripting examples
+
+```bash
+# Newest version of the main branch — the value to deploy
+krci project versions payments-api --branch main -o json |
+  jq -r '.data.streams[0].versions[0].name'
+
+# Branches that have never produced an image
+krci project versions payments-api -o json |
+  jq -r '.data.streams[] | select(.versions | length == 0) | .branch'
+
+# Has version 1.2.0-SNAPSHOT.3 been built? (exit 0 when found)
+krci project versions payments-api -o json |
+  jq -e '[.data.streams[].versions[].name] | index("1.2.0-SNAPSHOT.3")' >/dev/null
+```
 
 ## `project build`
 

@@ -96,6 +96,7 @@ Verifies every documented field is present on at least one row.
 | ENV-G-02 | `krci env get {{DEPLOYMENT_OK}} {{ENV_OK}} -o json`           | portal | env exists                   | `exit=0; stdout_json.schemaVersion=1; stdout_json.data.deployment={{DEPLOYMENT_OK}}; stdout_json.data.env={{ENV_OK}}; stdout_json.data.infrastructure:exists; stdout_json.data.qualityGates:exists; stdout_json.data.projects:exists` |
 | ENV-G-03 | `krci env get {{DEPLOYMENT_OK}} {{ENV_OK}} -o json`           | portal | env exists with >=1 project  | `exit=0; stdout_json.data.projects.0.name:exists; stdout_json.data.projects.0.ingressUrls:exists`                                                   |
 | ENV-G-04 | `krci env get {{DEPLOYMENT_OK}} {{ENV_OK}} -o json`           | portal | env exists                   | `exit=0; stdout_json.data.infrastructure.cluster:exists; stdout_json.data.infrastructure.namespace:exists; stdout_json.data.infrastructure.triggerType:exists; stdout_json.data.infrastructure.deployPipeline:exists` |
+| ENV-G-05 | `krci env get {{DEPLOYMENT_OK}} {{ENV_OK}} -o json`           | portal | env exists with >=1 project  | `exit=0; stdout_json.data.detailedMessage:exists; stdout_json.data.projects.0.conditions:exists; stdout_json.data.projects.0.operation:exists`                    |
 
 ## 6. `get` — sub-table layout (env: `portal`)
 
