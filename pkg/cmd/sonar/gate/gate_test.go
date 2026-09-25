@@ -259,8 +259,31 @@ func TestGate_RenderTable_NoConditions(t *testing.T) {
 		t.Errorf("expected project name in output, got: %s", out)
 	}
 
-	if !strings.Contains(out, "no conditions") {
+	if !strings.Contains(out, "no conditions evaluated") {
 		t.Errorf("expected no-conditions message, got: %s", out)
+	}
+
+	if strings.Contains(out, "no analyses") {
+		t.Errorf("a gate with a status has been analyzed, got: %s", out)
+	}
+}
+
+func TestGate_RenderTable_NoAnalyses(t *testing.T) {
+	t.Parallel()
+
+	for _, status := range []portal.QualityGateStatus{portal.QualityGateNone, ""} {
+		g := &portal.SonarGate{
+			ProjectStatus: portal.SonarGateProjectStatus{Status: status},
+		}
+
+		var buf bytes.Buffer
+		if err := renderTable(&buf, false, "payments-api", g); err != nil {
+			t.Fatalf("renderTable error: %v", err)
+		}
+
+		if out := buf.String(); !strings.Contains(out, "project has no analyses yet") {
+			t.Errorf("status %q: expected no-analyses message, got: %s", status, out)
+		}
 	}
 }
 

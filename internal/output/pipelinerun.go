@@ -1,8 +1,11 @@
 package output
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
+	"slices"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -160,7 +163,40 @@ func renderRunHeader(w io.Writer, run *portal.PipelineRunInfo) error {
 		}
 	}
 
+	return renderResults(w, run.Results)
+}
+
+// renderResults prints pipeline results as name=value lines, sorted by name,
+// under one Results: label. Array and object values print as compact JSON.
+func renderResults(w io.Writer, results map[string]any) error {
+	label := ReasonLabel.Render("Results:")
+	indent := strings.Repeat(" ", lipgloss.Width(label))
+
+	for i, name := range slices.Sorted(maps.Keys(results)) {
+		prefix := indent
+		if i == 0 {
+			prefix = label
+		}
+
+		if _, err := lipgloss.Fprintf(w, "%s %s=%s\n", prefix, name, resultValue(results[name])); err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+func resultValue(v any) string {
+	if s, ok := v.(string); ok {
+		return s
+	}
+
+	b, err := json.Marshal(v)
+	if err != nil {
+		return fmt.Sprint(v)
+	}
+
+	return string(b)
 }
 
 func taskListEnumerator(tasks []portal.TaskRunInfo) list.Enumerator {

@@ -385,7 +385,14 @@ krci project build my-app --dry-run -o yaml
 
 # JSON output (for AI agents / scripting)
 krci project build my-app -o json
+
+# Wait for the build and read the version it produced
+run=$(krci project build my-app -o json | jq -r '.data.name')
+krci pipelinerun get "$run" --wait -o json | jq -r '.pipelineRuns[0].results.VCS_TAG'
 ```
+
+`krci pipelinerun get --wait` exits `0` only when the run succeeded; see
+[Waiting for a run](pipelinerun.md#waiting-for-a-run---wait).
 
 ### JSON output
 

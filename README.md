@@ -34,6 +34,15 @@ krci run get <name> --reason -o json
 krci run list --project my-app --pr 44 --reason -o json
 ```
 
+### *"Build main and tell me the version it produced"*
+
+```bash
+# --wait blocks until the run ends and exits 1 unless it succeeded;
+# the build's VCS_TAG result is the version
+run=$(krci project build my-app -o json | jq -r '.data.name')
+krci run get "$run" --wait -o json | jq -r '.pipelineRuns[0].results.VCS_TAG'
+```
+
 ### *"Check quality gates for each of my projects"*
 
 ```bash
@@ -119,7 +128,7 @@ krci [--portal-url <url>]
   auth        login | status | logout
   project     list | get <name> | deployments <name> | versions <name> | build <name>
   deployment  list | get <name>
-  pipelinerun list | get <name>       (also filters, --logs, --reason)
+  pipelinerun list | get <name>       (also filters, --logs, --reason, --wait)
   sonar       list | get | gate | issues <project>
   version
 ```

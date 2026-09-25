@@ -14,8 +14,8 @@ deploy, release). Also surfaces logs and a focused failure-diagnosis view.
 | `pipelinerun start <pipeline>` | Create a new run from a Tekton pipeline name |
 
 `list` and `get` accept `-o, --output` (`table` | `json`), `--logs`, and
-`--reason`. `start` has its own flag set (`--param`, `--label`, `--dry-run`,
-`-o`) — see below.
+`--reason`; `get` also takes `--wait` and `--timeout`. `start` has its own
+flag set (`--param`, `--label`, `--dry-run`, `-o`) — see below.
 
 ## `pipelinerun list`
 
@@ -72,9 +72,33 @@ Status:      Succeeded
 Duration:    9m 49s
 Pipeline:    github-go-keycloak-operator-app-build-semver
 Project:     keycloak-operator
+Results:     VCS_TAG=build/1.30.0-SNAPSHOT.12
 ```
 
 Add `--logs` for full logs or `--reason` for focused failure diagnosis.
+
+`Results` lists the run's pipeline results, such as `VCS_TAG`, the version a
+build produced. Only a run still in the cluster carries them: runs read back
+from Tekton Results history show none.
+
+### Waiting for a run (`--wait`)
+
+`--wait` blocks until the run finishes, then prints it the way `get` does,
+including `--logs` and `--reason`. The CLI polls every 10 seconds; `--timeout`
+(default `1h`) limits the wait.
+
+The exit code is `0` only when the run succeeded. A failed, cancelled or
+timed-out run is still printed, and the command exits `1` with
+`pipeline run "<name>" finished with status <status>` on stderr.
+
+```bash
+# Build a branch and read the version it produced
+run=$(krci project build my-app -o json | jq -r '.data.name')
+krci run get "$run" --wait -o json | jq -r '.pipelineRuns[0].results.VCS_TAG'
+
+# Wait for a review run and get the failed step if it fails
+krci run get review-my-app-main-a1b2c3 --wait --reason -o json
+```
 
 ## `pipelinerun start`
 
@@ -206,13 +230,20 @@ krci run list --project keycloak-operator -o json
       "startTime": "2026-04-21T08:04:25.424326Z",
       "duration": "9m 49s",
       "targetBranch": "master",
-      "commitSha": "43820618bd016654dc81e198fe5fac95a0e87fc2"
+      "commitSha": "43820618bd016654dc81e198fe5fac95a0e87fc2",
+      "results": {
+        "VCS_TAG": "build/1.30.0-SNAPSHOT.12"
+      }
     }
   ]
 }
 ```
 
 `get` returns the same `pipelineRuns` envelope with a single-element array.
+
+`results` maps the run's pipeline results by name; a value keeps its Tekton
+type (string, array or object). The field is omitted when the run has no
+results or is read back from Tekton Results history.
 
 Agent workflow — extract only failed tasks from a diagnosis:
 

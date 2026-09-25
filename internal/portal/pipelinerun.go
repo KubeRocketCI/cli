@@ -201,6 +201,8 @@ func (s *PipelineRunService) Get(
 	if opts.IncludeLogs || opts.IncludeReason {
 		tektonResult, tektonErr := s.getFromResults(ctx, name, opts)
 		if tektonErr == nil {
+			tektonResult.PipelineRuns[0].Results = k8sResult.PipelineRuns[0].Results
+
 			return tektonResult, nil
 		}
 
@@ -211,6 +213,33 @@ func (s *PipelineRunService) Get(
 	}
 
 	return k8sResult, nil
+}
+
+// Wait polls the run every interval until it reaches a final status, then
+// returns it with the expansion opts asks for. ctx bounds the wait.
+func (s *PipelineRunService) Wait(
+	ctx context.Context, name string, opts PipelineRunGetOptions, interval time.Duration,
+) (*PipelineRunListResult, error) {
+	for {
+		result, err := s.Get(ctx, name, PipelineRunGetOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		if isFinishedStatus(result.PipelineRuns[0].Status) {
+			if !opts.IncludeLogs && !opts.IncludeReason {
+				return result, nil
+			}
+
+			return s.Get(ctx, name, opts)
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("waiting for pipeline run %q: %w", name, ctx.Err())
+		case <-time.After(interval):
+		}
+	}
 }
 
 // getLiveRun fetches a single pipeline run from K8s by name.
@@ -510,6 +539,7 @@ func mapK8sPipelineRunInfo(item *restapi.K8sList_200_Items_Item) PipelineRunInfo
 	if item.Status != nil {
 		status := *item.Status
 		info.StartTime = stringVal(status, "startTime")
+		info.Results = pipelineResults(status["results"])
 
 		if conditions, ok := status["conditions"].([]any); ok && len(conditions) > 0 {
 			if cond, ok := conditions[0].(map[string]any); ok {
@@ -558,6 +588,35 @@ func mapK8sPipelineRunInfo(item *restapi.K8sList_200_Items_Item) PipelineRunInfo
 	}
 
 	return info
+}
+
+// pipelineResults maps a PipelineRun's status.results ([{name, value}]) by
+// name. A value keeps its Tekton type: string, array or object. Returns nil
+// when there are none, so the JSON field is omitted.
+func pipelineResults(raw any) map[string]any {
+	items, ok := raw.([]any)
+	if !ok {
+		return nil
+	}
+
+	out := make(map[string]any, len(items))
+
+	for _, it := range items {
+		r, ok := it.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		if name := stringVal(r, "name"); name != "" {
+			out[name] = r["value"]
+		}
+	}
+
+	if len(out) == 0 {
+		return nil
+	}
+
+	return out
 }
 
 // parseResultAnnotations decodes the results.tekton.dev/resultAnnotations JSON

@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -359,6 +361,34 @@ func TestMapK8sPipelineRunInfo_Labels(t *testing.T) {
 	assert.Equal(t, "https://github.com/org/repo/pull/99", got.PRURL)
 	assert.Equal(t, "deadbeef", got.CommitSHA)
 	assert.Equal(t, "review-pipeline", got.Pipeline)
+}
+
+func TestMapK8sPipelineRunInfo_Results(t *testing.T) {
+	t.Parallel()
+
+	status := map[string]any{
+		"conditions": []any{map[string]any{"type": "Succeeded", "status": conditionStatusTrue}},
+		"results": []any{
+			map[string]any{"name": "VCS_TAG", "value": "build/1.0.0-SNAPSHOT.3"},
+			map[string]any{"name": "IMAGES", "value": []any{"app:1.0.0", "app:latest"}},
+			map[string]any{"value": "nameless results are dropped"},
+			"not an object",
+		},
+	}
+	item := &restapi.K8sList_200_Items_Item{
+		Metadata: restapi.K8sList_200_Items_Metadata{Name: "run-results"},
+		Status:   &status,
+	}
+
+	got := mapK8sPipelineRunInfo(item)
+	assert.Equal(t, map[string]any{
+		"VCS_TAG": "build/1.0.0-SNAPSHOT.3",
+		"IMAGES":  []any{"app:1.0.0", "app:latest"},
+	}, got.Results)
+
+	withoutResults := map[string]any{"conditions": status["conditions"]}
+	item.Status = &withoutResults
+	assert.Nil(t, mapK8sPipelineRunInfo(item).Results, "a run without results must omit the field")
 }
 
 func TestParseResultAnnotations(t *testing.T) {
@@ -714,6 +744,44 @@ func TestGet_CompletedK8sResultsNotFoundFallsBackToK8s(t *testing.T) {
 	assert.Equal(t, StatusSucceeded, result.PipelineRuns[0].Status)
 }
 
+func TestGet_CompletedRunFromResultsKeepsLiveResults(t *testing.T) {
+	t.Parallel()
+
+	const (
+		resultUID = "11111111-1111-1111-1111-111111111111"
+		recordUID = "22222222-2222-2222-2222-222222222222"
+	)
+
+	s := newMockPortal(t, pathHandlers{
+		"/v1/resources/list": func(w http.ResponseWriter, _ *http.Request) {
+			writeJSONOK(w, `{"apiVersion":"v1","kind":"List","metadata":{},"items":[{
+				"metadata":{"name":"run-done"},
+				"status":{"startTime":"2024-01-01T10:00:00Z","conditions":[
+					{"type":"Succeeded","status":"True","reason":"Succeeded"}
+				],"results":[{"name":"VCS_TAG","value":"build/1.0.0"}]}
+			}]}`)
+		},
+		"/v1/pipeline-runs": func(w http.ResponseWriter, _ *http.Request) {
+			writeJSONOK(w, `{"results":[{
+				"name":"ns/results/`+resultUID+`","uid":"`+resultUID+`",
+				"create_time":"2024-01-01T10:00:00Z","update_time":"2024-01-01T10:05:00Z",
+				"annotations":{"object.metadata.name":"run-done"},
+				"summary":{"record":"ns/results/`+resultUID+`/records/`+recordUID+`","status":"SUCCESS"}
+			}]}`)
+		},
+		"/v1/pipeline-runs/" + resultUID + "/logs": func(w http.ResponseWriter, _ *http.Request) {
+			writeJSONOK(w, `{"logs":"build log"}`)
+		},
+	})
+
+	result, err := s.Get(context.Background(), "run-done", PipelineRunGetOptions{IncludeLogs: true})
+	require.NoError(t, err)
+	assert.Equal(t, "build log", result.Logs, "the expansion must come from Tekton Results")
+	require.Len(t, result.PipelineRuns, 1)
+	assert.Equal(t, map[string]any{"VCS_TAG": "build/1.0.0"}, result.PipelineRuns[0].Results,
+		"Tekton Results summaries carry no pipeline results; the live run's must survive")
+}
+
 func TestGet_CompletedK8sResultsHardErrorPropagates(t *testing.T) {
 	t.Parallel()
 
@@ -734,6 +802,119 @@ func TestGet_CompletedK8sResultsHardErrorPropagates(t *testing.T) {
 	_, err := s.Get(context.Background(), "run-done", PipelineRunGetOptions{IncludeLogs: true})
 	require.Error(t, err)
 	assert.False(t, errors.Is(err, ErrNotFound), "500 from Tekton Results must not be reduced to ErrNotFound")
+}
+
+// liveRunJSON is a resources/list body holding run-x with the given
+// Succeeded condition status and reason.
+func liveRunJSON(condStatus, reason string) string {
+	return `{"apiVersion":"v1","kind":"List","metadata":{},"items":[{
+		"metadata":{"name":"run-x"},
+		"status":{"startTime":"2024-01-01T10:00:00Z","conditions":[
+			{"type":"Succeeded","status":"` + condStatus + `","reason":"` + reason + `"}
+		],"results":[{"name":"VCS_TAG","value":"build/1.0.0"}]}
+	}]}`
+}
+
+func TestWait_PollsUntilTheRunFinishes(t *testing.T) {
+	t.Parallel()
+
+	var polls atomic.Int32
+
+	s := newMockPortal(t, pathHandlers{
+		"/v1/resources/list": func(w http.ResponseWriter, _ *http.Request) {
+			if polls.Add(1) < 3 {
+				writeJSONOK(w, liveRunJSON("Unknown", "Running"))
+				return
+			}
+
+			writeJSONOK(w, liveRunJSON("True", "Succeeded"))
+		},
+		"/v1/pipeline-runs": func(_ http.ResponseWriter, _ *http.Request) {
+			t.Error("Tekton Results must not be called without an expansion")
+		},
+	})
+
+	result, err := s.Wait(context.Background(), "run-x", PipelineRunGetOptions{}, time.Millisecond)
+	require.NoError(t, err)
+	assert.Equal(t, int32(3), polls.Load(), "Wait must poll until the run leaves Running")
+	assert.Equal(t, StatusSucceeded, result.PipelineRuns[0].Status)
+	assert.Equal(t, "build/1.0.0", result.PipelineRuns[0].Results["VCS_TAG"])
+}
+
+func TestWait_FetchesTheExpansionOnceTheRunFinishes(t *testing.T) {
+	t.Parallel()
+
+	const (
+		resultUID = "33333333-3333-3333-3333-333333333333"
+		recordUID = "44444444-4444-4444-4444-444444444444"
+	)
+
+	var polls, resultsCalls atomic.Int32
+
+	s := newMockPortal(t, pathHandlers{
+		"/v1/resources/list": func(w http.ResponseWriter, _ *http.Request) {
+			if polls.Add(1) < 2 {
+				writeJSONOK(w, liveRunJSON("Unknown", "Running"))
+				return
+			}
+
+			writeJSONOK(w, liveRunJSON("False", "Failed"))
+		},
+		"/v1/pipeline-runs": func(w http.ResponseWriter, _ *http.Request) {
+			resultsCalls.Add(1)
+			writeJSONOK(w, `{"results":[{
+				"name":"ns/results/`+resultUID+`","uid":"`+resultUID+`",
+				"create_time":"2024-01-01T10:00:00Z","update_time":"2024-01-01T10:05:00Z",
+				"annotations":{"object.metadata.name":"run-x"},
+				"summary":{"record":"ns/results/`+resultUID+`/records/`+recordUID+`","status":"FAILURE"}
+			}]}`)
+		},
+		"/v1/pipeline-runs/" + resultUID + "/logs": func(w http.ResponseWriter, _ *http.Request) {
+			writeJSONOK(w, `{"logs":"step failed"}`)
+		},
+	})
+
+	result, err := s.Wait(context.Background(), "run-x", PipelineRunGetOptions{IncludeLogs: true}, time.Millisecond)
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), resultsCalls.Load(), "the expansion is fetched once, after the run finished")
+	assert.Equal(t, StatusFailed, result.PipelineRuns[0].Status)
+	assert.Equal(t, "step failed", result.Logs)
+}
+
+func TestWait_StopsWhenTheContextEnds(t *testing.T) {
+	t.Parallel()
+
+	s := newMockPortal(t, pathHandlers{
+		"/v1/resources/list": func(w http.ResponseWriter, _ *http.Request) {
+			writeJSONOK(w, liveRunJSON("Unknown", "Running"))
+		},
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	_, err := s.Wait(ctx, "run-x", PipelineRunGetOptions{}, time.Millisecond)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+func TestWait_UnknownRunFailsWithoutPolling(t *testing.T) {
+	t.Parallel()
+
+	var polls atomic.Int32
+
+	s := newMockPortal(t, pathHandlers{
+		"/v1/resources/list": func(w http.ResponseWriter, _ *http.Request) {
+			polls.Add(1)
+			writeJSONOK(w, `{"apiVersion":"v1","kind":"List","items":[],"metadata":{}}`)
+		},
+		"/v1/pipeline-runs": func(w http.ResponseWriter, _ *http.Request) {
+			writeJSONOK(w, `{"results":[]}`)
+		},
+	})
+
+	_, err := s.Wait(context.Background(), "run-ghost", PipelineRunGetOptions{}, time.Millisecond)
+	require.ErrorIs(t, err, ErrNotFound)
+	assert.Equal(t, int32(1), polls.Load())
 }
 
 // TestList_SourceErrorPropagates covers both legs of the errgroup fan-out.

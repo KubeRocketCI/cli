@@ -245,6 +245,29 @@ func TestStartService_Start_PipelineNotFound_NoReasonOnPlainText(t *testing.T) {
 	}
 }
 
+func TestStartService_Start_RouteMissingIsPortalUnsupported(t *testing.T) {
+	t.Parallel()
+
+	// Fastify's own not-found reply of a portal that predates the start route.
+	handler := func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(fastifyRouteMissing))
+	}
+
+	svc, closer := newStartService(t, handler)
+	defer closer()
+
+	_, err := svc.Start(context.Background(), StartInput{Pipeline: "noop"})
+	if !errors.Is(err, ErrPortalUnsupported) {
+		t.Fatalf("want ErrPortalUnsupported, got %v", err)
+	}
+
+	if !strings.Contains(err.Error(), "upgrade the portal") {
+		t.Fatalf("message should name the remedy: %q", err.Error())
+	}
+}
+
 func TestStartService_Start_TriggerTemplateNotFound(t *testing.T) {
 	t.Parallel()
 
