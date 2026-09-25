@@ -3,6 +3,7 @@ package portal
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/internal/ptr"
@@ -200,16 +201,25 @@ func (s *ProjectBuildService) Build(ctx context.Context, in BuildInput) (*StartR
 		body.DryRun = ptr.To(true)
 	}
 
-	resp, err := s.client.PipelineRunBuildWithResponse(ctx, body)
+	// The raw call keeps a route-level 404 from an older portal reachable:
+	// the generated parser fails on Fastify's not-found body first.
+	resp, err := s.client.PipelineRunBuild(ctx, body)
 	if err != nil {
 		return nil, fmt.Errorf("calling project build: %w", err)
 	}
 
-	if err := checkBuildResponse(resp.StatusCode(), resp.Body, in); err != nil {
+	defer func() { _ = resp.Body.Close() }()
+
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading project build response: %w", err)
+	}
+
+	if err := checkBuildResponse(resp.StatusCode, raw, in); err != nil {
 		return nil, err
 	}
 
-	return decodeStartBody(resp.Body)
+	return decodeStartBody(raw)
 }
 
 // checkBuildResponse maps a build response. A 404 without a reason tag (e.g.

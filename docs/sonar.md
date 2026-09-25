@@ -103,6 +103,10 @@ critical_violations              GT         0           0         OK
 new_security_hotspots_reviewed   LT         100         100.0     OK
 ```
 
+A gate that has a status but no evaluated conditions prints
+`(no conditions evaluated)`. Only a gate with status `NONE`, a project without
+an analysis, prints `(no conditions — project has no analyses yet)`.
+
 CI guardrail — fail the build when the gate is red:
 
 ```bash

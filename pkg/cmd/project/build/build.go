@@ -72,7 +72,10 @@ so two callers firing at once can both get a run.`,
   krci project build my-app --dry-run -o yaml
 
   # JSON output (for AI agents / scripting)
-  krci project build my-app -o json`,
+  krci project build my-app -o json
+
+  # Wait for the build to finish (the JSON carries the built version)
+  krci pipelinerun get "$(krci project build my-app -o json | jq -r .data.name)" --wait -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Project = args[0]
 

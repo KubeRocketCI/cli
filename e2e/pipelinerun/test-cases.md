@@ -24,6 +24,8 @@ your own portal):
 | `{{BRANCH}}`  | A source branch with at least one run.           | `main`                |
 | `{{RUN_NAME}}` | A real run name (copy from `list -o json`).     | `krci-cli-e2e-noop-run-m8z4m` |
 | `{{FAILED_RUN_NAME}}` | A run whose status is Failed.            | `krci-cli-e2e-noop-run-a1b2c` |
+| `{{SUCCEEDED_RUN_NAME}}` | A run whose status is Succeeded.      | `krci-cli-e2e-noop-run-k7p2q` |
+| `{{BUILD_RUN_NAME}}` | A succeeded build run still in the cluster (finished minutes ago, not yet pruned to Tekton Results). | `build-my-app-main-zhqvj` |
 | `{{NONCE}}`   | Random suffix for "definitely-doesn't-exist" assertions. | `test-999zzz` |
 
 **Start-feature placeholders** (point at the manifests in `fixtures/*.yaml`;
@@ -62,6 +64,7 @@ Fast, idempotent, no portal — these are the first line of defence.
 | PR-H-05  | `krci pipelinerun get --help`            | offline | —     | `exit=0; stdout~/^Usage:$/; stdout~/^\s+krci pipelinerun get <name> \[flags\]$/; stdout~/--logs/; stdout~/--reason/; stdout~/-o, --output string/; stdout!~/--project/` |
 | PR-H-06  | `krci run get --help`                    | offline | —     | `exit=0; stdout~/Get pipeline run details/`                                                                             |
 | PR-H-07  | `krci pipelinerun`                       | offline | —     | `exit=0; stdout~/^Available Commands:$/; stdout~/^\s+list\s/; stdout~/^\s+get\s/`                                        |
+| PR-H-08  | `krci pipelinerun get --help`            | offline | —     | `exit=0; stdout~/--wait/; stdout~/--timeout duration/; stdout~/default 1h0m0s/`                                          |
 
 ## 2. Argument validation (env: `offline`)
 
@@ -82,6 +85,9 @@ non-zero exit. These catch cobra/pflag wiring regressions and the custom
 | PR-V-09  | `krci pipelinerun list --type --status failed`                  | offline | —     | `exit=1; stderr~/flag needs an argument: --type/`                                                |
 | PR-V-10  | `krci pipelinerun list --pr abc`                                | offline | —     | `exit=1; stderr~/invalid argument "abc" for "--pr" flag/`                                        |
 | PR-V-11  | `krci pipelinerun list -o`                                      | offline | —     | `exit=1; stderr~/flag needs an argument/`                                                        |
+| PR-V-12  | `krci pipelinerun get some-run --timeout 5m`                    | offline | —     | `exit=1; stderr~/--timeout requires --wait/`                                                     |
+| PR-V-13  | `krci pipelinerun get some-run --wait --timeout 0s`             | offline | —     | `exit=1; stderr~/--timeout must be greater than 0/`                                              |
+| PR-V-14  | `krci pipelinerun get some-run --wait --timeout soon`           | offline | —     | `exit=1; stderr~/invalid argument "soon" for "--timeout" flag/`                                  |
 
 ## 3. Global flag wiring (env: `offline`)
 
@@ -157,6 +163,10 @@ absent. The flag wiring can be checked offline via a forced-failure path
 | PR-GE-05 | `krci pipelinerun get {{RUN_NAME}} --reason`                       | portal | run exists                | `exit=0; stdout~/Tasks:/`  _(or stdout~/No task data/)_                                  |
 | PR-GE-06 | `krci pipelinerun get nonexistent-run-{{NONCE}}`                   | portal | nonexistent name          | `exit=1; stderr~/pipeline run "nonexistent-run-{{NONCE}}" not found/`                    |
 | PR-GE-07 | `krci run get {{RUN_NAME}}`                                        | portal | alias check               | `exit=0; stdout~/^Pipeline:\s+{{RUN_NAME}}$/`                                               |
+| PR-GE-08 | `krci pipelinerun get {{SUCCEEDED_RUN_NAME}} --wait -o json`       | portal | succeeded run             | `exit=0; stdout_json.pipelineRuns.0.status=Succeeded` _(returns at once, the run has finished)_ |
+| PR-GE-09 | `krci pipelinerun get {{FAILED_RUN_NAME}} --wait`                  | portal | failed run exists         | `exit=1; stdout~/^Pipeline:\s+{{FAILED_RUN_NAME}}$/; stderr~/finished with status Failed/; stderr~/krci pipelinerun get {{FAILED_RUN_NAME}} --reason/` |
+| PR-GE-10 | `krci pipelinerun get {{FAILED_RUN_NAME}} --wait --reason -o json` | portal | failed run exists         | `exit=1; stdout_json.tasks:exists; stderr~/finished with status Failed/`                 |
+| PR-GE-11 | `krci pipelinerun get nonexistent-run-{{NONCE}} --wait`            | portal | nonexistent name          | `exit=1; stderr~/pipeline run "nonexistent-run-{{NONCE}}" not found/` _(fails at once, no waiting)_ |
 
 ## 8. JSON output contract (env: `portal`)
 
@@ -169,6 +179,7 @@ If the OpenAPI client drifts, these break first.
 | PR-J-02  | `krci pipelinerun list --project {{PROJECT}} --pr {{PR}} -o json`    | portal | PR run has git metadata | `exit=0; stdout_json.pipelineRuns.0.prNumber:exists; stdout_json.pipelineRuns.0.prUrl:exists; stdout_json.pipelineRuns.0.branch:exists; stdout_json.pipelineRuns.0.commitSha:exists; stdout_json.pipelineRuns.0.author:exists` |
 | PR-J-03  | `krci pipelinerun get {{RUN_NAME}} -o json`                          | portal | run exists | `exit=0; stdout_json.pipelineRuns.0.portalUrl:exists`                                                     |
 | PR-J-04  | `krci pipelinerun get {{FAILED_RUN_NAME}} --reason -o json`         | portal | failed run | `exit=0; stdout_json.tasks.0.name:exists; stdout_json.tasks.0.status:exists`                              |
+| PR-J-05  | `krci pipelinerun get {{BUILD_RUN_NAME}} -o json`                   | portal | build run still in the cluster | `exit=0; stdout_json.pipelineRuns.0.type=build; stdout_json.pipelineRuns.0.results.VCS_TAG:exists`   |
 
 ## 9. Auth gating (env: `auth` absent)
 
@@ -216,6 +227,9 @@ Each of the following must be covered by ≥1 row above. Tick as you add.
 - [x] `get <name> --reason`
 - [x] `get <name> -o json`
 - [x] `get` nonexistent name
+- [x] `get --wait`: succeeded, failed (exit 1 + hint), with `--reason`, nonexistent
+- [x] `get --timeout` validation (without `--wait`, non-positive, unparsable)
+- [x] `get` pipeline results (`results.VCS_TAG` of a build)
 - [x] JSON envelope field contract for `list` and `get`
 - [x] auth-required error path
 

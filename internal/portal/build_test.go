@@ -516,3 +516,26 @@ func TestBuildService_Build_MapsReason(t *testing.T) {
 		t.Fatalf("want ErrBuildInProgress, got %v", err)
 	}
 }
+
+func TestBuildService_Build_RouteMissingIsPortalUnsupported(t *testing.T) {
+	t.Parallel()
+
+	// Fastify's own not-found reply of a portal that predates the build route.
+	handler := func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(fastifyRouteMissing))
+	}
+
+	svc, closer := newBuildService(t, handler)
+	defer closer()
+
+	_, err := svc.Build(context.Background(), BuildInput{Codebase: buildCodebase})
+	if !errors.Is(err, ErrPortalUnsupported) {
+		t.Fatalf("want ErrPortalUnsupported, got %v", err)
+	}
+
+	if !strings.Contains(err.Error(), "upgrade the portal") {
+		t.Fatalf("message should name the remedy: %q", err.Error())
+	}
+}

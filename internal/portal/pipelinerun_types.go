@@ -46,6 +46,17 @@ func IsFailureStatus(status string) bool {
 	return status == StatusFailed || status == StatusTimeout
 }
 
+// isFinishedStatus reports whether a run has reached a final status. A run
+// with no status yet (the reconciler has not started it) is not finished.
+func isFinishedStatus(status string) bool {
+	switch status {
+	case StatusSucceeded, StatusFailed, StatusTimeout, StatusCancelled:
+		return true
+	default:
+		return false
+	}
+}
+
 var statusDisplay = map[string]string{
 	resultStatusSuccess:   StatusSucceeded,
 	resultStatusFailure:   StatusFailed,
@@ -193,6 +204,11 @@ type PipelineRunInfo struct {
 	Duration     string `json:"duration,omitempty"`
 	TargetBranch string `json:"targetBranch,omitempty"`
 	CommitSHA    string `json:"commitSha,omitempty"`
+
+	// Results maps the run's pipeline results (status.results) by name, e.g.
+	// VCS_TAG of a build. Only a run still in the cluster carries them: Tekton
+	// Results summaries do not.
+	Results map[string]any `json:"results,omitempty"`
 }
 
 type TaskRunInfo struct {

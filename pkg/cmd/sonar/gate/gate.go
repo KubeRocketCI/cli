@@ -115,7 +115,13 @@ func renderTable(w io.Writer, isTTY bool, project string, g *portal.SonarGate) e
 	}
 
 	if len(g.ProjectStatus.Conditions) == 0 {
-		_, err := fmt.Fprintln(w, "(no conditions — project has no analyses yet)")
+		msg := "(no conditions evaluated)"
+		if status == portal.QualityGateNone {
+			msg = "(no conditions — project has no analyses yet)"
+		}
+
+		_, err := fmt.Fprintln(w, msg)
+
 		return err
 	}
 
