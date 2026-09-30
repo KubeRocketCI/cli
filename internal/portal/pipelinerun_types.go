@@ -15,6 +15,8 @@ const (
 	annotationGitBranch         = "app.edp.epam.com/git-branch"
 	annotationGitTargetBranch   = "app.edp.epam.com/git-target-branch"
 	annotationGitCommitSHA      = "app.edp.epam.com/git-commit-sha"
+	annotationCDPipeline        = "app.edp.epam.com/cdpipeline"
+	annotationCDStage           = "app.edp.epam.com/cdstage"
 	annotationPipeline          = "tekton.dev/pipeline"
 	annotationObjectName        = "object.metadata.name"
 	annotationResultAnnotations = "results.tekton.dev/resultAnnotations"
@@ -204,6 +206,8 @@ type PipelineRunInfo struct {
 	Duration     string `json:"duration,omitempty"`
 	TargetBranch string `json:"targetBranch,omitempty"`
 	CommitSHA    string `json:"commitSha,omitempty"`
+	Deployment   string `json:"deployment,omitempty"`
+	Env          string `json:"env,omitempty"`
 
 	// Results maps the run's pipeline results (status.results) by name, e.g.
 	// VCS_TAG of a build. Only a run still in the cluster carries them: Tekton

@@ -163,6 +163,24 @@ func renderRunHeader(w io.Writer, run *portal.PipelineRunInfo) error {
 		}
 	}
 
+	if run.Deployment != "" {
+		if _, err := lipgloss.Fprintf(w, "%s %s\n",
+			ReasonLabel.Render("Deployment:"),
+			run.Deployment,
+		); err != nil {
+			return err
+		}
+	}
+
+	if run.Env != "" {
+		if _, err := lipgloss.Fprintf(w, "%s %s\n",
+			ReasonLabel.Render("Env:"),
+			run.Env,
+		); err != nil {
+			return err
+		}
+	}
+
 	return renderResults(w, run.Results)
 }
 

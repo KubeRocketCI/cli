@@ -36,16 +36,23 @@ build-keycloak-operator-mas...   Succeeded   keycloak-op...   331   bot        b
 
 All filters combine with AND logic.
 
-| Flag         | Description                                                    |
-|--------------|----------------------------------------------------------------|
-| `--project`  | Filter by project name                                         |
-| `--pr`       | Filter by pull request number                                  |
-| `--author`   | Filter by author name                                          |
-| `--branch`   | Filter by source branch                                        |
-| `--type`     | `review`, `build`, `deploy`, `release`                         |
-| `--status`   | `succeeded`, `failed`, `running`, `timeout`, `cancelled`       |
-| `--logs`     | Append logs for the most recent matching run                   |
-| `--reason`   | Show task tree + failed step + logs for the most recent run    |
+| Flag           | Description                                                    |
+|----------------|----------------------------------------------------------------|
+| `--project`    | Filter by project name                                         |
+| `--pr`         | Filter by pull request number                                  |
+| `--author`     | Filter by author name                                          |
+| `--branch`     | Filter by source branch                                        |
+| `--type`       | `review`, `build`, `deploy`, `release`                         |
+| `--status`     | `succeeded`, `failed`, `running`, `timeout`, `cancelled`       |
+| `--deployment` | Runs of a deployment (deploy and clean runs)                   |
+| `--env`        | Runs of one environment of `--deployment`                      |
+| `--logs`       | Append logs for the most recent matching run                   |
+| `--reason`     | Show task tree + failed step + logs for the most recent run    |
+
+Deploy and clean runs carry no project: select them with `--deployment` and
+`--env`, the names `krci env get <deployment> <env>` takes, and add
+`--type deploy` for deploy runs only. `--env` needs `--deployment`. To find
+where a project is deployed, run `krci project deployments <project>`.
 
 Examples:
 
@@ -58,6 +65,10 @@ krci run list --project keycloak-operator --status failed --type review
 
 # Diagnose the latest failing run for a PR
 krci run list --project keycloak-operator --pr 336 --reason
+
+# Deploy runs of environment dev of deployment demo, and why the latest failed
+krci run list --deployment demo --env dev --type deploy
+krci run list --deployment demo --env dev --type deploy --status failed --reason
 ```
 
 ## `pipelinerun get`
@@ -244,6 +255,24 @@ krci run list --project keycloak-operator -o json
 `results` maps the run's pipeline results by name; a value keeps its Tekton
 type (string, array or object). The field is omitted when the run has no
 results or is read back from Tekton Results history.
+
+A deploy or clean run has an empty `project` and carries `deployment` and
+`env`; the table view of `get` shows them as `Deployment:` and `Env:`:
+
+```json
+{
+  "name": "deploy-demo-dev-x7k2p",
+  "portalUrl": "https://portal.example.com/.../deploy-demo-dev-x7k2p",
+  "status": "Failed",
+  "pipeline": "deploy",
+  "project": "",
+  "type": "deploy",
+  "startTime": "2026-09-30T15:12:04Z",
+  "duration": "10m 3s",
+  "deployment": "demo",
+  "env": "dev"
+}
+```
 
 Agent workflow — extract only failed tasks from a diagnosis:
 
