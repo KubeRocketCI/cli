@@ -26,6 +26,8 @@ your own portal):
 | `{{FAILED_RUN_NAME}}` | A run whose status is Failed.            | `krci-cli-e2e-noop-run-a1b2c` |
 | `{{SUCCEEDED_RUN_NAME}}` | A run whose status is Succeeded.      | `krci-cli-e2e-noop-run-k7p2q` |
 | `{{BUILD_RUN_NAME}}` | A succeeded build run still in the cluster (finished minutes ago, not yet pruned to Tekton Results). | `build-my-app-main-zhqvj` |
+| `{{DEPLOYMENT}}` | A deployment with at least one deploy run.       | `demo`                |
+| `{{ENV}}`     | An environment of DEPLOYMENT with at least one deploy run. | `dev`       |
 | `{{NONCE}}`   | Random suffix for "definitely-doesn't-exist" assertions. | `test-999zzz` |
 
 **Start-feature placeholders** (point at the manifests in `fixtures/*.yaml`;
@@ -65,6 +67,7 @@ Fast, idempotent, no portal — these are the first line of defence.
 | PR-H-06  | `krci run get --help`                    | offline | —     | `exit=0; stdout~/Get pipeline run details/`                                                                             |
 | PR-H-07  | `krci pipelinerun`                       | offline | —     | `exit=0; stdout~/^Available Commands:$/; stdout~/^\s+list\s/; stdout~/^\s+get\s/`                                        |
 | PR-H-08  | `krci pipelinerun get --help`            | offline | —     | `exit=0; stdout~/--wait/; stdout~/--timeout duration/; stdout~/default 1h0m0s/`                                          |
+| PR-H-09  | `krci pipelinerun list --help`           | offline | —     | `exit=0; stdout~/--deployment string/; stdout~/--env string/; stdout~/review, build, deploy/`                            |
 
 ## 2. Argument validation (env: `offline`)
 
@@ -88,6 +91,10 @@ non-zero exit. These catch cobra/pflag wiring regressions and the custom
 | PR-V-12  | `krci pipelinerun get some-run --timeout 5m`                    | offline | —     | `exit=1; stderr~/--timeout requires --wait/`                                                     |
 | PR-V-13  | `krci pipelinerun get some-run --wait --timeout 0s`             | offline | —     | `exit=1; stderr~/--timeout must be greater than 0/`                                              |
 | PR-V-14  | `krci pipelinerun get some-run --wait --timeout soon`           | offline | —     | `exit=1; stderr~/invalid argument "soon" for "--timeout" flag/`                                  |
+| PR-V-15  | `krci pipelinerun list --env dev`                               | offline | —     | `exit=1; stderr~/--env requires --deployment/`                                                   |
+| PR-V-16  | `krci pipelinerun list --deployment Demo_1`                     | offline | —     | `exit=1; stderr~/--deployment must be a valid DNS-1123 name/`                                    |
+| PR-V-17  | `krci pipelinerun list --deployment ""`                         | offline | —     | `exit=1; stderr~/--deployment must not be empty/`                                               |
+| PR-V-18  | `krci pipelinerun list demo dev`                                | offline | —     | `exit=1; stderr~/unknown command "demo"/`                                                        |
 
 ## 3. Global flag wiring (env: `offline`)
 
@@ -127,6 +134,9 @@ the documented shape.
 | PR-L-15  | `krci pipelinerun list --project {{PROJECT}} --status failed --type review -o json`      | portal | combined filter has data          | `exit=0; stdout_json.pipelineRuns:exists`                                                                |
 | PR-L-16  | `krci pipelinerun list --project does-not-exist-{{NONCE}} -o json`                       | portal | nonexistent project               | `exit=0; stdout~/^\{/; stdout_json.pipelineRuns:len=0` _(empty result MUST still be a JSON envelope)_    |
 | PR-L-17  | `krci pipelinerun list --project does-not-exist-{{NONCE}}`                               | portal | nonexistent project, table mode   | `exit=0; stdout~/No pipeline runs found/`                                                                |
+| PR-L-24  | `krci pipelinerun list --deployment {{DEPLOYMENT}} --env {{ENV}} --type deploy -o json`  | portal | environment has deploy runs       | `exit=0; stdout_json.pipelineRuns.0.type=deploy; stdout_json.pipelineRuns.0.deployment={{DEPLOYMENT}}; stdout_json.pipelineRuns.0.env={{ENV}}` |
+| PR-L-25  | `krci pipelinerun list --deployment {{DEPLOYMENT}} -o json`                              | portal | deployment has deploy runs        | `exit=0; stdout_json.pipelineRuns.0.deployment={{DEPLOYMENT}}`                    |
+| PR-L-26  | `krci pipelinerun list --deployment {{DEPLOYMENT}} --env does-not-exist-{{NONCE}} -o json` | portal | nonexistent environment          | `exit=0; stdout_json.pipelineRuns:len=0`                                         |
 
 ## 5. `list --logs` / `--reason` (env: `portal`)
 
@@ -217,6 +227,7 @@ Each of the following must be covered by ≥1 row above. Tick as you add.
 - [x] `list --branch`
 - [x] `list --type` (review / build / deploy / release)
 - [x] `list --status` (succeeded / failed / running / timeout / cancelled)
+- [x] `list --deployment` / `--env` (runs of an environment), empty and `--env`-only validation, no positional args
 - [x] `list --logs`
 - [x] `list --reason`
 - [x] `list` combined filters

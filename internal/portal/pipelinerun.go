@@ -120,13 +120,38 @@ func (s *PipelineRunService) pipelineRunPortalURL(name string) string {
 }
 
 // PipelineRunFilter holds composable filter criteria for listing pipeline runs.
+// Deployment and Env select the deploy and clean runs of a CDPipeline stage.
+// Env is honoured only together with Deployment.
 type PipelineRunFilter struct {
-	Project  string
-	PRNumber int
-	Author   string
-	Branch   string
-	Type     string
-	Status   string
+	Project    string
+	PRNumber   int
+	Author     string
+	Branch     string
+	Type       string
+	Status     string
+	Deployment string
+	Env        string
+}
+
+// cdStage returns the app.edp.epam.com/cdstage value, the Stage resource name
+// "<deployment>-<env>"; empty unless both Deployment and Env are set.
+func (f PipelineRunFilter) cdStage() string {
+	if f.Deployment == "" || f.Env == "" {
+		return ""
+	}
+
+	return f.Deployment + "-" + f.Env
+}
+
+// stageEnv is the inverse of cdStage: it strips the "<deployment>-" prefix;
+// empty when cdStage does not belong to deployment.
+func stageEnv(deployment, cdStage string) string {
+	prefix := deployment + "-"
+	if deployment == "" || !strings.HasPrefix(cdStage, prefix) {
+		return ""
+	}
+
+	return strings.TrimPrefix(cdStage, prefix)
 }
 
 // PipelineRunGetOptions controls expansion for Get.
@@ -486,6 +511,14 @@ func matchesFilter(info PipelineRunInfo, filter PipelineRunFilter) bool {
 		return false
 	}
 
+	if filter.Deployment != "" && info.Deployment != filter.Deployment {
+		return false
+	}
+
+	if filter.cdStage() != "" && info.Env != filter.Env {
+		return false
+	}
+
 	return true
 }
 
@@ -512,6 +545,8 @@ func mapK8sPipelineRunInfo(item *restapi.K8sList_200_Items_Item) PipelineRunInfo
 		info.Author = labels[annotationGitAuthor]
 		info.PRNumber = labels[annotationGitChangeNumber]
 		info.TargetBranch = labels[annotationGitTargetBranch]
+		info.Deployment = labels[annotationCDPipeline]
+		info.Env = stageEnv(info.Deployment, labels[annotationCDStage])
 	}
 
 	if annotations := ptr.Deref(item.Metadata.Annotations, nil); annotations != nil {
@@ -892,6 +927,8 @@ func mapPipelineRunInfo(r *tektonResult) PipelineRunInfo {
 		startTime = r.Summary.StartTime
 	}
 
+	deployment := resultAnnotation(r, annotationCDPipeline)
+
 	return PipelineRunInfo{
 		Name:         name,
 		Status:       status,
@@ -906,6 +943,8 @@ func mapPipelineRunInfo(r *tektonResult) PipelineRunInfo {
 		Duration:     computeDuration(r, startTime),
 		TargetBranch: resultAnnotation(r, annotationGitTargetBranch),
 		CommitSHA:    resultAnnotation(r, annotationGitCommitSHA),
+		Deployment:   deployment,
+		Env:          stageEnv(deployment, resultAnnotation(r, annotationCDStage)),
 	}
 }
 
@@ -952,6 +991,8 @@ func buildCELFilter(f PipelineRunFilter) string {
 		{f.Author, annotationGitAuthor},
 		{f.Branch, annotationGitBranch},
 		{f.Type, annotationPipelineType},
+		{f.Deployment, annotationCDPipeline},
+		{f.cdStage(), annotationCDStage},
 	}
 
 	for _, m := range filters {

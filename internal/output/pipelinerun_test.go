@@ -2,6 +2,7 @@ package output
 
 import (
 	"bytes"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -49,5 +50,23 @@ func TestRenderRunInfo_NoResults(t *testing.T) {
 
 	if out := buf.String(); strings.Contains(out, "Results:") {
 		t.Errorf("a run without results must not print the block, got:\n%s", out)
+	}
+}
+
+func TestRenderRunInfo_DeploymentAndEnv(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	if err := RenderRunInfo(&buf, &portal.PipelineRunInfo{
+		Name: "deploy-demo-dev-ab12", Status: portal.StatusFailed, Deployment: "demo", Env: "dev",
+	}); err != nil {
+		t.Fatalf("RenderRunInfo: %v", err)
+	}
+
+	out := buf.String()
+	for _, want := range []string{`(?m)^Deployment:\s+demo$`, `(?m)^Env:\s+dev$`} {
+		if !regexp.MustCompile(want).MatchString(out) {
+			t.Errorf("no line matches %q in:\n%s", want, out)
+		}
 	}
 }

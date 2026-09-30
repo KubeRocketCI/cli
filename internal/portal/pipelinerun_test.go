@@ -32,6 +32,8 @@ func TestMatchesFilter(t *testing.T) {
 		PRNumber: "42",
 	}
 
+	deployRun := PipelineRunInfo{Name: "deploy-demo-dev-ab12", Type: "deploy", Deployment: "demo", Env: "dev"}
+
 	tests := []struct {
 		name   string
 		info   PipelineRunInfo
@@ -42,6 +44,42 @@ func TestMatchesFilter(t *testing.T) {
 			name:   "empty filter passes everything",
 			info:   base,
 			filter: PipelineRunFilter{},
+			want:   true,
+		},
+		{
+			name:   "deployment and env match",
+			info:   deployRun,
+			filter: PipelineRunFilter{Deployment: "demo", Env: "dev"},
+			want:   true,
+		},
+		{
+			name:   "deployment match without env",
+			info:   deployRun,
+			filter: PipelineRunFilter{Deployment: "demo"},
+			want:   true,
+		},
+		{
+			name:   "env mismatch",
+			info:   deployRun,
+			filter: PipelineRunFilter{Deployment: "demo", Env: "qa"},
+			want:   false,
+		},
+		{
+			name:   "deployment mismatch",
+			info:   deployRun,
+			filter: PipelineRunFilter{Deployment: "shop", Env: "dev"},
+			want:   false,
+		},
+		{
+			name:   "run without deployment labels never matches a deployment",
+			info:   base,
+			filter: PipelineRunFilter{Deployment: "demo"},
+			want:   false,
+		},
+		{
+			name:   "env without deployment is ignored, as in the Tekton Results filter",
+			info:   deployRun,
+			filter: PipelineRunFilter{Env: "qa"},
 			want:   true,
 		},
 		{
@@ -171,7 +209,72 @@ func TestMatchesStatus(t *testing.T) {
 	}
 }
 
+// --- buildCELFilter / stageEnv ---
+
+func TestBuildCELFilter_DeploymentAndEnv(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		filter PipelineRunFilter
+		want   string
+	}{
+		{
+			name:   "deployment only",
+			filter: PipelineRunFilter{Deployment: "demo"},
+			want:   `annotations["app.edp.epam.com/cdpipeline"] == "demo"`,
+		},
+		{
+			name:   "dashes in deployment and env",
+			filter: PipelineRunFilter{Deployment: "demo-app", Env: "qa-eu"},
+			want: `annotations["app.edp.epam.com/cdpipeline"] == "demo-app" && ` +
+				`annotations["app.edp.epam.com/cdstage"] == "demo-app-qa-eu"`,
+		},
+		{
+			name:   "deployment and env select the stage",
+			filter: PipelineRunFilter{Deployment: "demo", Env: "dev", Type: "deploy"},
+			want: `annotations["app.edp.epam.com/pipelinetype"] == "deploy" && ` +
+				`annotations["app.edp.epam.com/cdpipeline"] == "demo" && ` +
+				`annotations["app.edp.epam.com/cdstage"] == "demo-dev"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, buildCELFilter(tt.filter))
+		})
+	}
+}
+
+func TestStageEnv(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "dev", stageEnv("demo", "demo-dev"))
+	assert.Equal(t, "qa-eu", stageEnv("demo", "demo-qa-eu"), "stage names may contain dashes")
+	assert.Equal(t, "", stageEnv("", "demo-dev"), "without the deployment the stage cannot be split safely")
+	assert.Equal(t, "", stageEnv("shop", "demo-dev"), "a cdstage of another deployment is not an env of this one")
+	assert.Equal(t, "", stageEnv("demo", ""))
+}
+
 // --- mapK8sPipelineRunInfo ---
+
+func TestMapK8sPipelineRunInfo_DeploymentAndEnv(t *testing.T) {
+	t.Parallel()
+
+	labels := map[string]string{
+		annotationPipelineType: "deploy",
+		annotationCDPipeline:   "demo",
+		annotationCDStage:      "demo-dev",
+	}
+	item := &restapi.K8sList_200_Items_Item{
+		Metadata: restapi.K8sList_200_Items_Metadata{Name: "deploy-demo-dev-ab12", Labels: &labels},
+	}
+
+	got := mapK8sPipelineRunInfo(item)
+	assert.Equal(t, "demo", got.Deployment)
+	assert.Equal(t, "dev", got.Env, "env is the stage name, not the Stage resource name")
+}
 
 func TestMapK8sPipelineRunInfo(t *testing.T) {
 	t.Parallel()
@@ -495,6 +598,24 @@ func TestMapPipelineRunInfo_FallsBackToCreateTime(t *testing.T) {
 		got := mapPipelineRunInfo(r)
 		assert.Equal(t, "2024-01-01T10:05:00Z", got.StartTime)
 	})
+}
+
+func TestMapPipelineRunInfo_DeploymentAndEnv(t *testing.T) {
+	t.Parallel()
+
+	r := &tektonResult{
+		UID: "u1",
+		Annotations: map[string]any{
+			annotationObjectName:   "deploy-demo-dev-ab12",
+			annotationPipelineType: "deploy",
+			annotationCDPipeline:   "demo",
+			annotationCDStage:      "demo-dev",
+		},
+	}
+
+	got := mapPipelineRunInfo(r)
+	assert.Equal(t, "demo", got.Deployment)
+	assert.Equal(t, "dev", got.Env)
 }
 
 // --- mergePipelineRuns ---
@@ -915,6 +1036,55 @@ func TestWait_UnknownRunFailsWithoutPolling(t *testing.T) {
 	_, err := s.Wait(context.Background(), "run-ghost", PipelineRunGetOptions{}, time.Millisecond)
 	require.ErrorIs(t, err, ErrNotFound)
 	assert.Equal(t, int32(1), polls.Load())
+}
+
+func TestList_DeploymentAndEnvFilterBothSources(t *testing.T) {
+	t.Parallel()
+
+	var filter atomic.Value
+
+	s := newMockPortal(t, pathHandlers{
+		"/v1/resources/list": func(w http.ResponseWriter, _ *http.Request) {
+			writeJSONOK(w, `{"apiVersion":"v1","kind":"List","metadata":{},"items":[
+				{"metadata":{"name":"deploy-demo-dev-live1","labels":{
+					"app.edp.epam.com/pipelinetype":"deploy",
+					"app.edp.epam.com/cdpipeline":"demo","app.edp.epam.com/cdstage":"demo-dev"}},
+				 "status":{"startTime":"2024-01-01T10:10:00Z","conditions":[{"type":"Succeeded","status":"Unknown"}]}},
+				{"metadata":{"name":"deploy-demo-qa-live2","labels":{
+					"app.edp.epam.com/pipelinetype":"deploy",
+					"app.edp.epam.com/cdpipeline":"demo","app.edp.epam.com/cdstage":"demo-qa"}},
+				 "status":{"startTime":"2024-01-01T10:11:00Z","conditions":[{"type":"Succeeded","status":"Unknown"}]}}
+			]}`)
+		},
+		"/v1/pipeline-runs": func(w http.ResponseWriter, r *http.Request) {
+			filter.Store(r.URL.Query().Get("filter"))
+			writeJSONOK(w, `{"results":[{
+				"name":"ns/results/r1","uid":"r1",
+				"create_time":"2024-01-01T09:00:00Z","update_time":"2024-01-01T09:05:00Z",
+				"annotations":{"object.metadata.name":"deploy-demo-dev-old1",
+					"app.edp.epam.com/pipelinetype":"deploy",
+					"app.edp.epam.com/cdpipeline":"demo","app.edp.epam.com/cdstage":"demo-dev"},
+				"summary":{"record":"ns/results/r1/records/r1","status":"FAILURE"}
+			}]}`)
+		},
+	})
+
+	result, err := s.List(context.Background(), PipelineRunListOptions{
+		Filter: PipelineRunFilter{Type: "deploy", Deployment: "demo", Env: "dev"},
+	})
+	require.NoError(t, err)
+
+	assert.Contains(t, filter.Load(), `annotations["app.edp.epam.com/cdstage"] == "demo-dev"`,
+		"Tekton Results must be asked for the stage, not all deploy runs")
+
+	names := make([]string, 0, len(result.PipelineRuns))
+	for _, r := range result.PipelineRuns {
+		names = append(names, r.Name)
+		assert.Equal(t, "demo", r.Deployment)
+		assert.Equal(t, "dev", r.Env)
+	}
+	assert.Equal(t, []string{"deploy-demo-dev-live1", "deploy-demo-dev-old1"}, names,
+		"the live run of demo/qa is filtered out, the history run of demo/dev is kept")
 }
 
 // TestList_SourceErrorPropagates covers both legs of the errgroup fan-out.
