@@ -2,6 +2,7 @@ package portal
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -255,6 +256,15 @@ func TestStageEnv(t *testing.T) {
 	assert.Equal(t, "", stageEnv("", "demo-dev"), "without the deployment the stage cannot be split safely")
 	assert.Equal(t, "", stageEnv("shop", "demo-dev"), "a cdstage of another deployment is not an env of this one")
 	assert.Equal(t, "", stageEnv("demo", ""))
+}
+
+func TestStageEnv_InvertsCDStage(t *testing.T) {
+	t.Parallel()
+
+	for _, env := range []string{"dev", "qa-eu"} {
+		f := PipelineRunFilter{Deployment: "demo", Env: env}
+		assert.Equal(t, f.Env, stageEnv(f.Deployment, f.cdStage()))
+	}
 }
 
 // --- mapK8sPipelineRunInfo ---
@@ -1085,6 +1095,66 @@ func TestList_DeploymentAndEnvFilterBothSources(t *testing.T) {
 	}
 	assert.Equal(t, []string{"deploy-demo-dev-live1", "deploy-demo-dev-old1"}, names,
 		"the live run of demo/qa is filtered out, the history run of demo/dev is kept")
+}
+
+func TestList_LiveRunsSelectedByStageLabels(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		filter PipelineRunFilter
+		want   map[string]string
+	}{
+		{
+			name:   "deployment and env",
+			filter: PipelineRunFilter{Deployment: "demo", Env: "dev"},
+			want:   map[string]string{annotationCDPipeline: "demo", annotationCDStage: "demo-dev"},
+		},
+		{
+			name:   "deployment only",
+			filter: PipelineRunFilter{Deployment: "demo"},
+			want:   map[string]string{annotationCDPipeline: "demo"},
+		},
+		{
+			name:   "neither",
+			filter: PipelineRunFilter{Project: "my-app", Type: "build"},
+		},
+		{
+			name:   "stage over the label value limit",
+			filter: PipelineRunFilter{Deployment: "demo", Env: strings.Repeat("e", 60)},
+			want:   map[string]string{annotationCDPipeline: "demo"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var labels atomic.Value
+
+			s := newMockPortal(t, pathHandlers{
+				"/v1/resources/list": func(w http.ResponseWriter, r *http.Request) {
+					var body struct {
+						Labels map[string]string `json:"labels"`
+					}
+					if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+						http.Error(w, err.Error(), http.StatusBadRequest)
+						return
+					}
+
+					labels.Store(body.Labels)
+					writeJSONOK(w, `{"apiVersion":"v1","kind":"List","metadata":{},"items":[]}`)
+				},
+				"/v1/pipeline-runs": func(w http.ResponseWriter, _ *http.Request) {
+					writeJSONOK(w, `{"results":[]}`)
+				},
+			})
+
+			_, err := s.List(context.Background(), PipelineRunListOptions{Filter: tt.filter})
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, labels.Load())
+		})
+	}
 }
 
 // TestList_SourceErrorPropagates covers both legs of the errgroup fan-out.
