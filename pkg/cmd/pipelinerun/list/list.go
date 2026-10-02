@@ -71,14 +71,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
   # Output as JSON (for agent consumption)
   krci pipelinerun list --project edp-tekton --pr 44 -o json`,
-		// Flag-value validation runs before the positional-argument check.
-		Args: func(cmd *cobra.Command, args []string) error {
-			if err := cmdutil.ValidateStringFlags(cmd); err != nil {
-				return err
-			}
-
-			return cobra.NoArgs(cmd, args)
-		},
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := opts.validate(cmd.Flags().Changed("deployment"), cmd.Flags().Changed("env")); err != nil {
 				return err

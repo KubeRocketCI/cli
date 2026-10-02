@@ -53,6 +53,7 @@ non-zero exit.
 | SCA-V-11   | `krci sca findings svc --severity=garbage`                           | offline | —     | `exit=1; stderr~/invalid --severity/`                                                                              |
 | SCA-V-12   | `krci sca get Not_A_DNS_Label`                                       | offline | —     | `exit=1; stderr~/DNS-1123/`                                                                                        |
 | SCA-V-13   | `krci sca --unknown-flag`                                            | offline | —     | `exit=1; stderr~/unknown flag: --unknown-flag/`                                                                    |
+| SCA-V-14   | `krci sca findings svc --severity --branch main`                     | offline | —     | `exit=1; stderr~/flag needs an argument: --severity/`                                                              |
 
 ## 3. Happy paths (env: `portal`)
 

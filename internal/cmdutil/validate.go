@@ -9,28 +9,63 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// ValidateStringFlags checks that no string flag received a value that looks
-// like another flag (e.g. "--status --pr 53" where "--pr" is consumed as the
-// value for --status). Cobra/pflag silently accepts this; we reject it.
-func ValidateStringFlags(cmd *cobra.Command) error {
+// GuardFlagValues prepends validateStringFlags to the Args check of every
+// runnable leaf command under root; a leaf without Args gets
+// cobra.ArbitraryArgs. Group commands keep their nil Args and cobra's
+// unknown-command check. Call once, after every AddCommand and after
+// InitDefaultHelpCmd and InitDefaultCompletionCmd on the root; cobra otherwise
+// adds those two commands inside Execute, unwrapped.
+func GuardFlagValues(root *cobra.Command) {
+	for _, c := range root.Commands() {
+		GuardFlagValues(c)
+	}
+
+	if root.HasSubCommands() || !root.Runnable() {
+		return
+	}
+
+	args := root.Args
+	if args == nil {
+		args = cobra.ArbitraryArgs
+	}
+
+	root.Args = func(cmd *cobra.Command, a []string) error {
+		if err := validateStringFlags(cmd); err != nil {
+			return err
+		}
+
+		return args(cmd, a)
+	}
+}
+
+// validateStringFlags rejects a set string, stringSlice or stringArray flag
+// with a value starting with "-": pflag reads "--status --pr 53" as
+// status="--pr".
+func validateStringFlags(cmd *cobra.Command) error {
 	var errFlag string
 
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		if errFlag != "" {
+		if errFlag != "" || !f.Changed {
 			return
 		}
 
-		if !f.Changed {
-			return
+		var values []string
+
+		switch f.Value.Type() {
+		case "string":
+			values = []string{f.Value.String()}
+		case "stringSlice", "stringArray":
+			if sv, ok := f.Value.(pflag.SliceValue); ok {
+				values = sv.GetSlice()
+			}
 		}
 
-		if f.Value.Type() != "string" {
-			return
-		}
+		for _, v := range values {
+			if strings.HasPrefix(v, "-") {
+				errFlag = f.Name
 
-		v := f.Value.String()
-		if strings.HasPrefix(v, "-") {
-			errFlag = f.Name
+				return
+			}
 		}
 	})
 

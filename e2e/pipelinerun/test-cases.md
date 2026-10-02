@@ -72,8 +72,8 @@ Fast, idempotent, no portal — these are the first line of defence.
 ## 2. Argument validation (env: `offline`)
 
 Wrong shape of invocation must fail fast with a helpful message and a
-non-zero exit. These catch cobra/pflag wiring regressions and the custom
-`ValidateStringFlags` check.
+non-zero exit. These catch cobra/pflag wiring regressions and the root
+flag-value guard (`cmdutil.GuardFlagValues`).
 
 | ID       | Command                                                         | Env     | Setup | Expect                                                                                           |
 |----------|------------------------------------------------------------------|---------|-------|--------------------------------------------------------------------------------------------------|
@@ -95,6 +95,7 @@ non-zero exit. These catch cobra/pflag wiring regressions and the custom
 | PR-V-16  | `krci pipelinerun list --deployment Demo_1`                     | offline | —     | `exit=1; stderr~/--deployment must be a valid DNS-1123 name/`                                    |
 | PR-V-17  | `krci pipelinerun list --deployment ""`                         | offline | —     | `exit=1; stderr~/--deployment must not be empty/`                                               |
 | PR-V-18  | `krci pipelinerun list demo dev`                                | offline | —     | `exit=1; stderr~/unknown command "demo"/`                                                        |
+| PR-V-19  | `krci pipelinerun get some-run -o --timeout 5m`                 | offline | —     | `exit=1; stderr~/flag needs an argument: --output/`                                              |
 
 ## 3. Global flag wiring (env: `offline`)
 
@@ -217,7 +218,7 @@ Each of the following must be covered by ≥1 row above. Tick as you add.
 - [x] `get` help
 - [x] `get` missing arg, too many args
 - [x] unknown flag (list + get)
-- [x] string flag consumed by next flag (`--project --pr 53`)
+- [x] string flag consumed by next flag (`list --project --pr 53`, `get <name> -o --timeout 5m`)
 - [x] `--pr` non-integer
 - [x] `-o` without value
 - [x] `--portal-url` flag, `KRCI_PORTAL_URL` env, precedence
@@ -259,6 +260,7 @@ Fixtures: `fixtures/*.yaml` (Pipelines + TriggerTemplate); see
 | PR-S-PARAM-DUP      | validation | offline | reject `--param k=v1 --param k=v2`                                                                                                                                   | exit 1; stderr `duplicate parameter 'k'`                                                                              |
 | PR-S-PARAM-EMPTY    | validation | offline | reject `--param =value`                                                                                                                                              | exit 1; stderr `parameter key must not be empty`                                                                      |
 | PR-S-PARAM-MAL      | validation | offline | reject `--param keywithoutvalue`                                                                                                                                     | exit 1; stderr `parameter must be key=value`                                                                          |
+| PR-S-PARAM-FLAG     | validation | offline | reject `--param --dry-run` (the next flag taken as the value)                                                                                                        | exit 1; stderr `flag needs an argument: --param`                                                                      |
 | PR-S-LABEL-DUP      | validation | offline | reject `--label k=v1 --label k=v2`                                                                                                                                   | exit 1; stderr `duplicate label 'k'`                                                                                  |
 | PR-S-PARAM-EQ       | parser     | offline | accept `--param token=abc=def==` (split on first `=`)                                                                                                                | exit 0 (capture); param `token=abc=def==`                                                                             |
 | PR-S-PARAM-WS       | parser     | offline | accept `--param "  k  =  v  "` (whitespace trimmed)                                                                                                                  | exit 0 (capture); param `k=v`                                                                                         |

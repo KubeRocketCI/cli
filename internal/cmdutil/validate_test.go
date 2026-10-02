@@ -34,6 +34,20 @@ func TestValidateStringFlags(t *testing.T) {
 			wantErr: "flag needs an argument: --status",
 		},
 		{
+			name: "valid slice flags",
+			args: []string{"--severity", "critical,high", "--param", "key=value"},
+		},
+		{
+			name:    "string slice flag consumed a flag",
+			args:    []string{"--severity", "--project", "my-app"},
+			wantErr: "flag needs an argument: --severity",
+		},
+		{
+			name:    "string array flag consumed a flag",
+			args:    []string{"--param", "key=value", "--param", "--project"},
+			wantErr: "flag needs an argument: --param",
+		},
+		{
 			name: "non-string flags ignored",
 			args: []string{"--count", "5", "--verbose"},
 		},
@@ -48,17 +62,20 @@ func TestValidateStringFlags(t *testing.T) {
 			cmd := &cobra.Command{Use: "test", RunE: func(*cobra.Command, []string) error { return nil }}
 
 			var status, project string
+			var severity, params []string
 			var count int
 			var verbose bool
 
 			cmd.Flags().StringVar(&status, "status", "", "filter by status")
 			cmd.Flags().StringVar(&project, "project", "", "filter by project")
+			cmd.Flags().StringSliceVar(&severity, "severity", nil, "filter by severity")
+			cmd.Flags().StringArrayVar(&params, "param", nil, "parameter as key=value")
 			cmd.Flags().IntVar(&count, "count", 0, "number of items")
 			cmd.Flags().BoolVar(&verbose, "verbose", false, "verbose output")
 
 			require.NoError(t, cmd.ParseFlags(tt.args))
 
-			err := ValidateStringFlags(cmd)
+			err := validateStringFlags(cmd)
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Equal(t, tt.wantErr, err.Error())
