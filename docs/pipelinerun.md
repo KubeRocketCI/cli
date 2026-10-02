@@ -36,23 +36,31 @@ build-keycloak-operator-mas...   Succeeded   keycloak-op...   331   bot        b
 
 All filters combine with AND logic.
 
-| Flag           | Description                                                    |
-|----------------|----------------------------------------------------------------|
-| `--project`    | Filter by project name                                         |
-| `--pr`         | Filter by pull request number                                  |
-| `--author`     | Filter by author name                                          |
-| `--branch`     | Filter by source branch                                        |
-| `--type`       | `review`, `build`, `deploy`, `release`                         |
-| `--status`     | `succeeded`, `failed`, `running`, `timeout`, `cancelled`       |
-| `--deployment` | Runs of a deployment (deploy and clean runs)                   |
-| `--env`        | Runs of one environment of `--deployment`                      |
-| `--logs`       | Append logs for the most recent matching run                   |
-| `--reason`     | Show task tree + failed step + logs for the most recent run    |
+| Flag           | Description                                                          |
+|----------------|----------------------------------------------------------------------|
+| `--project`    | Filter by project name                                               |
+| `--pr`         | Filter by pull request number                                        |
+| `--author`     | Filter by author name                                                |
+| `--branch`     | Filter by source branch                                              |
+| `--type`       | `review`, `build`, `deploy`, `clean`, `release`, `security`, `tests` |
+| `--status`     | `succeeded`, `failed`, `running`, `timeout`, `cancelled`             |
+| `--deployment` | Runs of a deployment (deploy and clean runs)                         |
+| `--env`        | Runs of one environment of `--deployment`                            |
+| `--logs`       | Append logs for the most recent matching run                         |
+| `--reason`     | Show task tree + failed step + logs for the most recent run          |
 
 Deploy and clean runs carry no project: select them with `--deployment` and
 `--env`, the names `krci env get <deployment> <env>` takes, and add
 `--type deploy` for deploy runs only. `--env` needs `--deployment`. To find
 where a project is deployed, run `krci project deployments <project>`.
+
+History comes from Tekton Results and matches on the
+`app.edp.epam.com/cdpipeline` and `app.edp.epam.com/cdstage` annotations. The
+Tekton Results watcher records them only when its `-summary_labels` flag lists
+both labels. Runs archived before that are skipped by `--deployment` and
+`--env`; other filters return them with empty `deployment` and `env`. Live runs
+are matched by label and always included. Fallback for older history: list with
+`--type deploy` and match the run name `deploy-<deployment>-<env>-<suffix>`.
 
 Examples:
 

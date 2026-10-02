@@ -67,7 +67,7 @@ Fast, idempotent, no portal — these are the first line of defence.
 | PR-H-06  | `krci run get --help`                    | offline | —     | `exit=0; stdout~/Get pipeline run details/`                                                                             |
 | PR-H-07  | `krci pipelinerun`                       | offline | —     | `exit=0; stdout~/^Available Commands:$/; stdout~/^\s+list\s/; stdout~/^\s+get\s/`                                        |
 | PR-H-08  | `krci pipelinerun get --help`            | offline | —     | `exit=0; stdout~/--wait/; stdout~/--timeout duration/; stdout~/default 1h0m0s/`                                          |
-| PR-H-09  | `krci pipelinerun list --help`           | offline | —     | `exit=0; stdout~/--deployment string/; stdout~/--env string/; stdout~/review, build, deploy/`                            |
+| PR-H-09  | `krci pipelinerun list --help`           | offline | —     | `exit=0; stdout~/--deployment string/; stdout~/--env string/; stdout~/review, build, deploy, clean/`                     |
 
 ## 2. Argument validation (env: `offline`)
 

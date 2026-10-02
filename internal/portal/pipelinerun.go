@@ -143,15 +143,35 @@ func (f PipelineRunFilter) cdStage() string {
 	return f.Deployment + "-" + f.Env
 }
 
+// labelValueMaxLength is the Kubernetes limit for a label value.
+const labelValueMaxLength = 63
+
+// liveLabels returns the label selector for the live PipelineRun list:
+// cdpipeline from Deployment, cdstage from cdStage(). Empty values and values
+// over labelValueMaxLength are left out; matchesFilter applies every filter.
+func (f PipelineRunFilter) liveLabels() map[string]string {
+	labels := make(map[string]string, 2)
+
+	for _, l := range []struct{ key, value string }{
+		{annotationCDPipeline, f.Deployment},
+		{annotationCDStage, f.cdStage()},
+	} {
+		if l.value != "" && len(l.value) <= labelValueMaxLength {
+			labels[l.key] = l.value
+		}
+	}
+
+	return labels
+}
+
 // stageEnv is the inverse of cdStage: it strips the "<deployment>-" prefix;
 // empty when cdStage does not belong to deployment.
 func stageEnv(deployment, cdStage string) string {
-	prefix := deployment + "-"
-	if deployment == "" || !strings.HasPrefix(cdStage, prefix) {
-		return ""
+	if env, ok := strings.CutPrefix(cdStage, deployment+"-"); ok && deployment != "" {
+		return env
 	}
 
-	return strings.TrimPrefix(cdStage, prefix)
+	return ""
 }
 
 // PipelineRunGetOptions controls expansion for Get.
@@ -450,13 +470,10 @@ func mergePipelineRuns(live, history []PipelineRunInfo) []PipelineRunInfo {
 	return all
 }
 
-// fetchLiveRuns fetches pipeline runs from the K8s API and applies client-side filtering.
+// fetchLiveRuns lists pipeline runs from the K8s API by liveLabels and applies client-side filtering.
 func (s *PipelineRunService) fetchLiveRuns(ctx context.Context, filter PipelineRunFilter) ([]PipelineRunInfo, error) {
-	resp, err := s.client.K8sListWithResponse(ctx, restapi.K8sListJSONRequestBody{
-		ClusterName:    s.clusterName,
-		Namespace:      ptr.To(s.namespace),
-		ResourceConfig: pipelineRunResourceConfig.ResourceConfig,
-	})
+	resp, err := s.client.K8sListWithResponse(ctx,
+		buildK8sListBody(s.clusterName, s.namespace, pipelineRunResourceConfig, filter.liveLabels()))
 	if err != nil {
 		return nil, fmt.Errorf("fetching live pipeline runs: %w", err)
 	}
@@ -473,7 +490,7 @@ func (s *PipelineRunService) fetchLiveRuns(ctx context.Context, filter PipelineR
 	for i := range resp.JSON200.Items {
 		info := mapK8sPipelineRunInfo(&resp.JSON200.Items[i])
 
-		// Apply all filters client-side (K8s API doesn't support label selectors in this endpoint)
+		// Branch, author and PR resolve from resultAnnotations. matchesFilter applies every filter client-side.
 		if !matchesFilter(info, filter) {
 			continue
 		}

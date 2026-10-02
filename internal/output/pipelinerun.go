@@ -136,47 +136,18 @@ func renderRunHeader(w io.Writer, run *portal.PipelineRunInfo) error {
 		return err
 	}
 
-	if run.Duration != "" {
-		if _, err := lipgloss.Fprintf(w, "%s %s\n",
-			ReasonLabel.Render("Duration:"),
-			run.Duration,
-		); err != nil {
-			return err
+	for _, field := range []struct{ label, value string }{
+		{"Duration:", run.Duration},
+		{"Pipeline:", run.Pipeline},
+		{"Project:", run.Project},
+		{"Deployment:", run.Deployment},
+		{"Env:", run.Env},
+	} {
+		if field.value == "" {
+			continue
 		}
-	}
 
-	if run.Pipeline != "" {
-		if _, err := lipgloss.Fprintf(w, "%s %s\n",
-			ReasonLabel.Render("Pipeline:"),
-			run.Pipeline,
-		); err != nil {
-			return err
-		}
-	}
-
-	if run.Project != "" {
-		if _, err := lipgloss.Fprintf(w, "%s %s\n",
-			ReasonLabel.Render("Project:"),
-			run.Project,
-		); err != nil {
-			return err
-		}
-	}
-
-	if run.Deployment != "" {
-		if _, err := lipgloss.Fprintf(w, "%s %s\n",
-			ReasonLabel.Render("Deployment:"),
-			run.Deployment,
-		); err != nil {
-			return err
-		}
-	}
-
-	if run.Env != "" {
-		if _, err := lipgloss.Fprintf(w, "%s %s\n",
-			ReasonLabel.Render("Env:"),
-			run.Env,
-		); err != nil {
+		if _, err := lipgloss.Fprintf(w, "%s %s\n", ReasonLabel.Render(field.label), field.value); err != nil {
 			return err
 		}
 	}

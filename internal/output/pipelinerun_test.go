@@ -70,3 +70,34 @@ func TestRenderRunInfo_DeploymentAndEnv(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderRunInfo_AllFields(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	if err := RenderRunInfo(&buf, &portal.PipelineRunInfo{
+		Name:       "deploy-demo-dev-ab12",
+		Status:     portal.StatusSucceeded,
+		Duration:   "1m 2s",
+		Pipeline:   "deploy",
+		Project:    "demo-app",
+		Deployment: "demo",
+		Env:        "dev",
+		Results:    map[string]any{"VCS_TAG": "1.0.0"},
+	}); err != nil {
+		t.Fatalf("RenderRunInfo: %v", err)
+	}
+
+	want := `Pipeline: deploy-demo-dev-ab12
+Status:      Succeeded
+Duration:    1m 2s
+Pipeline:    deploy
+Project:     demo-app
+Deployment:  demo
+Env:         dev
+Results:     VCS_TAG=1.0.0
+`
+	if got := buf.String(); got != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+}

@@ -96,7 +96,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().IntVar(&opts.PRNumber, "pr", 0, "Filter by pull request number")
 	cmd.Flags().StringVar(&opts.Author, "author", "", "Filter by author name")
 	cmd.Flags().StringVar(&opts.Branch, "branch", "", "Filter by source branch")
-	cmd.Flags().StringVar(&opts.Type, "type", "", "Filter by pipeline type (review, build, deploy, ...)")
+	cmd.Flags().StringVar(&opts.Type, "type", "", "Filter by pipeline type (review, build, deploy, clean, ...)")
 	cmd.Flags().StringVar(&opts.Status, "status", "", "Filter by status (succeeded, failed, running, timeout, cancelled)")
 	cmd.Flags().StringVar(&opts.Deployment, "deployment", "", "Filter runs of a deployment (deploy and clean runs)")
 	cmd.Flags().StringVar(&opts.Env, "env", "", "Filter runs of one environment of --deployment")
