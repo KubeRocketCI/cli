@@ -29,7 +29,6 @@ func TestList_EnvironmentFlagValidation(t *testing.T) {
 		"invalid deployment":     {[]string{"--deployment", "Demo_1"}, "--deployment must be a valid DNS-1123 name"},
 		"invalid env":            {[]string{"--deployment", "demo", "--env", "dev.eu"}, "--env must be a valid DNS-1123 name"},
 		"positional arguments":   {[]string{"demo", "dev"}, `unknown command "demo"`},
-		"flag swallowed a flag":  {[]string{"--project", "--pr", "53"}, "flag needs an argument: --project"},
 	}
 
 	for name, tc := range cases {

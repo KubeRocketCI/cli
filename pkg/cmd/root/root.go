@@ -26,11 +26,7 @@ func NewCmdRoot(f *cmdutil.Factory, v, commit, date string) *cobra.Command {
 		Version:       v,
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			if err := cmdutil.ValidateStringFlags(cmd); err != nil {
-				return err
-			}
-
+		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
 			// Warm the config cache after Cobra has parsed all flags.
 			// Subcommand RunE functions receive the cached result instantly.
 			_, err := f.Config()
@@ -50,6 +46,13 @@ func NewCmdRoot(f *cmdutil.Factory, v, commit, date string) *cobra.Command {
 		sonar.NewCmdSonar(f),
 		version.NewCmdVersion(f.IOStreams, v, commit, date),
 	)
+
+	// Cobra adds help and completion inside Execute; add them now so
+	// GuardFlagValues covers them.
+	cmd.InitDefaultHelpCmd()
+	cmd.InitDefaultCompletionCmd()
+
+	cmdutil.GuardFlagValues(cmd)
 
 	return cmd
 }
