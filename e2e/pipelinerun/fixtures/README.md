@@ -14,7 +14,7 @@ identifiers — drop them into any namespace on any KubeRocketCI cluster.
 
 | File | Resource | Purpose | Test rows |
 |---|---|---|---|
-| `pipeline-noop.yaml` | Pipeline `krci-cli-e2e-noop` | Four params, all with defaults; `should-fail=true` makes the run exit non-zero. | `PR-S-1`, `PR-S-2`, `PR-S-3`, `PR-S-LABEL`, `PR-S-DRY-YAML`, `PR-S-DRY-JSON`, `PR-S-RACE`, `PR-S-GENNAME`, `PR-S-COL-EQ` |
+| `pipeline-noop.yaml` | Pipeline `krci-cli-e2e-noop` | Five params, all with defaults; `should-fail=true` makes the run exit non-zero, `sleep-seconds=<n>` keeps it in progress. | `PR-S-1`, `PR-S-2`, `PR-S-3`, `PR-S-LABEL`, `PR-S-DRY-YAML`, `PR-S-DRY-JSON`, `PR-S-RACE`, `PR-S-GENNAME`, `PR-S-COL-EQ`, `PR-L-27`, `PR-L-28`, `PR-GE-12`, `PR-GE-13` |
 | `pipeline-required.yaml` | Pipeline `krci-cli-e2e-required` | Declares a no-default param. Documents the portal's empty-string synthesis: omitting `--param message=...` produces `spec.params[0].value: ""`, **not** an admission rejection. The fixture's spec.description still references the old (incorrect) intent — left untouched to avoid drift; see `PR-S-PARAM-SYNTHESIZED` for the actual contract. | `PR-S-PARAM-SYNTHESIZED` |
 | `pipeline-broken-tt.yaml` | Pipeline `krci-cli-e2e-broken-tt` | Carries an `app.edp.epam.com/triggertemplate` label pointing at a TT that does not exist. | `PR-S-TT-MISSING` |
 | `pipeline-bare.yaml` | Pipeline `krci-cli-e2e-bare` | No KRCI labels at all. Proves the CLI can start any valid Tekton Pipeline regardless of the KubeRocketCI labelling convention. | `PR-S-BARE` |
@@ -52,6 +52,9 @@ kubectl -n <namespace> get pipeline.tekton.dev,triggertemplate.triggers.tekton.d
 
 # Deterministic failure path.
 ./dist/krci pipelinerun start krci-cli-e2e-noop --param should-fail=true -o json
+
+# A run that stays in progress for ten minutes (RUNNING_RUN_NAME).
+./dist/krci pipelinerun start krci-cli-e2e-noop --param sleep-seconds=600 -o json
 
 # No-default-param path: succeeds with synthesised empty value (exit 0).
 # Demonstrates that "missing required param" is not a reachable failure mode.

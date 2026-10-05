@@ -26,6 +26,7 @@ your own portal):
 | `{{FAILED_RUN_NAME}}` | A run whose status is Failed.            | `krci-cli-e2e-noop-run-a1b2c` |
 | `{{SUCCEEDED_RUN_NAME}}` | A run whose status is Succeeded.      | `krci-cli-e2e-noop-run-k7p2q` |
 | `{{BUILD_RUN_NAME}}` | A succeeded build run still in the cluster (finished minutes ago, not yet pruned to Tekton Results). | `build-my-app-main-zhqvj` |
+| `{{RUNNING_RUN_NAME}}` | A run that stays in progress while the rows execute: start `krci-cli-e2e-noop` with `--param sleep-seconds=600` right before the run. | `krci-cli-e2e-noop-run-x7k2p` |
 | `{{DEPLOYMENT}}` | A deployment with at least one deploy run.       | `demo`                |
 | `{{ENV}}`     | An environment of DEPLOYMENT with at least one deploy run. | `dev`       |
 | `{{NONCE}}`   | Random suffix for "definitely-doesn't-exist" assertions. | `test-999zzz` |
@@ -68,6 +69,8 @@ Fast, idempotent, no portal — these are the first line of defence.
 | PR-H-07  | `krci pipelinerun`                       | offline | —     | `exit=0; stdout~/^Available Commands:$/; stdout~/^\s+list\s/; stdout~/^\s+get\s/`                                        |
 | PR-H-08  | `krci pipelinerun get --help`            | offline | —     | `exit=0; stdout~/--wait/; stdout~/--timeout duration/; stdout~/default 1h0m0s/`                                          |
 | PR-H-09  | `krci pipelinerun list --help`           | offline | —     | `exit=0; stdout~/--deployment string/; stdout~/--env string/; stdout~/review, build, deploy, clean/`                     |
+| PR-H-10  | `krci pipelinerun list --help`           | offline | —     | `exit=0; stdout~/succeeded, failed, running, timeout, cancelled/; stdout~/--logs.*none until the run finishes/; stdout~/--reason.*none until the run finishes/` |
+| PR-H-11  | `krci pipelinerun get --help`            | offline | —     | `exit=0; stdout~/--logs.*none until the run finishes/; stdout~/--reason.*none until the run finishes/` |
 
 ## 2. Argument validation (env: `offline`)
 
@@ -96,6 +99,9 @@ flag-value guard (`cmdutil.GuardFlagValues`).
 | PR-V-17  | `krci pipelinerun list --deployment ""`                         | offline | —     | `exit=1; stderr~/--deployment must not be empty/`                                               |
 | PR-V-18  | `krci pipelinerun list demo dev`                                | offline | —     | `exit=1; stderr~/unknown command "demo"/`                                                        |
 | PR-V-19  | `krci pipelinerun get some-run -o --timeout 5m`                 | offline | —     | `exit=1; stderr~/flag needs an argument: --output/`                                              |
+| PR-V-20  | `krci pipelinerun list --status bogus`                          | offline | —     | `exit=1; stderr~/invalid --status=bogus/; stderr~/must be one of succeeded, failed, running, timeout, cancelled/` |
+| PR-V-21  | `krci pipelinerun list --status bogus -o json`                  | offline | —     | `exit=1; stdout_empty; stderr~/invalid --status=bogus/` _(a rejected flag prints no envelope)_   |
+| PR-V-22  | `krci pipelinerun list --status ""`                             | offline | —     | `exit=1; stderr~/must be one of succeeded, failed, running, timeout, cancelled/`                 |
 
 ## 3. Global flag wiring (env: `offline`)
 
@@ -148,13 +154,15 @@ These flags target the most recent matching run and shape the output.
 | PR-L-20  | `krci pipelinerun list --project {{PROJECT}} --pr {{PR}} --logs -o json`             | portal | PR has runs                     | `exit=0; stdout_json.pipelineRuns:exists; stdout_json.logs:exists`                                      |
 | PR-L-21  | `krci pipelinerun list --project {{PROJECT}} --pr {{PR}} --reason -o json`          | portal | PR has runs                     | `exit=0; stdout_json.pipelineRuns:exists; stdout_json.tasks:exists`                                     |
 | PR-L-22  | `krci pipelinerun list --project {{PROJECT}} --pr {{PR}} --logs`                     | portal | PR has runs, table mode         | `exit=0; stdout~/Logs:\s+/`                                                                             |
-| PR-L-23  | `krci pipelinerun list --project {{PROJECT}} --pr {{PR}} --reason`                   | portal | PR has runs (with task data)    | `exit=0; stdout~/Tasks:/`  _(or stdout~/No task data/ for runs without steps)_                          |
+| PR-L-23  | `krci pipelinerun list --project {{PROJECT}} --pr {{PR}} --reason`                   | portal | PR has runs (with task data)    | `exit=0; stdout~/Tasks:/`  _(or stdout~/Task data is not available/ for a run without task data)_       |
+| PR-L-27  | `krci pipelinerun list --status running --reason -o json`                            | portal | `{{RUNNING_RUN_NAME}}` is still running | `exit=0; stdout_json.pipelineRuns.0.status=Running; stdout_json.tasksUnavailable=run_not_finished; stdout!~/"tasks":/` |
+| PR-L-28  | `krci pipelinerun list --status running --reason`                                    | portal | `{{RUNNING_RUN_NAME}}` is still running | `exit=0; stdout~/^Pipeline run has not finished yet/; stdout~/^NAME/` |
 
 ## 6. Output format negotiation (env: `offline` where possible)
 
-`-o` accepts `table` or `json`; `--help` advertises auto-detect when
-absent. The flag wiring can be checked offline via a forced-failure path
-(unreachable portal) but the format-specific output needs `portal`.
+`-o` accepts `table` or `json`; `table` is the default. The flag wiring can be
+checked offline via a forced-failure path (unreachable portal) but the
+format-specific output needs `portal`.
 
 | ID       | Command                                                                 | Env     | Setup | Expect                                                                                  |
 |----------|--------------------------------------------------------------------------|---------|-------|-----------------------------------------------------------------------------------------|
@@ -171,13 +179,15 @@ absent. The flag wiring can be checked offline via a forced-failure path
 | PR-GE-02 | `krci pipelinerun get {{RUN_NAME}} -o json`                        | portal | run exists                | `exit=0; stdout_json.pipelineRuns.0.name={{RUN_NAME}}`                                   |
 | PR-GE-03 | `krci pipelinerun get {{RUN_NAME}} --logs -o json`                 | portal | run exists                | `exit=0; stdout_json.pipelineRuns.0.name={{RUN_NAME}}; stdout_json.logs:exists`          |
 | PR-GE-04 | `krci pipelinerun get {{FAILED_RUN_NAME}} --reason -o json`        | portal | failed run exists         | `exit=0; stdout_json.tasks:exists`                                                       |
-| PR-GE-05 | `krci pipelinerun get {{RUN_NAME}} --reason`                       | portal | run exists                | `exit=0; stdout~/Tasks:/`  _(or stdout~/No task data/)_                                  |
+| PR-GE-05 | `krci pipelinerun get {{RUN_NAME}} --reason`                       | portal | run exists                | `exit=0; stdout~/Tasks:/`  _(or stdout~/Task data is not available/)_                    |
 | PR-GE-06 | `krci pipelinerun get nonexistent-run-{{NONCE}}`                   | portal | nonexistent name          | `exit=1; stderr~/pipeline run "nonexistent-run-{{NONCE}}" not found/`                    |
 | PR-GE-07 | `krci run get {{RUN_NAME}}`                                        | portal | alias check               | `exit=0; stdout~/^Pipeline:\s+{{RUN_NAME}}$/`                                               |
 | PR-GE-08 | `krci pipelinerun get {{SUCCEEDED_RUN_NAME}} --wait -o json`       | portal | succeeded run             | `exit=0; stdout_json.pipelineRuns.0.status=Succeeded` _(returns at once, the run has finished)_ |
 | PR-GE-09 | `krci pipelinerun get {{FAILED_RUN_NAME}} --wait`                  | portal | failed run exists         | `exit=1; stdout~/^Pipeline:\s+{{FAILED_RUN_NAME}}$/; stderr~/finished with status Failed/; stderr~/krci pipelinerun get {{FAILED_RUN_NAME}} --reason/` |
 | PR-GE-10 | `krci pipelinerun get {{FAILED_RUN_NAME}} --wait --reason -o json` | portal | failed run exists         | `exit=1; stdout_json.tasks:exists; stderr~/finished with status Failed/`                 |
 | PR-GE-11 | `krci pipelinerun get nonexistent-run-{{NONCE}} --wait`            | portal | nonexistent name          | `exit=1; stderr~/pipeline run "nonexistent-run-{{NONCE}}" not found/` _(fails at once, no waiting)_ |
+| PR-GE-12 | `krci pipelinerun get {{RUNNING_RUN_NAME}} --reason -o json`       | portal | run still running         | `exit=0; stdout_json.pipelineRuns.0.status=Running; stdout_json.tasksUnavailable=run_not_finished; stdout!~/"tasks":/` |
+| PR-GE-13 | `krci pipelinerun get {{RUNNING_RUN_NAME}} --reason`               | portal | run still running         | `exit=0; stdout~/^Pipeline run has not finished yet/; stdout~/^Status:\s+Running/` |
 
 ## 8. JSON output contract (env: `portal`)
 
@@ -227,7 +237,7 @@ Each of the following must be covered by ≥1 row above. Tick as you add.
 - [x] `list --author`
 - [x] `list --branch`
 - [x] `list --type` (review / build / deploy / release)
-- [x] `list --status` (succeeded / failed / running / timeout / cancelled)
+- [x] `list --status` (succeeded / failed / running / timeout / cancelled), unknown value rejected
 - [x] `list --deployment` / `--env` (runs of an environment), empty and `--env`-only validation, no positional args
 - [x] `list --logs`
 - [x] `list --reason`
@@ -237,6 +247,8 @@ Each of the following must be covered by ≥1 row above. Tick as you add.
 - [x] `get <name>` default
 - [x] `get <name> --logs`
 - [x] `get <name> --reason`
+- [x] `list --reason` / `get --reason` on a run still running (note, `tasksUnavailable`)
+- [x] a rejected flag prints no JSON envelope
 - [x] `get <name> -o json`
 - [x] `get` nonexistent name
 - [x] `get --wait`: succeeded, failed (exit 1 + hint), with `--reason`, nonexistent
@@ -253,8 +265,9 @@ Fixtures: `fixtures/*.yaml` (Pipelines + TriggerTemplate); see
 
 | ID                  | Class      | Run as  | Title                                                                                                                                                                | Expect                                                                                                                |
 |---------------------|------------|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
-| PR-S-HELP           | help       | offline | `start --help` lists `--param`, `--label`, `--dry-run`, `-o`                                                                                                          | exit 0; help text mentions `escape hatch`                                                                             |
+| PR-S-HELP           | help       | offline | `start --help` lists `--param`, `--label`, `--dry-run`, `-o`                                                                                                          | exit 0; help text mentions `escape hatch`; `--dry-run` help says `YAML by default`                                                                             |
 | PR-S-DNS-1          | validation | offline | reject uppercase positional `Foo_Build`                                                                                                                              | exit 1; stderr `must be a valid DNS-1123 name`                                                                        |
+| PR-S-DNS-JSON       | validation | offline | reject `Foo_Build -o json` (a rejected argument prints no envelope)                                                                                                  | exit 1; stdout empty; stderr `must be a valid DNS-1123 name`                                                                                                                                                                     |
 | PR-S-OUT-1          | validation | offline | reject `-o xml`                                                                                                                                                      | exit 1; stderr `unknown output format`                                                                                |
 | PR-S-DRY-MUTEX      | validation | offline | reject `--dry-run -o table`                                                                                                                                          | exit 1; stderr `--dry-run cannot use -o table`                                                                        |
 | PR-S-PARAM-DUP      | validation | offline | reject `--param k=v1 --param k=v2`                                                                                                                                   | exit 1; stderr `duplicate parameter 'k'`                                                                              |
@@ -275,6 +288,7 @@ Fixtures: `fixtures/*.yaml` (Pipelines + TriggerTemplate); see
 | PR-S-DRY-JSON       | dry-run    | portal  | `start {{PIPELINE_OK}} --dry-run -o json`                                                                                                                            | exit 0; stdout `{"schemaVersion":"1","data":{...PipelineRun manifest...}}`; `data.metadata.generateName` starts with `{{PIPELINE_OK}}-run-` |
 | PR-S-TT-DRY         | dry-run    | portal  | `start {{PIPELINE_WITH_TT}} --dry-run -o json`                                                                                                                       | exit 0; `data.metadata.labels."test.krci-cli-e2e/seeded-message"` equals `from-pipeline-default` (resolved before K8s submission) |
 | PR-S-NOT-FOUND      | error      | portal  | `start ghost` (no such Pipeline)                                                                                                                                     | exit 1; stderr `pipeline 'ghost' not found`                                                                           |
+| PR-S-NOT-FOUND-JSON | error      | portal  | `start ghost -o json`                                                                                                                                                | exit 1; `stdout_json.schemaVersion=1`; `stdout_json.error.message=pipeline 'ghost' not found`; stderr `pipeline 'ghost' not found`                                                                                              |
 | PR-S-TT-MISSING     | error      | portal  | `start {{PIPELINE_BROKEN_TT}}`                                                                                                                                       | exit 1; stderr `references a TriggerTemplate that does not exist`                                                     |
 | PR-S-PARAM-SYNTHESIZED | regression | portal | `start {{PIPELINE_REQUIRED_PARAM}}` (omit `--param {{PIPELINE_REQUIRED_PARAM_NAME}}=...`); then read back `kubectl get pipelinerun <data.name> -o jsonpath='{.spec.params[0].value}'` | exit 0 from start; the synthesized param value is the empty string. Documents the portal's "always submit a complete manifest" behavior — admission cannot reject for missing required params via this client. |
 | PR-S-COL-EQ         | regression | portal  | header row of `start {{PIPELINE_OK}}` matches header row of `pipelinerun list` byte-for-byte                                                                          | identical header strings                                                                                              |

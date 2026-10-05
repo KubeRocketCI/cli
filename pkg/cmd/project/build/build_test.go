@@ -2,6 +2,7 @@ package build
 
 import (
 	"encoding/json"
+	"net/http"
 	"os"
 	"slices"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/pipelinerun"
 )
 
 var newFactory = cmdtest.NewFactory
@@ -280,4 +282,20 @@ func TestBuildInput_MatchSpec(t *testing.T) {
 		t.Errorf("branch bounds: spec [%d, %d], portal [1, %d]",
 			props.Branch.MinLength, props.Branch.MaxLength, portal.MaxBranchLength)
 	}
+}
+
+// TestBuild_ErrorOutput: an error of the run, a Portal reply or a manifest the
+// Portal left empty, reaches stdout as the JSON error envelope under -o json
+// and only then.
+func TestBuild_ErrorOutput(t *testing.T) {
+	t.Parallel()
+
+	notFound := cmdtest.PortalReply(http.StatusNotFound,
+		`{"error":{"code":"NOT_FOUND","reason":"codebase_not_found","message":"Not Found"}}`)
+	cmdtest.CheckErrorOutput(t, NewCmdBuild, notFound, []string{"my-app"},
+		pipelinerun.SchemaVersion, "project 'my-app' not found")
+
+	emptyManifest := cmdtest.PortalReply(http.StatusOK, `{"kind":"dryRun","manifest":null}`)
+	cmdtest.CheckErrorOutput(t, NewCmdBuild, emptyManifest, []string{"my-app", "--dry-run"},
+		pipelinerun.SchemaVersion, "portal returned empty dry-run manifest")
 }

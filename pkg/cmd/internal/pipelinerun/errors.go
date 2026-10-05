@@ -1,18 +1,12 @@
 package pipelinerun
 
 import (
-	"errors"
-
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
-	"github.com/KubeRocketCI/cli/internal/portal"
+	"github.com/KubeRocketCI/cli/internal/iostreams"
 )
 
-// HandleAuthError maps portal.ErrUnauthorized to the auth-required remediation
-// hint; other errors pass through unchanged.
-func HandleAuthError(err error) error {
-	if errors.Is(err, portal.ErrUnauthorized) {
-		return cmdutil.ErrAuthRequired(err)
-	}
-
-	return err
+// HandleError is cmdutil.HandleError with the envelope version of
+// `pipelinerun start` and `project build`.
+func HandleError(ios *iostreams.IOStreams, outputFormat string, err error) error {
+	return cmdutil.HandleError(ios, outputFormat, SchemaVersion, err)
 }

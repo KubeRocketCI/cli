@@ -1,14 +1,12 @@
 package sonarinternal
 
 import (
-	"errors"
 	"fmt"
 	"io"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
-	"github.com/KubeRocketCI/cli/internal/portal"
 )
 
 // SchemaVersion is the shared JSON envelope version for every `krci sonar *` verb.
@@ -37,22 +35,9 @@ func Render[T any](ios *iostreams.IOStreams, outputFormat string, data T, render
 	}
 }
 
-// HandleError promotes portal.ErrUnauthorized to the shared "run krci auth login"
-// message, and — when `-o json` is selected — also writes the
-// `{schemaVersion, error: { message }}` envelope to stdout so scripting
-// consumers get a structured error alongside the exit-1 signal. Callers still
-// return the returned error so root-level main.go emits the plain-text form on
-// stderr and exits 1.
+// HandleError is cmdutil.HandleError with the sonar envelope version.
 func HandleError(ios *iostreams.IOStreams, outputFormat string, err error) error {
-	if errors.Is(err, portal.ErrUnauthorized) {
-		err = cmdutil.ErrAuthRequired(err)
-	}
-
-	if output.ResolveFormat(outputFormat) == output.FormatJSON {
-		_ = output.PrintJSONErrorEnvelope(ios.Out, SchemaVersion, err)
-	}
-
-	return err
+	return cmdutil.HandleError(ios, outputFormat, SchemaVersion, err)
 }
 
 // PrintTable is the shared TTY/non-TTY dispatcher for sonar verbs that show a

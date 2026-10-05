@@ -237,8 +237,12 @@ func (s *PipelineRunService) Get(
 		return s.getFromResults(ctx, name, opts)
 	}
 
-	if k8sResult.PipelineRuns[0].Status == StatusRunning {
-		// Pipeline is still running: logs/reason are not available from Tekton Results yet.
+	if !isFinishedStatus(k8sResult.PipelineRuns[0].Status) {
+		// Not finished: logs/reason are not available from Tekton Results yet.
+		if opts.IncludeReason {
+			k8sResult.TasksUnavailable = TasksRunNotFinished
+		}
+
 		return k8sResult, nil
 	}
 
@@ -255,6 +259,9 @@ func (s *PipelineRunService) Get(
 			return nil, tektonErr
 		}
 		// ErrNotFound: run not yet indexed in Tekton Results; fall through to K8s result.
+		if opts.IncludeReason {
+			k8sResult.TasksUnavailable = TasksNotIndexed
+		}
 	}
 
 	return k8sResult, nil
@@ -358,6 +365,12 @@ func (s *PipelineRunService) listFromResults(
 func (s *PipelineRunService) List(
 	ctx context.Context, opts PipelineRunListOptions,
 ) (*PipelineRunListResult, error) {
+	if opts.Filter.Status != "" {
+		if err := ValidatePipelineRunStatus("status", opts.Filter.Status); err != nil {
+			return nil, err
+		}
+	}
+
 	// The errgroup derives its own ctx that is cancelled once Wait() returns, so
 	// subsequent calls that need to outlive the fan-out must use the parent ctx.
 	g, fetchCtx := errgroup.WithContext(ctx)
@@ -375,7 +388,7 @@ func (s *PipelineRunService) List(
 
 	// Tekton Results only stores completed pipeline runs, so querying it while
 	// filtering for "running" causes API errors — skip that round trip entirely.
-	if !strings.EqualFold(opts.Filter.Status, StatusRunning) {
+	if status, _ := findStatusFilter(opts.Filter.Status); status.display != StatusRunning {
 		g.Go(func() error {
 			runs, err := s.listFromResults(fetchCtx, opts.Filter)
 			if err != nil {
@@ -410,14 +423,18 @@ func (s *PipelineRunService) List(
 }
 
 // attachTopRunExpansion fetches logs/tasks for result.PipelineRuns[0] and copies
-// them onto result. Runs still executing (no Tekton Results record yet) and runs
-// not yet indexed (ErrNotFound) are handled silently: the caller surfaces a
-// "task data not available" hint based on the empty Tasks slice.
+// them onto result. A run that has not finished (no Tekton Results record yet)
+// and a run not yet indexed (ErrNotFound) are not errors: with IncludeReason
+// the result carries the cause in TasksUnavailable.
 func (s *PipelineRunService) attachTopRunExpansion(
 	ctx context.Context, result *PipelineRunListResult, opts PipelineRunListOptions,
 ) error {
 	top := result.PipelineRuns[0]
-	if top.Status == StatusRunning {
+	if !isFinishedStatus(top.Status) {
+		if opts.IncludeReason {
+			result.TasksUnavailable = TasksRunNotFinished
+		}
+
 		return nil
 	}
 
@@ -427,6 +444,10 @@ func (s *PipelineRunService) attachTopRunExpansion(
 	})
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
+			if opts.IncludeReason {
+				result.TasksUnavailable = TasksNotIndexed
+			}
+
 			return nil
 		}
 		return err
@@ -434,6 +455,7 @@ func (s *PipelineRunService) attachTopRunExpansion(
 
 	result.Logs = expanded.Logs
 	result.Tasks = expanded.Tasks
+	result.TasksUnavailable = expanded.TasksUnavailable
 	return nil
 }
 
@@ -541,12 +563,12 @@ func matchesFilter(info PipelineRunInfo, filter PipelineRunFilter) bool {
 
 // matchesStatus checks if the actual status matches the filter status (case-insensitive).
 func matchesStatus(actualStatus, filterStatus string) bool {
-	m, ok := statusMappings[strings.ToLower(filterStatus)]
+	f, ok := findStatusFilter(filterStatus)
 	if !ok {
 		return false
 	}
 
-	return actualStatus == m.display
+	return actualStatus == f.display
 }
 
 // mapK8sPipelineRunInfo converts a K8s PipelineRun item to the display model.
@@ -702,7 +724,15 @@ func (s *PipelineRunService) fetchExpansion(
 	ctx context.Context, r *tektonResult, out *PipelineRunListResult, includeLogs, includeReason bool,
 ) error {
 	if includeReason {
-		return s.fetchReason(ctx, r, out)
+		if err := s.fetchReason(ctx, r, out); err != nil {
+			return err
+		}
+
+		if len(out.Tasks) == 0 {
+			out.TasksUnavailable = TasksNotIndexed
+		}
+
+		return nil
 	}
 
 	if includeLogs {
@@ -1022,8 +1052,8 @@ func buildCELFilter(f PipelineRunFilter) string {
 		parts = append(parts, fmt.Sprintf("annotations[%q] == %q", annotationGitChangeNumber, strconv.Itoa(f.PRNumber)))
 	}
 
-	if m, ok := statusMappings[strings.ToLower(f.Status)]; ok {
-		parts = append(parts, fmt.Sprintf("summary.status == %s", m.cel))
+	if status, ok := findStatusFilter(f.Status); ok {
+		parts = append(parts, fmt.Sprintf("summary.status == %s", status.cel))
 	}
 
 	return strings.Join(parts, " && ")

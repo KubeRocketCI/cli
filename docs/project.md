@@ -345,12 +345,12 @@ run is immediately traceable with `krci pipelinerun list --project my-app`.
 
 ### Flags
 
-| Flag           | Description                                                                  |
-|----------------|------------------------------------------------------------------------------|
-| `--branch`     | Git branch to build (default: the project's `spec.defaultBranch`)            |
-| `--param`      | Pipeline parameter as `key=value` (repeatable; split on first `=`)           |
-| `--dry-run`    | Render the would-be PipelineRun without creating it (needs `-o json`/`yaml`) |
-| `-o, --output` | `table` (default), `json`, or `yaml` (yaml only with `--dry-run`)            |
+| Flag           | Description                                                                                               |
+|----------------|-----------------------------------------------------------------------------------------------------------|
+| `--branch`     | Git branch to build (default: the project's `spec.defaultBranch`)                                         |
+| `--param`      | Pipeline parameter as `key=value` (repeatable; split on first `=`)                                        |
+| `--dry-run`    | Render the would-be PipelineRun without creating it (YAML by default; `-o json` wraps it in the envelope) |
+| `-o, --output` | `table` (default), `json`, or `yaml` (only with `--dry-run`, where it is the default)                     |
 
 There is no `--label`: labels are what this command resolves for you. Use
 [`krci pipelinerun start`](pipelinerun.md#pipelinerun-start) when you need
@@ -415,7 +415,8 @@ krci pipelinerun get "$run" --wait -o json | jq -r '.pipelineRuns[0].results.VCS
 ```
 
 For `--dry-run`, `data` is the rendered PipelineRun manifest instead of the
-result row.
+result row. An error prints the
+[error envelope](json-schemas.md#error-envelope) instead.
 
 ### Dry run
 

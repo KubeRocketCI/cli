@@ -101,3 +101,23 @@ Results:     VCS_TAG=1.0.0
 		t.Errorf("got:\n%s\nwant:\n%s", got, want)
 	}
 }
+
+func TestRenderNoTaskData(t *testing.T) {
+	t.Parallel()
+
+	notes := map[string]string{
+		portal.TasksRunNotFinished: "Pipeline run has not finished yet. Task data is available after it finishes.\n",
+		portal.TasksNotIndexed:     "Task data is not available. The run may not yet be indexed in Tekton Results.\n",
+	}
+
+	for reason, want := range notes {
+		var buf bytes.Buffer
+		if err := RenderNoTaskData(&buf, reason); err != nil {
+			t.Fatalf("RenderNoTaskData(%q): %v", reason, err)
+		}
+
+		if buf.String() != want {
+			t.Errorf("RenderNoTaskData(%q) = %q, want %q", reason, buf.String(), want)
+		}
+	}
+}

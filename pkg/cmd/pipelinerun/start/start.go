@@ -84,10 +84,8 @@ returned in the output.`,
 		"Pipeline parameter as key=value (repeatable; split on first '=')")
 	cmd.Flags().StringArrayVar(&opts.Labels, "label", nil,
 		"Label to attach to the resulting PipelineRun as key=value (repeatable)")
-	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false,
-		"Render the would-be PipelineRun without creating it (requires -o json or -o yaml)")
-	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "",
-		"Output format: table, json, yaml (yaml only with --dry-run)")
+	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, pipelinerun.DryRunFlagUsage)
+	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "", pipelinerun.OutputFlagUsage)
 
 	return cmd
 }
@@ -118,7 +116,17 @@ func (opts *StartOptions) validate() error {
 	return nil
 }
 
+// startRun starts the run; under -o json an error also reaches stdout as the
+// JSON error envelope.
 func startRun(ctx context.Context, opts *StartOptions) error {
+	if err := start(ctx, opts); err != nil {
+		return pipelinerun.HandleError(opts.IO, opts.OutputFormat, err)
+	}
+
+	return nil
+}
+
+func start(ctx context.Context, opts *StartOptions) error {
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
@@ -138,7 +146,7 @@ func startRun(ctx context.Context, opts *StartOptions) error {
 		DryRun:   opts.DryRun,
 	})
 	if err != nil {
-		return pipelinerun.HandleAuthError(err)
+		return err
 	}
 
 	return pipelinerun.PresentResult(opts.IO, opts.OutputFormat, opts.DryRun, result)

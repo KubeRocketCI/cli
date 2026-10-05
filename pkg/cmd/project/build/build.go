@@ -95,10 +95,8 @@ so two callers firing at once can both get a run.`,
 		"Git branch to build (default: the project's default branch)")
 	cmd.Flags().StringArrayVar(&opts.Params, "param", nil,
 		"Pipeline parameter as key=value (repeatable; split on first '=')")
-	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false,
-		"Render the would-be PipelineRun without creating it (requires -o json or -o yaml)")
-	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "",
-		"Output format: table, json, yaml (yaml only with --dry-run)")
+	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, pipelinerun.DryRunFlagUsage)
+	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "", pipelinerun.OutputFlagUsage)
 
 	return cmd
 }
@@ -140,7 +138,17 @@ func (opts *BuildOptions) validateBranch() error {
 	return nil
 }
 
+// buildRun starts the build; under -o json an error also reaches stdout as
+// the JSON error envelope.
 func buildRun(ctx context.Context, opts *BuildOptions) error {
+	if err := build(ctx, opts); err != nil {
+		return pipelinerun.HandleError(opts.IO, opts.OutputFormat, err)
+	}
+
+	return nil
+}
+
+func build(ctx context.Context, opts *BuildOptions) error {
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
@@ -160,7 +168,7 @@ func buildRun(ctx context.Context, opts *BuildOptions) error {
 		DryRun:   opts.DryRun,
 	})
 	if err != nil {
-		return pipelinerun.HandleAuthError(err)
+		return err
 	}
 
 	return pipelinerun.PresentResult(opts.IO, opts.OutputFormat, opts.DryRun, result)

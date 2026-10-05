@@ -4,48 +4,22 @@ import (
 	"bytes"
 	"context"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
-	"github.com/KubeRocketCI/cli/internal/config"
-	"github.com/KubeRocketCI/cli/internal/iostreams"
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
+	"github.com/KubeRocketCI/cli/internal/output"
+	"github.com/KubeRocketCI/cli/internal/portal"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
 )
 
 // newFactory returns a Factory whose portal serves the given resources/list
-// body for every request; an empty body means no portal at all.
+// body for every request, and the buffer stdout is written to.
 func newFactory(t *testing.T, listBody string) (*cmdutil.Factory, *bytes.Buffer) {
 	t.Helper()
 
-	out := &bytes.Buffer{}
-	f := &cmdutil.Factory{
-		IOStreams: &iostreams.IOStreams{Out: out, ErrOut: &bytes.Buffer{}},
-		Config: func() (*config.Config, error) {
-			return &config.Config{PortalURL: "https://portal.example", ClusterName: "c", Namespace: "ns"}, nil
-		},
-		RestClient: func() (*restapi.ClientWithResponses, error) {
-			return nil, nil
-		},
-	}
-
-	if listBody == "" {
-		return f, out
-	}
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(listBody))
-	}))
-	t.Cleanup(srv.Close)
-
-	f.RestClient = func() (*restapi.ClientWithResponses, error) {
-		return restapi.NewClientWithResponses(srv.URL)
-	}
-
-	return f, out
+	return cmdtest.NewPortalFactory(t, cmdtest.PortalReply(http.StatusOK, listBody))
 }
 
 func runJSON(condStatus, reason string) string {
@@ -86,9 +60,7 @@ func TestGet_WaitFlagValidation(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			f, _ := newFactory(t, "")
-			err := execute(f, tc.args...)
-
+			_, err := cmdtest.RunCmd(t, NewCmdGet, tc.args)
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("want error %q, got %v", tc.want, err)
 			}
@@ -99,17 +71,8 @@ func TestGet_WaitFlagValidation(t *testing.T) {
 func TestGet_WaitDefaults(t *testing.T) {
 	t.Parallel()
 
-	f, _ := newFactory(t, "")
-
-	var got *GetOptions
-
-	cmd := NewCmdGet(f, func(opts *GetOptions) error {
-		got = opts
-		return nil
-	})
-	cmd.SetArgs([]string{"run-x", "--wait"})
-
-	if err := cmd.Execute(); err != nil {
+	got, err := cmdtest.RunCmd(t, NewCmdGet, []string{"run-x", "--wait"})
+	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
 
@@ -171,5 +134,42 @@ func TestGet_WithoutWaitAFailedRunExitsZero(t *testing.T) {
 
 	if err := execute(f, "run-x"); err != nil {
 		t.Fatalf("plain get reports the run, it does not judge it: %v", err)
+	}
+}
+
+// TestGet_ReasonOnARunningRun: a run still in progress has no tasks, and the
+// result says why in both views.
+func TestGet_ReasonOnARunningRun(t *testing.T) {
+	t.Parallel()
+
+	var note bytes.Buffer
+	if err := output.RenderNoTaskData(&note, portal.TasksRunNotFinished); err != nil {
+		t.Fatal(err)
+	}
+
+	reason := `"tasksUnavailable": "` + portal.TasksRunNotFinished + `"`
+
+	cases := map[string]struct {
+		args         []string
+		want, absent string
+	}{
+		"json":  {[]string{"run-x", "--reason", "-o", "json"}, reason, `"tasks"`},
+		"table": {[]string{"run-x", "--reason"}, note.String(), "Tasks:"},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			f, out := newFactory(t, runJSON("Unknown", "Running"))
+
+			if err := execute(f, tc.args...); err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+
+			if !strings.Contains(out.String(), tc.want) || strings.Contains(out.String(), tc.absent) {
+				t.Errorf("want %q and no %q, got:\n%s", tc.want, tc.absent, out.String())
+			}
+		})
 	}
 }

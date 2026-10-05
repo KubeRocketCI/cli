@@ -126,12 +126,13 @@ binary. `--label` must stay absent: `build` resolves labels itself.
 
 | ID         | Command                                                     | Env     | Setup | Expect                                                                                                                                  |
 |------------|-------------------------------------------------------------|---------|-------|-------------------------------------------------------------------------------------------------------------------------------------------|
-| PROJ-B-01  | `krci project build --help`                                 | offline | —     | `exit=0; stdout~/--branch string/; stdout~/--param stringArray/; stdout~/--dry-run/; stdout~/-o, --output string/; stdout!~/--label/`      |
+| PROJ-B-01  | `krci project build --help`                                 | offline | —     | `exit=0; stdout~/--branch string/; stdout~/--param stringArray/; stdout~/--dry-run/; stdout~/YAML by default/; stdout~/-o, --output string/; stdout!~/--label/` |
 | PROJ-B-02  | `krci project build`                                        | offline | —     | `exit=1; stderr~/requires a project name/`                                                                                               |
 | PROJ-B-03  | `krci project build My.App`                                 | offline | —     | `exit=1; stderr~/lowercase alphanumeric/`                                                                                                |
 | PROJ-B-04  | `krci project build my-app --param git-source-url=x`        | offline | —     | `exit=1; stderr~/managed|set from the project/`                                                                                          |
 | PROJ-B-05  | `krci project build my-app --dry-run -o table`              | offline | —     | `exit=1; stderr~/--dry-run cannot use -o table/`                                                                                         |
 | PROJ-B-06  | `krci project build my-app -o yaml`                         | offline | —     | `exit=1; stderr~/-o yaml requires --dry-run/`                                                                                            |
+| PROJ-B-16  | `krci project build My.App -o json`                         | offline | —     | `exit=1; stdout_empty; stderr~/lowercase alphanumeric/` _(a rejected argument prints no envelope)_                                        |
 
 ## 8. `project build` (env: `portal`)
 
@@ -145,6 +146,8 @@ without a create, and the error rows are rejected before a create.
 | PROJ-B-09  | `krci project build {{PROJECT_MISSING}}`                                                        | portal | name does not exist                                    | `exit=1; stderr~/not found/`                                                                              |
 | PROJ-B-10  | `krci project build {{PROJECT_BUILD}} --branch does-not-exist-branch-xyz`                       | portal | project exists, branch does not                        | `exit=1; stderr~/not found/`                                                                              |
 | PROJ-B-11  | `krci project build {{PROJECT_NOT_READY}}`                                                      | portal | CodebaseBranch status is not `created`                 | `exit=1; stderr~/not ready/`                                                                              |
+| PROJ-B-14  | `krci project build {{PROJECT_MISSING}} -o json`                                                | portal | name does not exist                                    | `exit=1; stdout_json.schemaVersion=1; stdout_json.error.message:exists; stdout~/not found/; stderr~/not found/` |
+| PROJ-B-15  | `krci project build {{PROJECT_BUILD}} --dry-run`                                                | portal | buildable project, no `-o`                             | `exit=0; stdout~/generateName: build-/; stdout!~/schemaVersion/` _(YAML is the default of `--dry-run`)_ |
 
 ## 9. `project build` — create then reject (env: `portal`, serial)
 

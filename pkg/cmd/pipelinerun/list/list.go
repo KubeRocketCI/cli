@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"charm.land/lipgloss/v2"
 	"github.com/spf13/cobra"
@@ -73,7 +74,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
   krci pipelinerun list --project edp-tekton --pr 44 -o json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := opts.validate(cmd.Flags().Changed("deployment"), cmd.Flags().Changed("env")); err != nil {
+			flags := cmd.Flags()
+			if err := opts.validate(flags.Changed("status"), flags.Changed("deployment"), flags.Changed("env")); err != nil {
 				return err
 			}
 
@@ -90,18 +92,26 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVar(&opts.Author, "author", "", "Filter by author name")
 	cmd.Flags().StringVar(&opts.Branch, "branch", "", "Filter by source branch")
 	cmd.Flags().StringVar(&opts.Type, "type", "", "Filter by pipeline type (review, build, deploy, clean, ...)")
-	cmd.Flags().StringVar(&opts.Status, "status", "", "Filter by status (succeeded, failed, running, timeout, cancelled)")
+	cmd.Flags().StringVar(&opts.Status, "status", "",
+		"Filter by status ("+strings.Join(portal.PipelineRunStatusKeywords(), ", ")+")")
 	cmd.Flags().StringVar(&opts.Deployment, "deployment", "", "Filter runs of a deployment (deploy and clean runs)")
 	cmd.Flags().StringVar(&opts.Env, "env", "", "Filter runs of one environment of --deployment")
-	cmd.Flags().BoolVar(&opts.IncludeLogs, "logs", false, "Include pipeline run logs")
-	cmd.Flags().BoolVar(&opts.IncludeReason, "reason", false, "Show task tree and failure diagnosis")
-	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "", "Output format: table, json (default: auto-detect)")
+	cmd.Flags().BoolVar(&opts.IncludeLogs, "logs", false, pipelinerun.LogsFlagUsage)
+	cmd.Flags().BoolVar(&opts.IncludeReason, "reason", false, pipelinerun.ReasonFlagUsage)
+	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "", "Output format: table, json (default: table)")
 
 	return cmd
 }
 
-// validate rejects --env without --deployment and empty or non-DNS-1123 values.
-func (opts *ListOptions) validate(deploymentSet, envSet bool) error {
+// validate rejects an unknown --status, --env without --deployment, and empty
+// or non-DNS-1123 values.
+func (opts *ListOptions) validate(statusSet, deploymentSet, envSet bool) error {
+	if statusSet {
+		if err := portal.ValidatePipelineRunStatus("--status", opts.Status); err != nil {
+			return err
+		}
+	}
+
 	if envSet && !deploymentSet {
 		return errors.New("--env requires --deployment: an env is a stage of a deployment")
 	}
@@ -147,7 +157,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		IncludeReason: opts.IncludeReason,
 	})
 	if err != nil {
-		return pipelinerun.HandleAuthError(err)
+		return cmdutil.HandleAuthError(err)
 	}
 
 	if opts.IncludeReason {
@@ -172,7 +182,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 			return output.RenderReason(opts.IO.Out, result)
 		}
 
-		if err := output.RenderNoTaskData(opts.IO.Out, result.PipelineRuns[0].Status); err != nil {
+		if err := output.RenderNoTaskData(opts.IO.Out, result.TasksUnavailable); err != nil {
 			return err
 		}
 	}
