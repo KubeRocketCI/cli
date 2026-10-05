@@ -31,6 +31,10 @@ spec:
       type: string
       default: "false"
       description: Set to "true" to make the run exit non-zero (deterministic failure for tests).
+    - name: sleep-seconds
+      type: string
+      default: "0"
+      description: Seconds to keep the run in progress after the echo (a run that is still running for tests).
   tasks:
     - name: echo
       params:
@@ -42,12 +46,15 @@ spec:
           value: $(params.count)
         - name: should-fail
           value: $(params.should-fail)
+        - name: sleep-seconds
+          value: $(params.sleep-seconds)
       taskSpec:
         params:
           - name: message
           - name: revision
           - name: count
           - name: should-fail
+          - name: sleep-seconds
         steps:
           - name: hello
             image: docker.io/library/busybox:1.36
@@ -60,6 +67,8 @@ spec:
                 value: $(params.count)
               - name: SHOULD_FAIL
                 value: $(params.should-fail)
+              - name: SLEEP_SECONDS
+                value: $(params.sleep-seconds)
             script: |
               #!/bin/sh
               set -eu
@@ -68,6 +77,10 @@ spec:
                 echo "[$i] $MESSAGE @ $REVISION"
                 i=$((i + 1))
               done
+              if [ "$SLEEP_SECONDS" -gt 0 ]; then
+                echo "sleeping ${SLEEP_SECONDS}s"
+                sleep "$SLEEP_SECONDS"
+              fi
               if [ "$SHOULD_FAIL" = "true" ]; then
                 echo "SHOULD_FAIL=true -> exiting 1"
                 exit 1

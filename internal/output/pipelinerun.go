@@ -110,11 +110,12 @@ func RenderRunInfo(w io.Writer, run *portal.PipelineRunInfo) error {
 	return renderRunHeader(w, run)
 }
 
-// RenderNoTaskData writes a dim status message for --reason when no task data is available.
-func RenderNoTaskData(w io.Writer, status string) error {
+// RenderNoTaskData writes a dim note for --reason when no task data is
+// available; reason is the TasksUnavailable value of the result.
+func RenderNoTaskData(w io.Writer, reason string) error {
 	var msg string
-	if status == portal.StatusRunning {
-		msg = "Pipeline is still running. Task data will appear here as tasks complete."
+	if reason == portal.TasksRunNotFinished {
+		msg = "Pipeline run has not finished yet. Task data is available after it finishes."
 	} else {
 		msg = "Task data is not available. The run may not yet be indexed in Tekton Results."
 	}

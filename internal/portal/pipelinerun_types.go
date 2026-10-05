@@ -1,6 +1,9 @@
 package portal
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/internal/ptr"
 )
@@ -67,19 +70,56 @@ var statusDisplay = map[string]string{
 	resultStatusUnknown:   StatusRunning,
 }
 
-// statusMapping pairs the display label and Tekton Results CEL numeric value
-// for each user-facing status filter keyword.
-type statusMapping struct {
+// statusFilter pairs a user-facing status filter keyword with the display
+// label and the Tekton Results CEL numeric value it selects.
+type statusFilter struct {
+	keyword string
 	display string
 	cel     string
 }
 
-var statusMappings = map[string]statusMapping{
-	"succeeded": {display: StatusSucceeded, cel: "1"},
-	"failed":    {display: StatusFailed, cel: "2"},
-	"timeout":   {display: StatusTimeout, cel: "3"},
-	"cancelled": {display: StatusCancelled, cel: "4"},
-	"running":   {display: StatusRunning, cel: "0"},
+// statusFilters is in the order help and error messages list the keywords.
+var statusFilters = []statusFilter{
+	{keyword: "succeeded", display: StatusSucceeded, cel: "1"},
+	{keyword: "failed", display: StatusFailed, cel: "2"},
+	{keyword: "running", display: StatusRunning, cel: "0"},
+	{keyword: "timeout", display: StatusTimeout, cel: "3"},
+	{keyword: "cancelled", display: StatusCancelled, cel: "4"},
+}
+
+// findStatusFilter looks a status filter keyword up, ignoring case.
+func findStatusFilter(keyword string) (statusFilter, bool) {
+	keyword = strings.ToLower(keyword)
+
+	for _, f := range statusFilters {
+		if f.keyword == keyword {
+			return f, true
+		}
+	}
+
+	return statusFilter{}, false
+}
+
+// PipelineRunStatusKeywords returns the keywords the status filter accepts.
+func PipelineRunStatusKeywords() []string {
+	keywords := make([]string, len(statusFilters))
+	for i, f := range statusFilters {
+		keywords[i] = f.keyword
+	}
+
+	return keywords
+}
+
+// ValidatePipelineRunStatus rejects a status filter keyword that is not one of
+// PipelineRunStatusKeywords; case is ignored. name is how the error refers to
+// the value, such as the flag that carries it.
+func ValidatePipelineRunStatus(name, keyword string) error {
+	if _, ok := findStatusFilter(keyword); ok {
+		return nil
+	}
+
+	return fmt.Errorf("invalid %s=%s; must be one of %s",
+		name, keyword, strings.Join(PipelineRunStatusKeywords(), ", "))
 }
 
 func displayStatus(resultStatus string) string {
@@ -229,4 +269,16 @@ type PipelineRunListResult struct {
 	PipelineRuns []PipelineRunInfo `json:"pipelineRuns"`
 	Logs         string            `json:"logs,omitempty"`
 	Tasks        []TaskRunInfo     `json:"tasks,omitempty"`
+	// TasksUnavailable is the reason a --reason result carries no Tasks.
+	TasksUnavailable string `json:"tasksUnavailable,omitempty"`
 }
+
+// Values of PipelineRunListResult.TasksUnavailable.
+const (
+	// TasksRunNotFinished: the run is pending or still running, and task data
+	// is read from Tekton Results once it has finished.
+	TasksRunNotFinished = "run_not_finished"
+	// TasksNotIndexed: the run has finished and Tekton Results has no task
+	// data for it yet.
+	TasksNotIndexed = "not_indexed"
+)

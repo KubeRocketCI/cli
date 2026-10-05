@@ -35,23 +35,15 @@ func Render[T any](ios *iostreams.IOStreams, outputFormat string, data T, render
 	}
 }
 
-// HandleError promotes portal.ErrUnauthorized to the "run krci auth login"
-// message; translates portal.ErrUpstreamUnavailable into a user-facing
-// "upstream unavailable (dependency-track)" hint; and — when `-o json` is
-// selected — also writes a structured error envelope to stdout so scripting
-// consumers can read it alongside the exit-1 signal.
+// HandleError translates portal.ErrUpstreamUnavailable into a user-facing
+// "upstream unavailable (dependency-track)" hint, then hands the error to
+// cmdutil.HandleError with the sca envelope version.
 func HandleError(ios *iostreams.IOStreams, outputFormat string, err error) error {
-	if errors.Is(err, portal.ErrUnauthorized) {
-		err = cmdutil.ErrAuthRequired(err)
-	} else if errors.Is(err, portal.ErrUpstreamUnavailable) {
+	if errors.Is(err, portal.ErrUpstreamUnavailable) {
 		err = fmt.Errorf("upstream unavailable (dependency-track): %w", err)
 	}
 
-	if output.ResolveFormat(outputFormat) == output.FormatJSON {
-		_ = output.PrintJSONErrorEnvelope(ios.Out, SchemaVersion, err)
-	}
-
-	return err
+	return cmdutil.HandleError(ios, outputFormat, SchemaVersion, err)
 }
 
 // PrintTable is the shared TTY/non-TTY dispatcher for sca verbs that show a

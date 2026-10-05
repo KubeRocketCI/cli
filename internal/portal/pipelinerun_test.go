@@ -210,6 +210,50 @@ func TestMatchesStatus(t *testing.T) {
 	}
 }
 
+// --- status filter keywords ---
+
+func TestValidatePipelineRunStatus(t *testing.T) {
+	t.Parallel()
+
+	for _, keyword := range append(PipelineRunStatusKeywords(), "Failed", "TIMEOUT") {
+		assert.NoError(t, ValidatePipelineRunStatus("--status", keyword), "keyword %q", keyword)
+	}
+
+	for _, keyword := range []string{"bogus", ""} {
+		assert.EqualError(t, ValidatePipelineRunStatus("--status", keyword),
+			"invalid --status="+keyword+"; must be one of succeeded, failed, running, timeout, cancelled")
+	}
+}
+
+// TestBuildCELFilter_Status pins the Tekton Results status number of every
+// keyword; case is ignored.
+func TestBuildCELFilter_Status(t *testing.T) {
+	t.Parallel()
+
+	want := map[string]string{"succeeded": "1", "failed": "2", "running": "0", "timeout": "3", "cancelled": "4"}
+
+	for _, keyword := range PipelineRunStatusKeywords() {
+		require.Contains(t, want, keyword)
+		assert.Equal(t, "summary.status == "+want[keyword], buildCELFilter(PipelineRunFilter{Status: keyword}))
+	}
+
+	assert.Equal(t, "summary.status == 2", buildCELFilter(PipelineRunFilter{Status: "Failed"}))
+	assert.Empty(t, buildCELFilter(PipelineRunFilter{}))
+}
+
+func TestList_UnknownStatusIsAnError(t *testing.T) {
+	t.Parallel()
+
+	s := newMockPortal(t, pathHandlers{
+		"/": func(_ http.ResponseWriter, r *http.Request) {
+			t.Errorf("the portal must not be called, got %s", r.URL.Path)
+		},
+	})
+
+	_, err := s.List(context.Background(), PipelineRunListOptions{Filter: PipelineRunFilter{Status: "bogus"}})
+	assert.EqualError(t, err, "invalid status=bogus; must be one of succeeded, failed, running, timeout, cancelled")
+}
+
 // --- buildCELFilter / stageEnv ---
 
 func TestBuildCELFilter_DeploymentAndEnv(t *testing.T) {
@@ -1374,4 +1418,74 @@ func TestList_CreationTimestampFallbackFromWireBytes(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result.PipelineRuns, 1)
 	assert.Equal(t, "2024-01-01T09:58:00Z", result.PipelineRuns[0].StartTime)
+}
+
+// --- TasksUnavailable ---
+
+// liveRun is a resources/list reply with one run; conditions is the JSON of
+// its status.conditions, empty for a run the reconciler has not started.
+func liveRun(conditions string) string {
+	status := `{"startTime":"2024-01-01T10:00:00Z"}`
+	if conditions != "" {
+		status = `{"startTime":"2024-01-01T10:00:00Z","conditions":[` + conditions + `]}`
+	}
+
+	return `{"apiVersion":"v1","kind":"List","metadata":{},"items":[{"metadata":{"name":"run-x"},"status":` + status + `}]}`
+}
+
+// TestTasksUnavailable covers the reasons Get and List give for a --reason
+// result without task data, and that only --reason sets one.
+func TestTasksUnavailable(t *testing.T) {
+	t.Parallel()
+
+	const (
+		running   = `{"type":"Succeeded","status":"Unknown","reason":"Running"}`
+		succeeded = `{"type":"Succeeded","status":"True","reason":"Succeeded"}`
+		empty     = `{"results":[]}`
+		// A Tekton Results record of run-x without a summary: no task data to read.
+		record = `{"results":[{"name":"results/ns/records/uuid-1","uid":"uuid-1",
+			"create_time":"2024-01-01T10:00:00Z","update_time":"2024-01-01T10:05:00Z",
+			"annotations":{"object.metadata.name":"run-x"}}]}`
+	)
+
+	tests := []struct {
+		name       string
+		conditions string
+		results    string // reply of Tekton Results
+		reason     bool
+		want       string
+	}{
+		{name: "running", conditions: running, results: empty, reason: true, want: TasksRunNotFinished},
+		{name: "not started", results: empty, reason: true, want: TasksRunNotFinished},
+		{name: "finished, not indexed", conditions: succeeded, results: empty, reason: true, want: TasksNotIndexed},
+		{name: "finished, no task data", conditions: succeeded, results: record, reason: true, want: TasksNotIndexed},
+		{name: "running, logs only", conditions: running, results: empty},
+		{name: "finished, logs only", conditions: succeeded, results: empty},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			s := newMockPortal(t, pathHandlers{
+				"/v1/resources/list": func(w http.ResponseWriter, _ *http.Request) {
+					writeJSONOK(w, liveRun(tt.conditions))
+				},
+				"/v1/pipeline-runs": func(w http.ResponseWriter, _ *http.Request) {
+					writeJSONOK(w, tt.results)
+				},
+			})
+
+			got, err := s.Get(context.Background(), "run-x",
+				PipelineRunGetOptions{IncludeLogs: !tt.reason, IncludeReason: tt.reason})
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got.TasksUnavailable, "Get")
+
+			listed, err := s.List(context.Background(),
+				PipelineRunListOptions{IncludeLogs: !tt.reason, IncludeReason: tt.reason})
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, listed.TasksUnavailable, "List")
+			assert.Empty(t, listed.Tasks)
+		})
+	}
 }

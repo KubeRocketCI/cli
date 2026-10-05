@@ -57,7 +57,7 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "", "Output format: table, json (default: auto-detect)")
+	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "", "Output format: table, json (default: table)")
 
 	return cmd
 }
@@ -81,11 +81,7 @@ func getRun(ctx context.Context, opts *GetOptions) error {
 			return fmt.Errorf("deployment %q not found", opts.Name)
 		}
 
-		if errors.Is(err, portal.ErrUnauthorized) {
-			return cmdutil.ErrAuthRequired(err)
-		}
-
-		return err
+		return cmdutil.HandleAuthError(err)
 	}
 
 	return output.RenderDetail(opts.IO, opts.OutputFormat, detail, output.DetailRenderer[*portal.DeploymentDetail]{

@@ -14,7 +14,9 @@ On error, the envelope is:
 ```
 
 The exit code is `1` on any error. The plain-text error message is also
-written to stderr.
+written to stderr. The envelope is printed for an error met after the flags and
+arguments are validated: no portal configured, no valid session, a Portal
+error. A rejected flag or argument is reported on stderr only.
 
 `schemaVersion` is a fixed string (`"1"` for every verb listed below) so
 scripts can detect future breaking changes by checking the version.
@@ -570,7 +572,6 @@ Common messages:
 | Unknown project (404)       | `project <name> not found`             |
 | Unknown pull request (404)  | `pull request <id> not found`          |
 | Upstream 5xx / network      | `portal returned HTTP 500: <cause>`    |
-| Invalid flag value          | Flag-specific message (e.g. enum list) |
 
 
 ## `krci pipelinerun start`
@@ -648,4 +649,6 @@ All errors exit `1` (per the global rule at the top of this document).
 | Portal upstream 5xx                         | `upstream service unavailable: <cause>`                                                       |
 | Duplicate / malformed `--param` / `--label` | `duplicate parameter '<k>'` / `parameter must be key=value` / `label key must not be empty`   |
 | `--dry-run` with `-o table`                 | `--dry-run cannot use -o table (use -o json or -o yaml)`                                      |
+
+The last two conditions are rejected flags: they are reported on stderr only.
 

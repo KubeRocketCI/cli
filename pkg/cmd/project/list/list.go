@@ -3,7 +3,6 @@ package list
 
 import (
 	"context"
-	"errors"
 
 	"github.com/spf13/cobra"
 
@@ -53,7 +52,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "", "Output format: table, json (default: auto-detect)")
+	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "", "Output format: table, json (default: table)")
 
 	return cmd
 }
@@ -73,11 +72,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 
 	projects, err := svc.List(ctx)
 	if err != nil {
-		if errors.Is(err, portal.ErrUnauthorized) {
-			return cmdutil.ErrAuthRequired(err)
-		}
-
-		return err
+		return cmdutil.HandleAuthError(err)
 	}
 
 	return output.RenderList(opts.IO, opts.OutputFormat, projects, func(isTTY bool) ([]string, [][]string) {

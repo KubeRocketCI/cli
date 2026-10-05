@@ -8,9 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
-	"github.com/KubeRocketCI/cli/internal/portal"
 )
 
 func newBufferedIO() (*iostreams.IOStreams, *bytes.Buffer) {
@@ -82,42 +80,6 @@ func TestRender_UnknownFormat(t *testing.T) {
 	}
 }
 
-func TestHandleError_EmitsJSONEnvelope(t *testing.T) {
-	t.Parallel()
-
-	ios, stdout := newBufferedIO()
-	boom := errors.New("boom")
-
-	got := HandleError(ios, "json", boom)
-	if got != boom {
-		t.Errorf("HandleError must return the original error; got %v", got)
-	}
-
-	var env struct {
-		SchemaVersion string `json:"schemaVersion"`
-		Error         struct {
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-	if err := json.Unmarshal(stdout.Bytes(), &env); err != nil {
-		t.Fatalf("invalid JSON: %v", err)
-	}
-	if env.Error.Message != "boom" {
-		t.Errorf("error.message = %q, want boom", env.Error.Message)
-	}
-}
-
-func TestHandleError_TableModeLeavesStdoutUntouched(t *testing.T) {
-	t.Parallel()
-
-	ios, stdout := newBufferedIO()
-
-	_ = HandleError(ios, "table", errors.New("boom"))
-	if stdout.Len() != 0 {
-		t.Errorf("table mode must not touch stdout; got %q", stdout.String())
-	}
-}
-
 func TestRender_TableCallbackReceivesNonTTY(t *testing.T) {
 	t.Parallel()
 
@@ -142,30 +104,6 @@ func TestRender_TableCallbackReceivesNonTTY(t *testing.T) {
 	}
 }
 
-func TestHandleError_PromotesErrUnauthorized(t *testing.T) {
-	t.Parallel()
-
-	ios, _ := newBufferedIO()
-
-	// Pass portal.ErrUnauthorized directly — HandleError must promote it.
-	got := HandleError(ios, "table", portal.ErrUnauthorized)
-	if got == nil {
-		t.Fatal("HandleError must return an error")
-	}
-
-	// ErrAuthRequired wraps its cause, so errors.Is must still find portal.ErrUnauthorized.
-	if !errors.Is(got, portal.ErrUnauthorized) {
-		t.Errorf("returned error should still wrap portal.ErrUnauthorized; got %v", got)
-	}
-
-	// Confirm the promotion adds the expected "authentication required" prefix
-	// (same phrasing produced by cmdutil.ErrAuthRequired).
-	want := cmdutil.ErrAuthRequired(portal.ErrUnauthorized).Error()
-	if got.Error() != want {
-		t.Errorf("promoted error = %q, want %q", got.Error(), want)
-	}
-}
-
 func TestHandleError_JSONWritesErrorEnvelopeAndReturnsSameError(t *testing.T) {
 	t.Parallel()
 
@@ -185,6 +123,9 @@ func TestHandleError_JSONWritesErrorEnvelopeAndReturnsSameError(t *testing.T) {
 	}
 	if err := json.Unmarshal(stdout.Bytes(), &env); err != nil {
 		t.Fatalf("stdout JSON is invalid: %v (raw: %q)", err, stdout.String())
+	}
+	if env.SchemaVersion != SchemaVersion {
+		t.Errorf("schemaVersion = %q, want %q", env.SchemaVersion, SchemaVersion)
 	}
 	if env.Error.Message != "something bad" {
 		t.Errorf("error.message = %q, want %q", env.Error.Message, "something bad")

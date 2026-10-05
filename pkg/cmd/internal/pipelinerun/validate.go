@@ -13,6 +13,21 @@ const (
 	KindLabel     = "label"
 )
 
+// DryRunFlagUsage and OutputFlagUsage are the help texts for `--dry-run` and
+// `-o` of `pipelinerun start` and `project build`.
+const (
+	DryRunFlagUsage = "Render the would-be PipelineRun without creating it " +
+		"(YAML by default; -o json wraps it in the JSON envelope)"
+	OutputFlagUsage = "Output format: table, json, yaml (yaml only with --dry-run, where it is the default)"
+)
+
+// LogsFlagUsage and ReasonFlagUsage are the help texts for `--logs` and
+// `--reason` of `pipelinerun list` and `pipelinerun get`.
+const (
+	LogsFlagUsage   = "Include pipeline run logs (none until the run finishes)"
+	ReasonFlagUsage = "Show task tree and failure diagnosis (none until the run finishes)"
+)
+
 // ValidateOutputAndDryRun enforces the joint contract between -o and --dry-run.
 //
 //   - "", "table", "json"  → ok (table only when not dry-run).

@@ -1,10 +1,12 @@
 package start
 
 import (
+	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/pipelinerun"
 )
 
 var newFactory = cmdtest.NewFactory
@@ -190,4 +192,20 @@ func TestStart_HelpHasExpectedExamples(t *testing.T) {
 			t.Errorf("help text missing %q", fragment)
 		}
 	}
+}
+
+// TestStart_ErrorOutput: an error of the run, a Portal reply or a manifest the
+// Portal left empty, reaches stdout as the JSON error envelope under -o json
+// and only then.
+func TestStart_ErrorOutput(t *testing.T) {
+	t.Parallel()
+
+	notFound := cmdtest.PortalReply(http.StatusNotFound,
+		`{"error":{"code":"NOT_FOUND","reason":"pipeline_not_found","message":"Not Found"}}`)
+	cmdtest.CheckErrorOutput(t, NewCmdStart, notFound, []string{"ghost"},
+		pipelinerun.SchemaVersion, "pipeline 'ghost' not found")
+
+	emptyManifest := cmdtest.PortalReply(http.StatusOK, `{"kind":"dryRun","manifest":null}`)
+	cmdtest.CheckErrorOutput(t, NewCmdStart, emptyManifest, []string{"ghost", "--dry-run"},
+		pipelinerun.SchemaVersion, "portal returned empty dry-run manifest")
 }

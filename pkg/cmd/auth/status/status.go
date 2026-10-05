@@ -170,11 +170,7 @@ func classifyTokenError(err error) error {
 // consumers get a structured error next to the exit-1 signal, then returns
 // err for the root command to print and exit on.
 func (opts *StatusOptions) fail(err error) error {
-	if output.ResolveFormat(opts.OutputFormat) == output.FormatJSON {
-		_ = output.PrintJSONErrorEnvelope(opts.IO.Out, SchemaVersion, err)
-	}
-
-	return err
+	return cmdutil.PrintError(opts.IO, opts.OutputFormat, SchemaVersion, err)
 }
 
 // render prints the authenticated state. haveInfo is false when the token's

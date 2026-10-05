@@ -36,18 +36,18 @@ build-keycloak-operator-mas...   Succeeded   keycloak-op...   331   bot        b
 
 All filters combine with AND logic.
 
-| Flag           | Description                                                          |
-|----------------|----------------------------------------------------------------------|
-| `--project`    | Filter by project name                                               |
-| `--pr`         | Filter by pull request number                                        |
-| `--author`     | Filter by author name                                                |
-| `--branch`     | Filter by source branch                                              |
-| `--type`       | `review`, `build`, `deploy`, `clean`, `release`, `security`, `tests` |
-| `--status`     | `succeeded`, `failed`, `running`, `timeout`, `cancelled`             |
-| `--deployment` | Runs of a deployment (deploy and clean runs)                         |
-| `--env`        | Runs of one environment of `--deployment`                            |
-| `--logs`       | Append logs for the most recent matching run                         |
-| `--reason`     | Show task tree + failed step + logs for the most recent run          |
+| Flag           | Description                                                                          |
+|----------------|--------------------------------------------------------------------------------------|
+| `--project`    | Filter by project name                                                               |
+| `--pr`         | Filter by pull request number                                                        |
+| `--author`     | Filter by author name                                                                |
+| `--branch`     | Filter by source branch                                                              |
+| `--type`       | `review`, `build`, `deploy`, `clean`, `release`, `security`, `tests`                 |
+| `--status`     | `succeeded`, `failed`, `running`, `timeout`, `cancelled`                             |
+| `--deployment` | Runs of a deployment (deploy and clean runs)                                         |
+| `--env`        | Runs of one environment of `--deployment`                                            |
+| `--logs`       | Append logs for the most recent matching run (none until it finishes)                |
+| `--reason`     | Show task tree + failed step + logs for the most recent run (none until it finishes) |
 
 Deploy and clean runs carry no project: select them with `--deployment` and
 `--env`, the names `krci env get <deployment> <env>` takes, and add
@@ -141,12 +141,12 @@ foo-build-run-zhqvj   Pending   -         -    -        build   2026-05-07T06:14
 
 ### Flags
 
-| Flag           | Description                                                                  |
-|----------------|------------------------------------------------------------------------------|
-| `--param`      | Pipeline parameter as `key=value` (repeatable; split on first `=`)           |
-| `--label`      | Label to attach to the resulting PipelineRun as `key=value` (repeatable)     |
-| `--dry-run`    | Render the would-be PipelineRun without creating it (needs `-o json`/`yaml`) |
-| `-o, --output` | `table` (default), `json`, or `yaml` (yaml only with `--dry-run`)            |
+| Flag           | Description                                                                                               |
+|----------------|-----------------------------------------------------------------------------------------------------------|
+| `--param`      | Pipeline parameter as `key=value` (repeatable; split on first `=`)                                        |
+| `--label`      | Label to attach to the resulting PipelineRun as `key=value` (repeatable)                                  |
+| `--dry-run`    | Render the would-be PipelineRun without creating it (YAML by default; `-o json` wraps it in the envelope) |
+| `-o, --output` | `table` (default), `json`, or `yaml` (only with `--dry-run`, where it is the default)                     |
 
 > **Params without a default** are submitted with `value: ""` (or `[]` for
 > arrays). Pass `--param k=v` for any values your pipeline actually needs.
@@ -189,7 +189,8 @@ krci pipelinerun start foo-build -o json
 ```
 
 For `--dry-run`, `data` is the rendered PipelineRun manifest itself instead
-of the result row.
+of the result row. An error prints the
+[error envelope](json-schemas.md#error-envelope) instead.
 
 ### Finding the run you just started
 
@@ -223,6 +224,13 @@ Failed: sonar
 Logs: sonar
   [sonar-scanner] ERROR: QUALITY GATE STATUS: FAILED
 ```
+
+Task data and logs exist only for a finished run. Until the run finishes,
+`--reason` prints a note instead of the task tree, the JSON result carries
+`tasksUnavailable` instead of `tasks`, and `--logs` adds nothing. `list` does
+not fall back to an older run: to diagnose the last finished failure add
+`--status failed`, and to wait for a run use
+[`get --wait --reason`](#waiting-for-a-run---wait).
 
 ## JSON output (`list` / `get`)
 
@@ -259,6 +267,28 @@ krci run list --project keycloak-operator -o json
 ```
 
 `get` returns the same `pipelineRuns` envelope with a single-element array.
+
+`--reason` adds `tasks`, the task tree of the first run. When there is no task
+data, `tasks` is omitted and `tasksUnavailable` gives the reason:
+
+| `tasksUnavailable` | Meaning                                                              |
+|--------------------|----------------------------------------------------------------------|
+| `run_not_finished` | The run is pending or still running; task data is read once it ends  |
+| `not_indexed`      | The run has finished and Tekton Results has no task data for it yet  |
+
+```json
+{
+  "pipelineRuns": [
+    {
+      "name": "build-keycloak-operator-master-x7k2p",
+      "status": "Running",
+      "project": "keycloak-operator",
+      "type": "build"
+    }
+  ],
+  "tasksUnavailable": "run_not_finished"
+}
+```
 
 `results` maps the run's pipeline results by name; a value keeps its Tekton
 type (string, array or object). The field is omitted when the run has no

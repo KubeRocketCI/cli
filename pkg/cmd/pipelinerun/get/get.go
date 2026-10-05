@@ -81,11 +81,11 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.IncludeLogs, "logs", false, "Include pipeline run logs")
-	cmd.Flags().BoolVar(&opts.IncludeReason, "reason", false, "Show task tree and failure diagnosis")
+	cmd.Flags().BoolVar(&opts.IncludeLogs, "logs", false, pipelinerun.LogsFlagUsage)
+	cmd.Flags().BoolVar(&opts.IncludeReason, "reason", false, pipelinerun.ReasonFlagUsage)
 	cmd.Flags().BoolVar(&opts.Wait, "wait", false, "Wait until the run finishes; exit 1 unless it succeeded")
 	cmd.Flags().DurationVar(&opts.Timeout, "timeout", defaultWaitTimeout, "Maximum time to wait with --wait")
-	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "", "Output format: table, json (default: auto-detect)")
+	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "", "Output format: table, json (default: table)")
 
 	return cmd
 }
@@ -168,7 +168,7 @@ func fetchRun(
 	case errors.Is(err, portal.ErrNotFound):
 		return nil, fmt.Errorf("pipeline run %q not found", opts.Name)
 	default:
-		return nil, pipelinerun.HandleAuthError(err)
+		return nil, cmdutil.HandleAuthError(err)
 	}
 }
 
@@ -203,7 +203,7 @@ func renderRun(opts *GetOptions, result *portal.PipelineRunListResult) error {
 			return output.RenderReason(opts.IO.Out, result)
 		}
 
-		if err := output.RenderNoTaskData(opts.IO.Out, run.Status); err != nil {
+		if err := output.RenderNoTaskData(opts.IO.Out, result.TasksUnavailable); err != nil {
 			return err
 		}
 	}

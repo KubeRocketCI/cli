@@ -79,15 +79,6 @@ func TestRender_UnknownFormatErrors(t *testing.T) {
 	}
 }
 
-func TestHandleError_UnauthorizedPromotes(t *testing.T) {
-	t.Parallel()
-	ios, _ := newStreams()
-	got := HandleError(ios, "", portal.ErrUnauthorized)
-	if got == nil || !strings.Contains(got.Error(), "krci auth login") {
-		t.Errorf("expected auth-login message, got %v", got)
-	}
-}
-
 func TestHandleError_UpstreamUnavailableAnnotates(t *testing.T) {
 	t.Parallel()
 	ios, _ := newStreams()
@@ -119,15 +110,6 @@ func TestHandleError_JSONEnvelopePrinted(t *testing.T) {
 	}
 	if env.Error.Message != "kaboom" {
 		t.Errorf("error.message = %q", env.Error.Message)
-	}
-}
-
-func TestHandleError_PlainTableFormatDoesNotEmitJSONEnvelope(t *testing.T) {
-	t.Parallel()
-	ios, out := newStreams()
-	_ = HandleError(ios, "table", errors.New("kaboom"))
-	if out.Len() != 0 {
-		t.Errorf("table format must not write JSON envelope to stdout, got %q", out.String())
 	}
 }
 
