@@ -237,30 +237,9 @@ func (s *PipelineRunService) Get(
 		return s.getFromResults(ctx, name, opts)
 	}
 
-	if !isFinishedStatus(k8sResult.PipelineRuns[0].Status) {
-		// Not finished: logs/reason are not available from Tekton Results yet.
-		if opts.IncludeReason {
-			k8sResult.TasksUnavailable = TasksRunNotFinished
-		}
-
-		return k8sResult, nil
-	}
-
-	// Pipeline completed but still visible in K8s. Try Tekton Results for full expansion.
 	if opts.IncludeLogs || opts.IncludeReason {
-		tektonResult, tektonErr := s.getFromResults(ctx, name, opts)
-		if tektonErr == nil {
-			tektonResult.PipelineRuns[0].Results = k8sResult.PipelineRuns[0].Results
-
-			return tektonResult, nil
-		}
-
-		if !errors.Is(tektonErr, ErrNotFound) {
-			return nil, tektonErr
-		}
-		// ErrNotFound: run not yet indexed in Tekton Results; fall through to K8s result.
-		if opts.IncludeReason {
-			k8sResult.TasksUnavailable = TasksNotIndexed
+		if err := s.attachExpansion(ctx, k8sResult, opts); err != nil {
+			return nil, err
 		}
 	}
 
@@ -414,7 +393,8 @@ func (s *PipelineRunService) List(
 	// UID order, not time order — so resp.Results[0] is frequently an arbitrary old
 	// run. A targeted name lookup via getFromResults guarantees the correct record.
 	if (opts.IncludeLogs || opts.IncludeReason) && len(allRuns) > 0 {
-		if err := s.attachTopRunExpansion(ctx, result, opts); err != nil {
+		expansion := PipelineRunGetOptions{IncludeLogs: opts.IncludeLogs, IncludeReason: opts.IncludeReason}
+		if err := s.attachExpansion(ctx, result, expansion); err != nil {
 			return nil, err
 		}
 	}
@@ -422,12 +402,13 @@ func (s *PipelineRunService) List(
 	return result, nil
 }
 
-// attachTopRunExpansion fetches logs/tasks for result.PipelineRuns[0] and copies
-// them onto result. A run that has not finished (no Tekton Results record yet)
-// and a run not yet indexed (ErrNotFound) are not errors: with IncludeReason
-// the result carries the cause in TasksUnavailable.
-func (s *PipelineRunService) attachTopRunExpansion(
-	ctx context.Context, result *PipelineRunListResult, opts PipelineRunListOptions,
+// attachExpansion reads the logs/tasks of result.PipelineRuns[0] from Tekton
+// Results into result.Logs, Tasks and TasksUnavailable; the run's own fields
+// are not modified. An unfinished run and ErrNotFound (not yet indexed) are
+// not errors: with IncludeReason, TasksUnavailable carries run_not_finished
+// or not_indexed.
+func (s *PipelineRunService) attachExpansion(
+	ctx context.Context, result *PipelineRunListResult, opts PipelineRunGetOptions,
 ) error {
 	top := result.PipelineRuns[0]
 	if !isFinishedStatus(top.Status) {
@@ -438,10 +419,7 @@ func (s *PipelineRunService) attachTopRunExpansion(
 		return nil
 	}
 
-	expanded, err := s.getFromResults(ctx, top.Name, PipelineRunGetOptions{
-		IncludeLogs:   opts.IncludeLogs,
-		IncludeReason: opts.IncludeReason,
-	})
+	expanded, err := s.getFromResults(ctx, top.Name, opts)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			if opts.IncludeReason {
@@ -967,7 +945,7 @@ func mapPipelineRunInfo(r *tektonResult) PipelineRunInfo {
 
 	status := ""
 	if r.Summary != nil {
-		status = displayStatus(r.Summary.Status)
+		status = summaryStatus(r.Summary)
 	}
 
 	// Prefer summary.start_time (actual pipeline start) over create_time (when the
@@ -1002,7 +980,7 @@ func mapPipelineRunInfo(r *tektonResult) PipelineRunInfo {
 }
 
 func computeDuration(r *tektonResult, startStr string) string {
-	if r.Summary == nil || r.Summary.Status == resultStatusUnknown {
+	if r.Summary == nil || !r.Summary.finished() {
 		return ""
 	}
 

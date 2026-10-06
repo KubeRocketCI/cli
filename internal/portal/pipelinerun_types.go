@@ -152,6 +152,25 @@ type tektonResultSummary struct {
 	EndTime   string
 }
 
+// finished reports whether the summarised run has ended. The Tekton Results
+// (v0.20) watcher leaves Status UNKNOWN for a run that ended with a reason it
+// does not classify (CouldntGetPipeline, PipelineValidationFailed,
+// CreateRunFailed, ...) and sets EndTime from the run's completionTime
+// regardless.
+func (sum *tektonResultSummary) finished() bool {
+	return sum.Status != resultStatusUnknown || sum.EndTime != ""
+}
+
+// summaryStatus is the display status of a Tekton Results summary. UNKNOWN
+// with an EndTime is Failed: the run ended with Succeeded=False.
+func summaryStatus(sum *tektonResultSummary) string {
+	if sum.Status == resultStatusUnknown && sum.finished() {
+		return StatusFailed
+	}
+
+	return displayStatus(sum.Status)
+}
+
 func resultAnnotation(r *tektonResult, key string) string {
 	if r.Annotations == nil {
 		return ""

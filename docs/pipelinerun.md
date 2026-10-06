@@ -100,6 +100,12 @@ Add `--logs` for full logs or `--reason` for focused failure diagnosis.
 build produced. Only a run still in the cluster carries them: runs read back
 from Tekton Results history show none.
 
+A run still in the cluster is reported with its cluster status even when its
+task tree is read from history. A run read back from history that ended with
+a reason Tekton Results does not classify (`CouldntGetPipeline`,
+`PipelineValidationFailed`, ...) is reported as `Failed`. `--status failed`
+does not select it; the history filter matches the stored status.
+
 ### Waiting for a run (`--wait`)
 
 `--wait` blocks until the run finishes, then prints it the way `get` does,
