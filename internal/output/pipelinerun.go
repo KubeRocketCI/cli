@@ -114,9 +114,13 @@ func RenderRunInfo(w io.Writer, run *portal.PipelineRunInfo) error {
 // available; reason is the TasksUnavailable value of the result.
 func RenderNoTaskData(w io.Writer, reason string) error {
 	var msg string
-	if reason == portal.TasksRunNotFinished {
+
+	switch reason {
+	case portal.TasksRunNotFinished:
 		msg = "Pipeline run has not finished yet. Task data is available after it finishes."
-	} else {
+	case portal.TasksNone:
+		msg = "The run finished without scheduling any task."
+	default:
 		msg = "Task data is not available. The run may not yet be indexed in Tekton Results."
 	}
 

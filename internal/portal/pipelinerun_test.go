@@ -1446,12 +1446,21 @@ func TestTasksUnavailable(t *testing.T) {
 		record = `{"results":[{"name":"results/ns/records/uuid-1","uid":"uuid-1",
 			"create_time":"2024-01-01T10:00:00Z","update_time":"2024-01-01T10:05:00Z",
 			"annotations":{"object.metadata.name":"run-x"}}]}`
+		resultUID = "9f1c6d2e-0000-4000-8000-000000000001"
+		// A Tekton Results record of run-x with a summary; its TaskRun records are served at taskRunsPath.
+		summarised = `{"results":[{"name":"ns/results/` + resultUID + `",
+			"uid":"` + resultUID + `",
+			"create_time":"2024-01-01T10:00:00Z","update_time":"2024-01-01T10:05:00Z",
+			"annotations":{"object.metadata.name":"run-x"},
+			"summary":{"record":"ns/results/` + resultUID + `/records/r1","status":"CANCELLED"}}]}`
+		taskRunsPath = "/v1/pipeline-runs/" + resultUID + "/task-runs"
 	)
 
 	tests := []struct {
 		name       string
 		conditions string
 		results    string // reply of Tekton Results
+		taskRuns   string // reply of the TaskRun records query; "" leaves the route unserved
 		reason     bool
 		want       string
 	}{
@@ -1459,6 +1468,8 @@ func TestTasksUnavailable(t *testing.T) {
 		{name: "not started", results: empty, reason: true, want: TasksRunNotFinished},
 		{name: "finished, not indexed", conditions: succeeded, results: empty, reason: true, want: TasksNotIndexed},
 		{name: "finished, no task data", conditions: succeeded, results: record, reason: true, want: TasksNotIndexed},
+		{name: "finished, no TaskRun", conditions: succeeded, results: summarised, taskRuns: `{"taskRuns":[]}`,
+			reason: true, want: TasksNone},
 		{name: "running, logs only", conditions: running, results: empty},
 		{name: "finished, logs only", conditions: succeeded, results: empty},
 	}
@@ -1467,14 +1478,21 @@ func TestTasksUnavailable(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			s := newMockPortal(t, pathHandlers{
+			handlers := pathHandlers{
 				"/v1/resources/list": func(w http.ResponseWriter, _ *http.Request) {
 					writeJSONOK(w, liveRun(tt.conditions))
 				},
 				"/v1/pipeline-runs": func(w http.ResponseWriter, _ *http.Request) {
 					writeJSONOK(w, tt.results)
 				},
-			})
+			}
+			if tt.taskRuns != "" {
+				handlers[taskRunsPath] = func(w http.ResponseWriter, _ *http.Request) {
+					writeJSONOK(w, tt.taskRuns)
+				}
+			}
+
+			s := newMockPortal(t, handlers)
 
 			got, err := s.Get(context.Background(), "run-x",
 				PipelineRunGetOptions{IncludeLogs: !tt.reason, IncludeReason: tt.reason})

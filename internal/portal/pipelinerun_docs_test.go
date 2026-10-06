@@ -22,7 +22,7 @@ func TestPipelineRunFilters_DocumentedInPipelinerunDocs(t *testing.T) {
 		t.Errorf("status keywords not in docs/pipelinerun.md: %s", row)
 	}
 
-	for _, reason := range []string{TasksRunNotFinished, TasksNotIndexed} {
+	for _, reason := range []string{TasksRunNotFinished, TasksNotIndexed, TasksNone} {
 		if !strings.Contains(docs, "| `"+reason+"`") {
 			t.Errorf("tasksUnavailable reason %q not in docs/pipelinerun.md", reason)
 		}

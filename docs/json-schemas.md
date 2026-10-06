@@ -650,5 +650,5 @@ All errors exit `1` (per the global rule at the top of this document).
 | Duplicate / malformed `--param` / `--label` | `duplicate parameter '<k>'` / `parameter must be key=value` / `label key must not be empty`   |
 | `--dry-run` with `-o table`                 | `--dry-run cannot use -o table (use -o json or -o yaml)`                                      |
 
-The last two conditions are rejected flags: they are reported on stderr only.
+Rejected flags (`--param` / `--label` errors, `--dry-run` with `-o table`) are reported on stderr only; no envelope.
 

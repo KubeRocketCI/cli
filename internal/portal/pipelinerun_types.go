@@ -281,4 +281,7 @@ const (
 	// TasksNotIndexed: the run has finished and Tekton Results has no task
 	// data for it yet.
 	TasksNotIndexed = "not_indexed"
+	// TasksNone: the run has finished and its Tekton Results record lists no
+	// TaskRun; it never scheduled a task.
+	TasksNone = "no_tasks"
 )
