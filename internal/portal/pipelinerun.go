@@ -724,15 +724,7 @@ func (s *PipelineRunService) fetchExpansion(
 	ctx context.Context, r *tektonResult, out *PipelineRunListResult, includeLogs, includeReason bool,
 ) error {
 	if includeReason {
-		if err := s.fetchReason(ctx, r, out); err != nil {
-			return err
-		}
-
-		if len(out.Tasks) == 0 {
-			out.TasksUnavailable = TasksNotIndexed
-		}
-
-		return nil
+		return s.fetchReason(ctx, r, out)
 	}
 
 	if includeLogs {
@@ -788,15 +780,22 @@ func (s *PipelineRunService) fetchLogs(ctx context.Context, r *tektonResult) (st
 	return stripANSI(resp.JSON200.Logs), nil
 }
 
+// fetchReason fills out.Tasks from the TaskRun records of r. Without a
+// readable record it sets TasksUnavailable to TasksNotIndexed; with a record
+// that lists no TaskRun it sets TasksNone.
 func (s *PipelineRunService) fetchReason(
 	ctx context.Context, r *tektonResult, out *PipelineRunListResult,
 ) error {
 	if r.Summary == nil {
+		out.TasksUnavailable = TasksNotIndexed
+
 		return nil
 	}
 
 	resultUID, _ := parseRecordName(r.Summary.Record)
 	if resultUID == "" {
+		out.TasksUnavailable = TasksNotIndexed
+
 		return nil
 	}
 
@@ -819,10 +818,17 @@ func (s *PipelineRunService) fetchReason(
 	}
 
 	if resp.JSON200 == nil {
+		out.TasksUnavailable = TasksNotIndexed
+
 		return nil
 	}
 
 	taskRuns := resp.JSON200.TaskRuns
+	if len(taskRuns) == 0 {
+		out.TasksUnavailable = TasksNone
+
+		return nil
+	}
 
 	sort.Slice(taskRuns, func(i, j int) bool {
 		return ptr.Deref(taskRuns[i].Status.StartTime, "") < ptr.Deref(taskRuns[j].Status.StartTime, "")

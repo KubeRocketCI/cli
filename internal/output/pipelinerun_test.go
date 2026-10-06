@@ -108,6 +108,7 @@ func TestRenderNoTaskData(t *testing.T) {
 	notes := map[string]string{
 		portal.TasksRunNotFinished: "Pipeline run has not finished yet. Task data is available after it finishes.\n",
 		portal.TasksNotIndexed:     "Task data is not available. The run may not yet be indexed in Tekton Results.\n",
+		portal.TasksNone:           "The run finished without scheduling any task.\n",
 	}
 
 	for reason, want := range notes {

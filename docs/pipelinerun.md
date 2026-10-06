@@ -275,6 +275,7 @@ data, `tasks` is omitted and `tasksUnavailable` gives the reason:
 |--------------------|----------------------------------------------------------------------|
 | `run_not_finished` | The run is pending or still running; task data is read once it ends  |
 | `not_indexed`      | The run has finished and Tekton Results has no task data for it yet  |
+| `no_tasks`         | The run has finished and its record lists no TaskRun; it never scheduled a task (for example cancelled while pending, or rejected before the first task) |
 
 ```json
 {
