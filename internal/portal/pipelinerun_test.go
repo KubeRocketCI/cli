@@ -654,6 +654,36 @@ func TestMapPipelineRunInfo_FallsBackToCreateTime(t *testing.T) {
 	})
 }
 
+// TestMapPipelineRunInfo_UnclassifiedTerminalReasonIsFailed: UNKNOWN status
+// with an end_time is Failed; without an end_time it is Running with no
+// Duration.
+func TestMapPipelineRunInfo_UnclassifiedTerminalReasonIsFailed(t *testing.T) {
+	t.Parallel()
+
+	record := func(endTime string) *tektonResult {
+		return &tektonResult{
+			UID:        "uuid-1",
+			Name:       "results/ns/records/r1",
+			CreateTime: "2024-01-01T10:00:00Z",
+			UpdateTime: "2024-01-01T10:00:30Z",
+			Summary: &tektonResultSummary{
+				Record:    "results/ns/records/r1",
+				Status:    "UNKNOWN",
+				StartTime: "2024-01-01T10:00:00Z",
+				EndTime:   endTime,
+			},
+		}
+	}
+
+	inProgress := mapPipelineRunInfo(record(""))
+	assert.Equal(t, StatusRunning, inProgress.Status)
+	assert.Empty(t, inProgress.Duration, "update_time must not pose as the end of a run still in progress")
+
+	ended := mapPipelineRunInfo(record("2024-01-01T10:00:10Z"))
+	assert.Equal(t, StatusFailed, ended.Status)
+	assert.Equal(t, "10s", ended.Duration)
+}
+
 func TestMapPipelineRunInfo_DeploymentAndEnv(t *testing.T) {
 	t.Parallel()
 
@@ -955,6 +985,43 @@ func TestGet_CompletedRunFromResultsKeepsLiveResults(t *testing.T) {
 	require.Len(t, result.PipelineRuns, 1)
 	assert.Equal(t, map[string]any{"VCS_TAG": "build/1.0.0"}, result.PipelineRuns[0].Results,
 		"Tekton Results summaries carry no pipeline results; the live run's must survive")
+}
+
+// TestGet_CompletedRunKeepsLiveStatus: the run's own fields come from K8s
+// even when the expansion is read from Tekton Results, whose summary may
+// classify the run differently.
+func TestGet_CompletedRunKeepsLiveStatus(t *testing.T) {
+	t.Parallel()
+
+	const resultUID = "9f1c6d2e-0000-4000-8000-000000000002"
+
+	s := newMockPortal(t, pathHandlers{
+		"/v1/resources/list": func(w http.ResponseWriter, _ *http.Request) {
+			writeJSONOK(w, liveRunJSON("False", "CouldntGetPipeline"))
+		},
+		"/v1/pipeline-runs": func(w http.ResponseWriter, _ *http.Request) {
+			writeJSONOK(w, `{"results":[{
+				"name":"ns/results/`+resultUID+`","uid":"`+resultUID+`",
+				"create_time":"2024-01-01T10:00:00Z","update_time":"2024-01-01T10:00:05Z",
+				"annotations":{"object.metadata.name":"run-x"},
+				"summary":{"record":"ns/results/`+resultUID+`/records/r1","status":"UNKNOWN",
+					"start_time":"2024-01-01T10:00:00.123456Z","end_time":"2024-01-01T10:00:00.123456Z"}
+			}]}`)
+		},
+		"/v1/pipeline-runs/" + resultUID + "/task-runs": func(w http.ResponseWriter, _ *http.Request) {
+			writeJSONOK(w, `{"taskRuns":[]}`)
+		},
+	})
+
+	result, err := s.Get(context.Background(), "run-x", PipelineRunGetOptions{IncludeReason: true})
+	require.NoError(t, err)
+	require.Len(t, result.PipelineRuns, 1)
+
+	run := result.PipelineRuns[0]
+	assert.Equal(t, StatusFailed, run.Status)
+	assert.Equal(t, "2024-01-01T10:00:00Z", run.StartTime, "live startTime, not the archive's")
+	assert.Equal(t, map[string]any{"VCS_TAG": "build/1.0.0"}, run.Results)
+	assert.Equal(t, TasksNone, result.TasksUnavailable)
 }
 
 func TestGet_CompletedK8sResultsHardErrorPropagates(t *testing.T) {
