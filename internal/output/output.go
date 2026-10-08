@@ -8,6 +8,8 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/table"
@@ -129,23 +131,38 @@ func OrDash(s string) string {
 	return s
 }
 
+// MaxMessageLen caps a free-text MESSAGE column on a TTY. Piped output is not
+// truncated.
+const MaxMessageLen = 80
+
 // Truncate shortens s to maxWidth characters, appending "..." if truncated.
 // Returns s unchanged if it fits within maxWidth or maxWidth is 0 (no limit).
 func Truncate(s string, maxWidth int) string {
-	if maxWidth <= 0 || len(s) <= maxWidth {
+	if maxWidth <= 0 || utf8.RuneCountInString(s) <= maxWidth {
 		return s
 	}
 
+	runes := []rune(s)
 	if maxWidth <= 3 {
-		return s[:maxWidth]
+		return string(runes[:maxWidth])
 	}
 
-	return s[:maxWidth-3] + "..."
+	return string(runes[:maxWidth-3]) + "..."
 }
 
 // SingleLine collapses every whitespace run, newlines included, into one
-// space so a multi-line operator message fits one display row.
+// space so a multi-line operator message fits one display row. It drops every
+// other control character: the text comes from the cluster, and an escape
+// sequence in it would drive the terminal.
 func SingleLine(s string) string {
+	s = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) && !unicode.IsSpace(r) {
+			return -1
+		}
+
+		return r
+	}, s)
+
 	return strings.Join(strings.Fields(s), " ")
 }
 

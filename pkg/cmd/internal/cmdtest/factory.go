@@ -50,6 +50,12 @@ func NewPortalFactory(t *testing.T, handler http.Handler) (*cmdutil.Factory, *by
 	return f, out
 }
 
+// Stderr returns what a verb wrote to the stderr buffer of a factory built by
+// NewFactory or NewPortalFactory.
+func Stderr(f *cmdutil.Factory) string {
+	return f.IOStreams.ErrOut.(*bytes.Buffer).String()
+}
+
 // PortalReply returns a mock portal that answers every request with status
 // and the JSON body.
 func PortalReply(status int, body string) http.Handler {

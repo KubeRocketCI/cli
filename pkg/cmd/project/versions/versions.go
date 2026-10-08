@@ -128,10 +128,8 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		return err
 	}
 
-	if note := emptyNote(opts.Project, opts.Branch, streams); note != "" && opts.OutputFormat != output.FormatJSON {
-		if _, err := fmt.Fprintln(opts.IO.ErrOut, note); err != nil {
-			return err
-		}
+	if note := emptyNote(opts.Project, opts.Branch, streams); note != "" {
+		return discovery.PrintEmptyNote(opts.IO, opts.OutputFormat, note)
 	}
 
 	return nil

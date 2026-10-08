@@ -21,6 +21,10 @@ var (
 	// deployment fails. Wraps ErrNotFound similarly.
 	ErrEnvNotFound = fmt.Errorf("environment %w", ErrNotFound)
 
+	// ErrRemoteCluster is returned by `env pods` and `env events` for an
+	// environment on a cluster other than the one the Portal runs on.
+	ErrRemoteCluster = errors.New("environment runs on another cluster")
+
 	// ErrPipelineNotFound is returned by `pipelinerun start` when the named
 	// Tekton Pipeline does not exist. Wraps ErrNotFound for generic-not-found
 	// handling.

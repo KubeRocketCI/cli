@@ -5,8 +5,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
+	"github.com/KubeRocketCI/cli/pkg/cmd/env/events"
 	"github.com/KubeRocketCI/cli/pkg/cmd/env/get"
 	"github.com/KubeRocketCI/cli/pkg/cmd/env/list"
+	"github.com/KubeRocketCI/cli/pkg/cmd/env/pods"
 )
 
 // NewCmdEnv returns the "env" group cobra.Command with all subcommands attached.
@@ -19,12 +21,16 @@ func NewCmdEnv(f *cmdutil.Factory) *cobra.Command {
 "environments" in the Portal — without leaving the terminal. Lists every
 stage in the configured namespace or shows full detail for one (deployment,
 env) pair, including infrastructure, quality gates, and the projects
-deployed there with health, sync, version, image, and ingress URLs.`,
+deployed there with health, sync, version, image, and ingress URLs. For an
+environment on the cluster the Portal runs on, lists the pods of its
+namespace and the Kubernetes events of that namespace.`,
 	}
 
 	cmd.AddCommand(
 		list.NewCmdList(f, nil),
 		get.NewCmdGet(f, nil),
+		pods.NewCmdPods(f, nil),
+		events.NewCmdEvents(f, nil),
 	)
 
 	return cmd

@@ -3,7 +3,6 @@ package list
 
 import (
 	"context"
-	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -119,10 +118,8 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		return err
 	}
 
-	if len(rows) == 0 && opts.OutputFormat != output.FormatJSON {
-		if _, err := fmt.Fprintln(opts.IO.ErrOut, "No environments found."); err != nil {
-			return err
-		}
+	if len(rows) == 0 {
+		return discovery.PrintEmptyNote(opts.IO, opts.OutputFormat, "No environments found.")
 	}
 
 	return nil

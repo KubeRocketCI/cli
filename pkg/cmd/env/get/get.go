@@ -3,7 +3,6 @@ package get
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -16,6 +15,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
+	envinternal "github.com/KubeRocketCI/cli/pkg/cmd/env/internal"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/discovery"
 )
 
@@ -46,11 +46,8 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 and the projects deployed there with health, sync, version, image digest,
 ingress URLs, ArgoCD link, and last-deployed timestamp.
 
-<deployment> is the parent CDPipeline name. <env> is Stage.spec.name (the
-short user-facing identifier such as "dev", "stage", "prod").`,
-		Args: cmdutil.ExactArgs(2,
-			"a deployment and an env (e.g. krci env get my-pipeline prod)",
-			"to see available environments: krci env list"),
+` + envinternal.TargetHelp,
+		Args: envinternal.TargetArgs("get"),
 		Example: `  # Default
   krci env get my-pipeline prod
 
@@ -64,15 +61,7 @@ short user-facing identifier such as "dev", "stage", "prod").`,
 			opts.Deployment = args[0]
 			opts.Env = args[1]
 
-			if err := discovery.ValidateOutputFormat(opts.OutputFormat); err != nil {
-				return err
-			}
-
-			if err := cmdutil.ValidateK8sName("<deployment>", opts.Deployment); err != nil {
-				return err
-			}
-
-			if err := cmdutil.ValidateK8sName("<env>", opts.Env); err != nil {
+			if err := envinternal.ValidateTarget(opts.OutputFormat, opts.Deployment, opts.Env); err != nil {
 				return err
 			}
 
@@ -105,26 +94,12 @@ func getRun(ctx context.Context, opts *GetOptions) error {
 
 	detail, err := svc.Get(ctx, opts.Deployment, opts.Env)
 	if err != nil {
-		return discovery.HandleError(opts.IO, opts.OutputFormat, mapNotFound(err, opts.Deployment, opts.Env))
+		return discovery.HandleError(opts.IO, opts.OutputFormat, envinternal.MapNotFound(err, opts.Deployment, opts.Env))
 	}
 
 	return discovery.Render(opts.IO, opts.OutputFormat, detail, func(w io.Writer, isTTY bool) error {
 		return renderDetail(w, isTTY, detail)
 	})
-}
-
-// mapNotFound rewrites the typed not-found sentinels from EnvService.Get into
-// the precise user-facing message the spec requires (M4 scenarios). Other
-// errors pass through unchanged.
-func mapNotFound(err error, deployment, env string) error {
-	switch {
-	case errors.Is(err, portal.ErrEnvNotFound):
-		return fmt.Errorf("environment %q not found in deployment %q", env, deployment)
-	case errors.Is(err, portal.ErrDeploymentNotFound):
-		return fmt.Errorf("deployment %q not found", deployment)
-	default:
-		return err
-	}
 }
 
 func renderDetail(w io.Writer, isTTY bool, d *portal.EnvDetail) error {
@@ -144,7 +119,7 @@ func renderDetail(w io.Writer, isTTY bool, d *portal.EnvDetail) error {
 		return err
 	}
 
-	if err := printSectionHeading(w, isTTY, "Infrastructure"); err != nil {
+	if err := discovery.PrintSectionHeading(w, isTTY, "Infrastructure"); err != nil {
 		return err
 	}
 
@@ -203,26 +178,7 @@ func buildHeaderPairs(d *portal.EnvDetail, isTTY bool) []labelValue {
 // so the reason behind an unknown or degraded status is readable without
 // opening Argo CD. Nothing is printed when no project carries a diagnostic.
 func renderConditions(w io.Writer, isTTY bool, projects []portal.EnvProject) error {
-	lines := conditionLines(projects)
-	if len(lines) == 0 {
-		return nil
-	}
-
-	if _, err := fmt.Fprintln(w); err != nil {
-		return err
-	}
-
-	if err := printSectionHeading(w, isTTY, fmt.Sprintf("Conditions (%d)", len(lines))); err != nil {
-		return err
-	}
-
-	for _, line := range lines {
-		if _, err := fmt.Fprintln(w, line); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return discovery.PrintSection(w, isTTY, "Conditions", conditionLines(projects))
 }
 
 // conditionLines flattens the diagnostics of every project into display rows:
@@ -283,7 +239,7 @@ func maxLabelWidth(groups ...[]labelValue) int {
 }
 
 func renderQualityGates(w io.Writer, isTTY bool, gates []portal.QualityGateDetail) error {
-	if err := printSectionHeading(w, isTTY, fmt.Sprintf("Quality Gates (%d)", len(gates))); err != nil {
+	if err := discovery.PrintSectionHeading(w, isTTY, fmt.Sprintf("Quality Gates (%d)", len(gates))); err != nil {
 		return err
 	}
 
@@ -323,7 +279,7 @@ func formatQualityGateLine(g portal.QualityGateDetail) string {
 }
 
 func renderProjects(w io.Writer, isTTY bool, projects []portal.EnvProject) error {
-	if err := printSectionHeading(w, isTTY, fmt.Sprintf("Projects (%d)", len(projects))); err != nil {
+	if err := discovery.PrintSectionHeading(w, isTTY, fmt.Sprintf("Projects (%d)", len(projects))); err != nil {
 		return err
 	}
 
@@ -347,19 +303,6 @@ func renderProjects(w io.Writer, isTTY bool, projects []portal.EnvProject) error
 	}
 
 	return discovery.PrintTable(w, isTTY, headers, rows)
-}
-
-// printSectionHeading writes a section heading: lipgloss-styled when isTTY,
-// "<text>:" otherwise. Centralizes the styled/plain branching that every
-// detail section shares.
-func printSectionHeading(w io.Writer, isTTY bool, text string) error {
-	if isTTY {
-		_, err := fmt.Fprintln(w, output.HeaderStyle.Render(text))
-		return err
-	}
-
-	_, err := fmt.Fprintln(w, text+":")
-	return err
 }
 
 // labelValue is one aligned "label: value" row in the detail block.

@@ -139,6 +139,16 @@ func stringVal(m map[string]any, key string) string {
 	return s
 }
 
+// nonEmpty returns nil for an empty string, so a field the cluster does not
+// set marshals as null.
+func nonEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+
+	return &s
+}
+
 func availableVal(m map[string]any) bool {
 	if m == nil {
 		return false

@@ -19,9 +19,8 @@ import (
 
 // Default / bound values mirror the shared Zod schema.
 const (
-	defaultPageSize  = 25
-	defaultPage      = 1
-	maxMessageLength = 80
+	defaultPageSize = 25
+	defaultPage     = 1
 )
 
 // IssuesOptions holds all inputs for `krci sonar issues <project>`.
@@ -227,7 +226,7 @@ func renderTable(w io.Writer, isTTY bool, project, pullRequest, branch string, r
 		// so downstream tools can grep on it.
 		msg := i.Message
 		if isTTY {
-			msg = output.Truncate(i.Message, maxMessageLength)
+			msg = output.Truncate(i.Message, output.MaxMessageLen)
 		}
 
 		rows = append(rows, []string{

@@ -75,6 +75,109 @@ func (s *EnvService) List(ctx context.Context, f EnvListFilters) ([]EnvSummary, 
 	return rows, nil
 }
 
+// envTarget is what one (deployment, env) pair resolves to: its Stage and the
+// projects its deployment registers.
+type envTarget struct {
+	stage    k8sItem
+	projects []string
+}
+
+func (s *EnvService) stagesOf(ctx context.Context, deployment string) (*restapi.K8sListResponse, error) {
+	resp, err := s.client.K8sListWithResponse(ctx, s.listBody(stageResourceConfig, map[string]string{
+		labelCDPipelineName: deployment,
+	}))
+	if err != nil {
+		return nil, fmt.Errorf("listing stages for deployment %q: %w", deployment, err)
+	}
+
+	return resp, checkResponse(resp.StatusCode(), resp.Body)
+}
+
+// pipelineOf gets the CDPipeline of one deployment. A missing one is
+// ErrDeploymentNotFound.
+func (s *EnvService) pipelineOf(ctx context.Context, deployment string) (*restapi.K8sGetResponse, error) {
+	ns := s.namespace
+	body := restapi.K8sGetJSONRequestBody{
+		ClusterName:    s.clusterName,
+		Namespace:      &ns,
+		Name:           deployment,
+		ResourceConfig: cdPipelineResourceConfig.ResourceConfig,
+	}
+
+	resp, err := s.client.K8sGetWithResponse(ctx, body)
+	if err != nil {
+		return nil, fmt.Errorf("getting deployment %q: %w", deployment, err)
+	}
+
+	if err := checkResponse(resp.StatusCode(), resp.Body); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return nil, ErrDeploymentNotFound
+		}
+
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+// pickTarget picks the Stage whose spec.name is env among the Stages of a
+// deployment and reads the registered apps of its CDPipeline. It reports false
+// when no Stage has that name.
+func pickTarget(stages *restapi.K8sListResponse, pipeline *restapi.K8sGetResponse, env string) (envTarget, bool) {
+	if stages.JSON200 == nil {
+		return envTarget{}, false
+	}
+
+	for _, it := range stages.JSON200.Items {
+		if stringVal(ptr.Deref(it.Spec, nil), "name") != env {
+			continue
+		}
+
+		var registered []string
+		if pipeline.JSON200 != nil {
+			registered = stringSliceVal(ptr.Deref(pipeline.JSON200.Spec, nil), "applications")
+		}
+
+		return envTarget{stage: it, projects: registered}, true
+	}
+
+	return envTarget{}, false
+}
+
+// resolveTarget lists the Stages of deployment and gets its CDPipeline in
+// parallel, then picks the Stage of env. It reports false when no Stage has
+// that name; the error is a failed call.
+func (s *EnvService) resolveTarget(ctx context.Context, deployment, env string) (envTarget, bool, error) {
+	var (
+		stageResp    *restapi.K8sListResponse
+		pipelineResp *restapi.K8sGetResponse
+	)
+
+	g, gctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		var err error
+		stageResp, err = s.stagesOf(gctx, deployment)
+
+		return err
+	})
+
+	g.Go(func() error {
+		var err error
+		pipelineResp, err = s.pipelineOf(gctx, deployment)
+
+		return err
+	})
+
+	if err := g.Wait(); err != nil {
+		return envTarget{}, false, err
+	}
+
+	target, found := pickTarget(stageResp, pipelineResp, env)
+
+	return target, found, nil
+}
+
 // Get returns the full detail of one stage. Fans out three k8s calls in
 // parallel: list Stages (to resolve env-name → metadata.name), get parent
 // CDPipeline (to enumerate registered apps), list Applications scoped to the
@@ -83,48 +186,18 @@ func (s *EnvService) List(ctx context.Context, f EnvListFilters) ([]EnvSummary, 
 // the compound resource name.
 func (s *EnvService) Get(ctx context.Context, deployment, env string) (*EnvDetail, error) {
 	var (
-		stageResp    *restapi.K8sListResponse
-		pipelineResp *restapi.K8sGetResponse
-		appResp      *restapi.K8sListResponse
+		target  envTarget
+		found   bool
+		appResp *restapi.K8sListResponse
 	)
 
 	g, gctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
 		var err error
-		stageResp, err = s.client.K8sListWithResponse(gctx, s.listBody(stageResourceConfig, map[string]string{
-			labelCDPipelineName: deployment,
-		}))
-		if err != nil {
-			return fmt.Errorf("listing stages for deployment %q: %w", deployment, err)
-		}
+		target, found, err = s.resolveTarget(gctx, deployment, env)
 
-		return checkResponse(stageResp.StatusCode(), stageResp.Body)
-	})
-
-	g.Go(func() error {
-		ns := s.namespace
-		body := restapi.K8sGetJSONRequestBody{
-			ClusterName:    s.clusterName,
-			Namespace:      &ns,
-			Name:           deployment,
-			ResourceConfig: cdPipelineResourceConfig.ResourceConfig,
-		}
-
-		var err error
-		pipelineResp, err = s.client.K8sGetWithResponse(gctx, body)
-		if err != nil {
-			return fmt.Errorf("getting deployment %q: %w", deployment, err)
-		}
-
-		if err := checkResponse(pipelineResp.StatusCode(), pipelineResp.Body); err != nil {
-			if errors.Is(err, ErrNotFound) {
-				return ErrDeploymentNotFound
-			}
-			return err
-		}
-
-		return nil
+		return err
 	})
 
 	g.Go(func() error {
@@ -144,25 +217,8 @@ func (s *EnvService) Get(ctx context.Context, deployment, env string) (*EnvDetai
 		return nil, err
 	}
 
-	var stageItem *k8sItem
-	if stageResp.JSON200 != nil {
-		for i := range stageResp.JSON200.Items {
-			it := stageResp.JSON200.Items[i]
-			spec := ptr.Deref(it.Spec, nil)
-			if stringVal(spec, "name") == env {
-				stageItem = &it
-				break
-			}
-		}
-	}
-
-	if stageItem == nil {
+	if !found {
 		return nil, ErrEnvNotFound
-	}
-
-	var registered []string
-	if pipelineResp.JSON200 != nil {
-		registered = stringSliceVal(ptr.Deref(pipelineResp.JSON200.Spec, nil), "applications")
 	}
 
 	var appItems []k8sItem
@@ -170,7 +226,7 @@ func (s *EnvService) Get(ctx context.Context, deployment, env string) (*EnvDetai
 		appItems = appResp.JSON200.Items
 	}
 
-	detail := buildEnvDetail(deployment, *stageItem, registered, appItems)
+	detail := buildEnvDetail(deployment, target.stage, target.projects, appItems)
 
 	return &detail, nil
 }
@@ -209,24 +265,12 @@ func buildEnvDetail(deployment string, stageItem k8sItem, registered []string, a
 	spec := ptr.Deref(stageItem.Spec, nil)
 	status := ptr.Deref(stageItem.Status, nil)
 
-	desc := stringVal(spec, "description")
-	var descPtr *string
-	if desc != "" {
-		descPtr = &desc
-	}
-
-	cleanTpl := stringVal(spec, "cleanTemplate")
-	var cleanPtr *string
-	if cleanTpl != "" {
-		cleanPtr = &cleanTpl
-	}
-
 	infra := Infrastructure{
 		Cluster:        stringVal(spec, "clusterName"),
 		Namespace:      stringVal(spec, "namespace"),
 		TriggerType:    stringVal(spec, "triggerType"),
 		DeployPipeline: stringVal(spec, "triggerTemplate"),
-		CleanPipeline:  cleanPtr,
+		CleanPipeline:  nonEmpty(stringVal(spec, "cleanTemplate")),
 	}
 
 	gates := mapQualityGateDetails(spec)
@@ -248,17 +292,12 @@ func buildEnvDetail(deployment string, stageItem k8sItem, registered []string, a
 		return projects[i].Name < projects[j].Name
 	})
 
-	var messagePtr *string
-	if msg := stringVal(status, "detailed_message"); msg != "" {
-		messagePtr = &msg
-	}
-
 	return EnvDetail{
 		Deployment:      deployment,
 		Env:             stringVal(spec, "name"),
 		Status:          stringVal(status, "status"),
-		DetailedMessage: messagePtr,
-		Description:     descPtr,
+		DetailedMessage: nonEmpty(stringVal(status, "detailed_message")),
+		Description:     nonEmpty(stringVal(spec, "description")),
 		Order:           stageOrder(spec),
 		Infrastructure:  infra,
 		QualityGates:    gates,
@@ -332,9 +371,7 @@ func extractAppFields(item k8sItem) appFields {
 		out.Version = &v
 	}
 
-	if tag != "" {
-		out.ImageTag = &tag
-	}
+	out.ImageTag = nonEmpty(tag)
 
 	if v, ok := imageDigest(repo, summary); ok {
 		out.ImageDigest = &v
@@ -348,10 +385,7 @@ func extractAppFields(item k8sItem) appFields {
 		out.ArgocdURL = &u
 	}
 
-	if v := stringVal(deepGet(status, "operationState"), "finishedAt"); v != "" {
-		out.DeployedAt = &v
-	}
-
+	out.DeployedAt = nonEmpty(stringVal(deepGet(status, "operationState"), "finishedAt"))
 	out.Conditions = appConditions(status)
 	out.Operation = appOperation(status)
 
@@ -371,13 +405,11 @@ func appConditions(status map[string]any) []AppCondition {
 			continue
 		}
 
-		c := AppCondition{Type: stringVal(m, "type"), Message: stringVal(m, "message")}
-
-		if v := stringVal(m, "lastTransitionTime"); v != "" {
-			c.LastTransitionTime = &v
-		}
-
-		out = append(out, c)
+		out = append(out, AppCondition{
+			Type:               stringVal(m, "type"),
+			Message:            stringVal(m, "message"),
+			LastTransitionTime: nonEmpty(stringVal(m, "lastTransitionTime")),
+		})
 	}
 
 	return out
@@ -391,21 +423,12 @@ func appOperation(status map[string]any) *AppOperation {
 		return nil
 	}
 
-	out := &AppOperation{Phase: stringVal(op, "phase")}
-
-	if v := stringVal(op, "message"); v != "" {
-		out.Message = &v
+	return &AppOperation{
+		Phase:      stringVal(op, "phase"),
+		Message:    nonEmpty(stringVal(op, "message")),
+		StartedAt:  nonEmpty(stringVal(op, "startedAt")),
+		FinishedAt: nonEmpty(stringVal(op, "finishedAt")),
 	}
-
-	if v := stringVal(op, "startedAt"); v != "" {
-		out.StartedAt = &v
-	}
-
-	if v := stringVal(op, "finishedAt"); v != "" {
-		out.FinishedAt = &v
-	}
-
-	return out
 }
 
 // fillEnvProjectFromApp populates an EnvProject from one Application item.
@@ -444,20 +467,11 @@ func mapQualityGateDetails(spec map[string]any) []QualityGateDetail {
 			continue
 		}
 
-		var autotestPtr, branchPtr *string
-		if v := stringVal(m, "autotestName"); v != "" {
-			autotestPtr = &v
-		}
-
-		if v := stringVal(m, "branchName"); v != "" {
-			branchPtr = &v
-		}
-
 		gates = append(gates, QualityGateDetail{
 			Type:         stringVal(m, "qualityGateType"),
 			StepName:     stringVal(m, "stepName"),
-			AutotestName: autotestPtr,
-			BranchName:   branchPtr,
+			AutotestName: nonEmpty(stringVal(m, "autotestName")),
+			BranchName:   nonEmpty(stringVal(m, "branchName")),
 		})
 	}
 

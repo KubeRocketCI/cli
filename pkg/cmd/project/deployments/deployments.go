@@ -11,7 +11,6 @@ import (
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
-	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/discovery"
@@ -110,10 +109,9 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		return err
 	}
 
-	if len(rows) == 0 && opts.OutputFormat != output.FormatJSON {
-		if _, err := fmt.Fprintf(opts.IO.ErrOut, "No deployments found for project %s.\n", opts.Project); err != nil {
-			return err
-		}
+	if len(rows) == 0 {
+		return discovery.PrintEmptyNote(opts.IO, opts.OutputFormat,
+			fmt.Sprintf("No deployments found for project %s.", opts.Project))
 	}
 
 	return nil

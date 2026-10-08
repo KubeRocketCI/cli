@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 )
@@ -21,9 +22,10 @@ import (
 //nolint:unused // false positives for fields populated through composite literals
 type envTestRecorder struct {
 	t            *testing.T
-	listByKind   map[string]string // Kind → JSON response
-	getByName    map[string]string // metadata.name → JSON response (for CDPipeline get)
-	statusByKind map[string]int    // optional override per kind
+	listByKind   map[string]string        // Kind → JSON response
+	getByName    map[string]string        // metadata.name → JSON response (for CDPipeline get)
+	statusByKind map[string]int           // optional override per kind
+	delayByKind  map[string]time.Duration // optional response delay per kind
 
 	mu    sync.Mutex
 	calls []envTestCall
@@ -32,6 +34,7 @@ type envTestRecorder struct {
 type envTestCall struct {
 	Path           string
 	Kind           string
+	Namespace      string
 	LabelSelectors map[string]string
 }
 
@@ -47,21 +50,30 @@ func (r *envTestRecorder) handler(w http.ResponseWriter, req *http.Request) {
 		ResourceConfig struct {
 			Kind string `json:"kind"`
 		} `json:"resourceConfig"`
-		Labels *map[string]string `json:"labels,omitempty"`
-		Name   string             `json:"name,omitempty"`
+		Namespace string             `json:"namespace,omitempty"`
+		Labels    *map[string]string `json:"labels,omitempty"`
+		Name      string             `json:"name,omitempty"`
 	}
 
 	if err := json.Unmarshal(body, &parsed); err != nil {
 		r.t.Fatalf("unmarshal body: %v\nbody=%s", err, string(body))
 	}
 
-	call := envTestCall{Path: req.URL.Path, Kind: parsed.ResourceConfig.Kind}
+	call := envTestCall{Path: req.URL.Path, Kind: parsed.ResourceConfig.Kind, Namespace: parsed.Namespace}
 	if parsed.Labels != nil {
 		call.LabelSelectors = *parsed.Labels
 	}
 	r.mu.Lock()
 	r.calls = append(r.calls, call)
 	r.mu.Unlock()
+
+	if d := r.delayByKind[parsed.ResourceConfig.Kind]; d > 0 {
+		select {
+		case <-time.After(d):
+		case <-req.Context().Done():
+			return
+		}
+	}
 
 	if status, ok := r.statusByKind[parsed.ResourceConfig.Kind]; ok && status != 0 {
 		w.WriteHeader(status)
@@ -109,6 +121,52 @@ func newEnvServiceForTest(t *testing.T, rec *envTestRecorder) (*EnvService, func
 	}
 
 	return NewEnvService(client, "in-cluster", "ns"), closer
+}
+
+// objectList wraps objects into the list envelope the portal returns.
+func objectList(items ...map[string]any) string {
+	return mustJSON(map[string]any{"apiVersion": "v1", "kind": "List", "metadata": map[string]any{}, "items": items})
+}
+
+// envWithStage returns a recorder that serves one Stage of deployment
+// my-pipeline on the given cluster and the CDPipeline with projects foo and bar.
+func envWithStage(t *testing.T, cluster string) *envTestRecorder {
+	t.Helper()
+
+	return envWithStageIn(t, cluster, "my-pipeline-dev")
+}
+
+// envWithStageIn is envWithStage with the namespace of the Stage.
+func envWithStageIn(t *testing.T, cluster, namespace string) *envTestRecorder {
+	t.Helper()
+
+	return &envTestRecorder{
+		t: t,
+		listByKind: map[string]string{
+			"Stage": stageListJSON([]stageStub{
+				{name: "my-pipeline-dev", deployment: "my-pipeline", env: "dev", cluster: cluster, namespace: namespace, trigger: "Auto", status: "created"},
+			}),
+		},
+		getByName: map[string]string{
+			"my-pipeline": cdPipelineGetJSON("my-pipeline", []string{"foo", "bar"}),
+		},
+	}
+}
+
+// callsOfKind returns the recorded Portal calls for one kind, list and get.
+func callsOfKind(rec *envTestRecorder, kind string) []envTestCall {
+	rec.mu.Lock()
+	defer rec.mu.Unlock()
+
+	var out []envTestCall
+
+	for _, c := range rec.calls {
+		if c.Kind == kind {
+			out = append(out, c)
+		}
+	}
+
+	return out
 }
 
 // newDeploymentByProjectServiceForTest wires up a DeploymentByProjectService.
@@ -305,6 +363,35 @@ func TestEnvService_Get_EnvNotFound(t *testing.T) {
 
 	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("ErrEnvNotFound must wrap ErrNotFound, got %v", err)
+	}
+}
+
+// TestEnvService_Get_FailedCallBeforeEnvNotFound pins the order of Get: a
+// missing environment is reported only after every call has answered, so a
+// call that failed is what the user sees. The Applications call answers last.
+func TestEnvService_Get_FailedCallBeforeEnvNotFound(t *testing.T) {
+	t.Parallel()
+
+	rec := &envTestRecorder{
+		t: t,
+		listByKind: map[string]string{
+			"Stage": stageListJSON([]stageStub{
+				{name: "my-pipeline-dev", deployment: "my-pipeline", env: "dev", order: 0},
+			}),
+		},
+		getByName: map[string]string{
+			"my-pipeline": cdPipelineGetJSON("my-pipeline", []string{"foo"}),
+		},
+		statusByKind: map[string]int{"Application": http.StatusForbidden},
+		delayByKind:  map[string]time.Duration{"Application": 200 * time.Millisecond},
+	}
+
+	svc, closer := newEnvServiceForTest(t, rec)
+	defer closer()
+
+	_, err := svc.Get(context.Background(), "my-pipeline", "wat")
+	if !errors.Is(err, ErrPermissionDenied) {
+		t.Fatalf("expected ErrPermissionDenied from the Applications call, got %v", err)
 	}
 }
 

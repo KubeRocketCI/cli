@@ -6,66 +6,22 @@ import (
 	"testing"
 
 	"github.com/KubeRocketCI/cli/internal/portal"
+	"github.com/KubeRocketCI/cli/pkg/cmd/env/internal/envtestutil"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
 )
 
 var newFactory = cmdtest.NewFactory
 
-func TestGet_RequiresExactlyTwoPositionals(t *testing.T) {
+func TestGet_RejectsInvalidInput(t *testing.T) {
 	t.Parallel()
 
-	cases := [][]string{
-		{},
-		{"only-one"},
-		{"a", "b", "c"},
-	}
-
-	for _, args := range cases {
-		cmd := NewCmdGet(newFactory(), nil)
-		cmd.SetArgs(args)
-		cmd.SetOut(&bytes.Buffer{})
-		cmd.SetErr(&bytes.Buffer{})
-
-		if err := cmd.Execute(); err == nil {
-			t.Errorf("expected error for args=%v", args)
-		}
-	}
+	envtestutil.CheckInvalidTarget(t, NewCmdGet)
 }
 
-func TestGet_RejectsInvalidDeployment(t *testing.T) {
+func TestGetRun_NotFound(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCmdGet(newFactory(), nil)
-	cmd.SetArgs([]string{"BAD_NAME", "dev"})
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Fatal("expected error")
-	}
-
-	if !strings.Contains(err.Error(), "DNS-1123") {
-		t.Errorf("expected DNS-1123 message, got: %v", err)
-	}
-}
-
-func TestGet_RejectsInvalidEnv(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCmdGet(newFactory(), nil)
-	cmd.SetArgs([]string{"my-pipeline", "Bad_Env"})
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Fatal("expected error")
-	}
-
-	if !strings.Contains(err.Error(), "DNS-1123") {
-		t.Errorf("expected DNS-1123 message, got: %v", err)
-	}
+	envtestutil.CheckNotFound(t, NewCmdGet, "Application", "")
 }
 
 func TestGet_AcceptsValidArgs(t *testing.T) {
