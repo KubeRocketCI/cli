@@ -192,3 +192,50 @@ func TestHandleError_JSONEnvelopePrinted(t *testing.T) {
 		t.Errorf("envelope = %+v, want %+v", got, want)
 	}
 }
+
+func TestPrintEmptyNote(t *testing.T) {
+	t.Parallel()
+
+	for format, want := range map[string]string{"": "No pods found.\n", "table": "No pods found.\n", "json": ""} {
+		f := cmdtest.NewFactory()
+
+		if err := PrintEmptyNote(f.IOStreams, format, "No pods found."); err != nil {
+			t.Fatalf("-o %q: %v", format, err)
+		}
+
+		if got := cmdtest.Stderr(f); got != want {
+			t.Errorf("-o %q: stderr = %q, want %q", format, got, want)
+		}
+	}
+}
+
+func TestPrintSection(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+
+	if err := PrintSection(&buf, false, "Details", nil); err != nil || buf.Len() != 0 {
+		t.Fatalf("no lines print nothing, got %q (error %v)", buf.String(), err)
+	}
+
+	if err := PrintSection(&buf, false, "Details", []string{"  - one", "  - two"}); err != nil {
+		t.Fatalf("PrintSection error: %v", err)
+	}
+
+	if want := "\nDetails (2):\n  - one\n  - two\n"; buf.String() != want {
+		t.Errorf("section = %q, want %q", buf.String(), want)
+	}
+}
+
+func TestOptTimeCell(t *testing.T) {
+	t.Parallel()
+
+	if got := OptTimeCell(nil); got != output.EmptyCell {
+		t.Errorf("OptTimeCell(nil) = %q, want %q", got, output.EmptyCell)
+	}
+
+	at := "2026-01-02T03:04:05Z"
+	if got, want := OptTimeCell(&at), output.FormatRelativeTime(at); got != want {
+		t.Errorf("OptTimeCell = %q, want %q", got, want)
+	}
+}

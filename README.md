@@ -84,9 +84,10 @@ stable enough to treat `krci` as a first-class agent tool.
 | Authentication | OIDC + PKCE browser flow, AES-256-GCM token storage, OS keyring integration      | [`docs/auth.md`](docs/auth.md)            |
 | Projects       | List and inspect projects, list their built image versions, build a branch      | [`docs/project.md`](docs/project.md)      |
 | Deployments    | Inspect deployments, their apps, environments, and promotion gates               | [`docs/deployment.md`](docs/deployment.md)|
-| Environments   | Inspect envs — deployed apps, infrastructure, gates, and health                  | [`docs/env.md`](docs/env.md)              |
+| Environments   | Inspect envs — deployed apps, infrastructure, gates, health, pods, and events    | [`docs/env.md`](docs/env.md)              |
 | Pipeline runs  | List, filter, stream logs, and diagnose failures across Tekton runs              | [`docs/pipelinerun.md`](docs/pipelinerun.md) |
 | SonarQube      | Projects, quality gates, measures, and issues via the Portal's Sonar binding     | [`docs/sonar.md`](docs/sonar.md)          |
+| SCA            | Dependency-Track projects, dependencies, and vulnerability findings              | [`docs/sca.md`](docs/sca.md)              |
 
 Every data command accepts `-o table` (default) or `-o json`. Tables render
 nicely on a TTY, plain text into pipes, JSON for automation.
@@ -128,12 +129,14 @@ krci [--portal-url <url>]
   auth        login | status | logout
   project     list | get <name> | deployments <name> | versions <name> | build <name>
   deployment  list | get <name>
-  pipelinerun list | get <name>       (also filters, --logs, --reason, --wait)
+  env         list | get | pods | events <deployment> <env>
+  pipelinerun list | get <name> | start <pipeline>   (also filters, --logs, --reason, --wait)
   sonar       list | get | gate | issues <project>
+  sca         list | get | components | findings <project>
   version
 ```
 
-**Aliases:** `project` → `proj`, `deployment` → `dp`, `pipelinerun` → `run`
+**Aliases:** `project` → `proj`, `deployment` → `dp`, `env` → `e`, `pipelinerun` → `run`
 
 ## Configuration
 

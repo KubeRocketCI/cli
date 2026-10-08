@@ -240,8 +240,48 @@ func TestPrintJSONErrorEnvelope_WrappedError(t *testing.T) {
 func TestSingleLine(t *testing.T) {
 	t.Parallel()
 
-	got := SingleLine("  rpc error:\n\tcode = Unknown  desc = chart\r\nfailed \n")
-	if want := "rpc error: code = Unknown desc = chart failed"; got != want {
-		t.Errorf("SingleLine = %q, want %q", got, want)
+	cases := map[string]struct {
+		in   string
+		want string
+	}{
+		"whitespace runs": {
+			in:   "  rpc error:\n\tcode = Unknown  desc = chart\r\nfailed \n",
+			want: "rpc error: code = Unknown desc = chart failed",
+		},
+		"escape sequences lose their control characters": {
+			in:   "boom \x1b]0;title\x07\x1b[2J done\u009b31m",
+			want: "boom ]0;title[2J done31m",
+		},
+		"text beyond ASCII stays": {in: "помилка —  кінець", want: "помилка — кінець"},
+	}
+
+	for name, tc := range cases {
+		if got := SingleLine(tc.in); got != tc.want {
+			t.Errorf("%s: SingleLine = %q, want %q", name, got, tc.want)
+		}
+	}
+}
+
+func TestTruncate(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		in    string
+		width int
+		want  string
+	}{
+		"fits":                       {in: "short", width: 5, want: "short"},
+		"no limit":                   {in: "anything goes", width: 0, want: "anything goes"},
+		"cut with an ellipsis":       {in: "a long message", width: 9, want: "a long..."},
+		"no room for an ellipsis":    {in: "abcdef", width: 3, want: "abc"},
+		"counts characters":          {in: "помилка", width: 7, want: "помилка"},
+		"cuts between characters":    {in: "помилка запуску", width: 10, want: "помилка..."},
+		"a short width of non-ASCII": {in: "помилка", width: 2, want: "по"},
+	}
+
+	for name, tc := range cases {
+		if got := Truncate(tc.in, tc.width); got != tc.want {
+			t.Errorf("%s: Truncate = %q, want %q", name, got, tc.want)
+		}
 	}
 }

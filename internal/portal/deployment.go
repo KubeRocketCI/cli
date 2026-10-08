@@ -12,10 +12,14 @@ import (
 )
 
 // newK8sResourceConfig assembles a K8sListJSONBody whose ResourceConfig
-// identifies a single CRD by its group/version/kind triple. Centralizes the
-// anonymous-struct shape from the generated restapi package so each new kind
-// (CDPipeline, Stage, Application, …) reduces to one line.
+// identifies a single kind by its group/version/kind triple. The core group is
+// "": its apiVersion is the bare version.
 func newK8sResourceConfig(group, version, kind, singular, plural string) restapi.K8sListJSONBody {
+	apiVersion := version
+	if group != "" {
+		apiVersion = group + "/" + version
+	}
+
 	return restapi.K8sListJSONBody{
 		ResourceConfig: struct {
 			ApiVersion    string             `json:"apiVersion"`
@@ -27,7 +31,7 @@ func newK8sResourceConfig(group, version, kind, singular, plural string) restapi
 			SingularName  string             `json:"singularName"`
 			Version       string             `json:"version"`
 		}{
-			ApiVersion:   group + "/" + version,
+			ApiVersion:   apiVersion,
 			Group:        group,
 			Version:      version,
 			Kind:         kind,
@@ -44,6 +48,8 @@ var (
 		"v2.edp.epam.com", "v1", "Stage", "stage", "stages")
 	applicationResourceConfig = newK8sResourceConfig(
 		"argoproj.io", "v1alpha1", "Application", "application", "applications")
+	podResourceConfig   = newK8sResourceConfig("", "v1", "Pod", "pod", "pods")
+	eventResourceConfig = newK8sResourceConfig("", "v1", "Event", "event", "events")
 )
 
 // Canonical KRCI / ArgoCD label keys used by the deployment-discovery surface.

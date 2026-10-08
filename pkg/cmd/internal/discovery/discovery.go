@@ -1,5 +1,4 @@
-// Package discovery holds helpers shared by the deployment-discovery verbs
-// (`krci env list`, `krci env get`, `krci project deployments`):
+// Package discovery holds helpers shared by the deployment-discovery verbs:
 // output-format dispatch, JSON envelope rendering, table cells, and
 // shared error promotion. Placed under `pkg/cmd/internal/` so Go enforces
 // package visibility: only packages below `pkg/cmd/...` may import it.
@@ -75,10 +74,68 @@ func PrintTable(w io.Writer, isTTY bool, headers []string, rows [][]string) erro
 	return output.PrintTable(w, headers, rows)
 }
 
+// PrintEmptyNote writes the note of an empty result to stderr. Under -o json
+// it writes nothing: the empty array is the answer.
+func PrintEmptyNote(ios *iostreams.IOStreams, outputFormat, note string) error {
+	if outputFormat == output.FormatJSON {
+		return nil
+	}
+
+	_, err := fmt.Fprintln(ios.ErrOut, note)
+
+	return err
+}
+
+// PrintSectionHeading writes a section heading: lipgloss-styled when isTTY,
+// "<text>:" otherwise.
+func PrintSectionHeading(w io.Writer, isTTY bool, text string) error {
+	if isTTY {
+		_, err := fmt.Fprintln(w, output.HeaderStyle.Render(text))
+		return err
+	}
+
+	_, err := fmt.Fprintln(w, text+":")
+	return err
+}
+
+// PrintSection prints a blank line, the heading "<title> (<number of lines>)"
+// and the lines. It prints nothing when there are no lines.
+func PrintSection(w io.Writer, isTTY bool, title string, lines []string) error {
+	if len(lines) == 0 {
+		return nil
+	}
+
+	if _, err := fmt.Fprintln(w); err != nil {
+		return err
+	}
+
+	if err := PrintSectionHeading(w, isTTY, fmt.Sprintf("%s (%d)", title, len(lines))); err != nil {
+		return err
+	}
+
+	for _, line := range lines {
+		if _, err := fmt.Fprintln(w, line); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // OptCell renders an optional string field, output.EmptyCell when the pointer
 // is nil or the value is empty.
 func OptCell(s *string) string {
 	return output.OrDash(ptr.Deref(s, ""))
+}
+
+// OptTimeCell renders an optional RFC 3339 timestamp as a relative time,
+// output.EmptyCell when the pointer is nil.
+func OptTimeCell(at *string) string {
+	if at == nil {
+		return output.EmptyCell
+	}
+
+	return output.FormatRelativeTime(*at)
 }
 
 // OptStatusCell renders an ArgoCD health-status cell with optional TTY color,

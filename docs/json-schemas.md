@@ -420,6 +420,174 @@ Field absence rules:
   longer, but the OSC 8 hyperlink target retains the full URL. JSON output is
   unaffected by this rendering — `ingressUrls` is always the full array.
 
+## `krci env pods <deployment> <env>`
+
+```json
+{
+  "schemaVersion": "1",
+  "data": {
+    "deployment": "my-pipeline",
+    "env": "dev",
+    "cluster": "in-cluster",
+    "namespace": "my-pipeline-dev",
+    "pods": [
+      {
+        "name": "bar-7b9c8d7f6c-fghij",
+        "project": "bar",
+        "status": "Pending",
+        "phase": "Pending",
+        "readyContainers": 0,
+        "totalContainers": 1,
+        "restarts": 0,
+        "lastRestartAt": null,
+        "createdAt": "2026-04-25T08:00:00Z",
+        "node": null,
+        "owner": { "kind": "ReplicaSet", "name": "bar-7b9c8d7f6c" },
+        "reason": null,
+        "message": null,
+        "conditions": [
+          {
+            "type": "PodScheduled",
+            "status": "False",
+            "reason": "Unschedulable",
+            "message": "0/3 nodes are available: 3 Insufficient memory.",
+            "lastTransitionTime": "2026-04-25T08:00:00Z"
+          }
+        ],
+        "containers": []
+      },
+      {
+        "name": "foo-6c9f7d9b8-x2x9k",
+        "project": "foo",
+        "status": "CrashLoopBackOff",
+        "phase": "Running",
+        "readyContainers": 0,
+        "totalContainers": 1,
+        "restarts": 7,
+        "lastRestartAt": "2026-04-25T08:10:02Z",
+        "createdAt": "2026-04-25T07:40:11Z",
+        "node": "node-1",
+        "owner": { "kind": "ReplicaSet", "name": "foo-6c9f7d9b8" },
+        "reason": null,
+        "message": null,
+        "conditions": [
+          {
+            "type": "Ready",
+            "status": "False",
+            "reason": "ContainersNotReady",
+            "message": "containers with unready status: [foo]",
+            "lastTransitionTime": "2026-04-25T07:41:00Z"
+          }
+        ],
+        "containers": [
+          {
+            "name": "foo",
+            "init": false,
+            "sidecar": false,
+            "image": "registry.example.com/ns/foo:1.2.0",
+            "imageID": "registry.example.com/ns/foo@sha256:abc12345...",
+            "imageDigest": "sha256:abc12345...",
+            "ready": false,
+            "restarts": 7,
+            "state": "waiting",
+            "reason": "CrashLoopBackOff",
+            "message": "back-off 5m0s restarting failed container=foo",
+            "exitCode": null,
+            "startedAt": null,
+            "finishedAt": null,
+            "lastTermination": {
+              "reason": "Error",
+              "message": null,
+              "exitCode": 1,
+              "startedAt": "2026-04-25T08:09:58Z",
+              "finishedAt": "2026-04-25T08:10:02Z"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Rules:
+
+- `pods[]` is every pod in the namespace of the environment, sorted by
+  `name`. An empty namespace is success: `data.pods: []`, exit 0, with
+  `No pods found in namespace <namespace>.` written to stderr in table mode.
+- `status`, `readyContainers`, `totalContainers` and `restarts` are the
+  `STATUS`, `READY` and `RESTARTS` values of `kubectl get pods`. `phase` is
+  the Kubernetes pod phase. `lastRestartAt` is the time of the newest restart
+  `restarts` counts, `null` without one.
+- `project` is the project of the deployment whose name the pod carries in
+  its `app.kubernetes.io/instance` label, `null` for any other pod.
+- `node` is `null` until the pod is scheduled, `owner` is `null` for a pod
+  without owners, `reason` and `message` are `null` unless the pod sets its
+  own `status.reason` and `status.message`.
+- `conditions[]` is always an array and carries only a condition that is
+  not `True`, or a `DisruptionTarget` that is; `reason`, `message` and
+  `lastTransitionTime` are `null` when absent.
+- `containers[]` is always an array, init containers first, `[]` for a pod
+  that reports no container yet. `sidecar` is `true` for an init container
+  with `restartPolicy: Always`, `false` otherwise. `image` is the image the
+  pod asks for. `imageID` is the `imageID` the container runtime reports,
+  `null` until the image is present. `imageDigest` is the full `sha256:...`
+  registry digest in it, `null` when it names none: a bare `sha256:...`
+  `imageID` is the image's local ID, not a registry digest. `state` is one of
+  `waiting`, `running`, `terminated`; `reason`, `message`, `exitCode`,
+  `startedAt` and `finishedAt` are `null` when the state does not carry
+  them. `lastTermination` is `null` for a container that has not been
+  restarted.
+
+Errors (exit 1, the error envelope under `-o json`):
+
+| Condition                                  | Message                                                                                                                                  |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Unknown deployment                         | `deployment "<deployment>" not found`                                                                                                    |
+| Unknown environment                        | `environment "<env>" not found in deployment "<deployment>"`                                                                             |
+| Environment on another cluster             | `environment "<env>" of deployment "<deployment>" runs on cluster "<cluster>"; the Portal reads pods and events only on its own cluster` |
+| The Stage names no namespace               | `environment "<env>" of deployment "<deployment>" has no namespace`                                                                      |
+| No right to list pods in the namespace     | `listing pods in namespace "<namespace>": permission denied`                                                                             |
+
+## `krci env events <deployment> <env>`
+
+```json
+{
+  "schemaVersion": "1",
+  "data": {
+    "deployment": "my-pipeline",
+    "env": "dev",
+    "cluster": "in-cluster",
+    "namespace": "my-pipeline-dev",
+    "events": [
+      {
+        "type": "Warning",
+        "reason": "BackOff",
+        "message": "Back-off restarting failed container foo in pod foo-6c9f7d9b8-x2x9k",
+        "involvedObject": { "kind": "Pod", "name": "foo-6c9f7d9b8-x2x9k" },
+        "count": 42,
+        "firstSeen": "2026-04-25T07:41:00Z",
+        "lastSeen": "2026-04-25T08:10:02Z",
+        "source": "kubelet"
+      }
+    ]
+  }
+}
+```
+
+Rules:
+
+- `events[]` is the Kubernetes events in the namespace of the environment,
+  newest first by `lastSeen`; with `--pod` only the events about that pod,
+  with `--warnings` only the events of type `Warning`. No event is success:
+  `data.events: []`, exit 0, with `No events found in namespace <namespace>.`
+  written to stderr in table mode.
+- `count`, `firstSeen` and `lastSeen` are the values `kubectl get events`
+  derives; `source` is `null` when the event names no component.
+- Kubernetes keeps an event for a limited time, one hour by default.
+- The errors are those of `krci env pods`; the permission error names the
+  events: `listing events in namespace "<namespace>": permission denied`.
+
 ## `krci project deployments <project>`
 
 ```json

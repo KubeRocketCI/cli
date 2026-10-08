@@ -8,6 +8,7 @@ import (
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
+	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 )
@@ -375,7 +376,7 @@ func TestIssues_RenderTable_WithIssues(t *testing.T) {
 func TestIssues_RenderTable_MessageTruncationInTTY(t *testing.T) {
 	t.Parallel()
 
-	longMsg := strings.Repeat("x", maxMessageLength+20)
+	longMsg := strings.Repeat("x", output.MaxMessageLen+20)
 
 	result := &portal.SonarIssueList{
 		Paging: portal.SonarPaging{PageIndex: 1, PageSize: 25, Total: 1},

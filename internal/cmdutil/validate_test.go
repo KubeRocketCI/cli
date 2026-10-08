@@ -167,3 +167,46 @@ func TestValidateK8sName(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateK8sSubdomain(t *testing.T) {
+	t.Parallel()
+
+	const shape = "must be a valid DNS-1123 name: lowercase alphanumeric, '-' and '.'"
+
+	tests := []struct {
+		name    string
+		in      string
+		wantErr string // empty = expect no error
+	}{
+		{"simple name", "my-app-6c9f7d9b8-x2x9k", ""},
+		{"dots allowed", "my.app-6c9f7d9b8-x2x9k", ""},
+		{"253 chars ok", strings.Repeat("a", 253), ""},
+
+		{"empty rejected", "", "must not be empty"},
+		{"uppercase rejected", "My-App", shape},
+		{"kind prefix rejected", "pod/my-app", shape},
+		{"leading dot rejected", ".my-app", shape},
+		{"empty label rejected", "my..app", shape},
+		{"label with a trailing hyphen rejected", "my-.app", shape},
+		{"254 chars rejected", strings.Repeat("a", 254), "must be at most 253 characters"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := ValidateK8sSubdomain("--pod", tc.in)
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Fatalf("expected no error, got: %v", err)
+				}
+
+				return
+			}
+
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) || !strings.HasPrefix(err.Error(), "--pod") {
+				t.Fatalf("expected an error for --pod containing %q, got: %v", tc.wantErr, err)
+			}
+		})
+	}
+}
