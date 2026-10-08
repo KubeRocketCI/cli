@@ -32,6 +32,7 @@ Fast, idempotent, no portal — these are the first line of defence.
 | SCA-H-04   | `krci sca components --help`             | offline | —     | `exit=0; stdout~/--only-outdated/; stdout~/--only-direct/; stdout~/--severity/; stdout~/inclusive/; stdout!~/--pr/`            |
 | SCA-H-05   | `krci sca findings --help`               | offline | —     | `exit=0; stdout~/--include-suppressed/; stdout~/--source string/; stdout~/--severity/; stdout!~/--pr/`                         |
 | SCA-H-06   | `krci sca`                               | offline | —     | `exit=0; stdout~/^Available Commands:$/; stdout~/^\s+list\s/; stdout~/^\s+get\s/; stdout~/^\s+components\s/; stdout~/^\s+findings\s/` |
+| SCA-H-07   | `krci sca lst`                           | offline | —     | `exit=1; stderr~/unknown command "lst" for "krci sca"/; stdout!~/^Available Commands:$/`                                   |
 
 ## 2. Argument validation (env: `offline`)
 

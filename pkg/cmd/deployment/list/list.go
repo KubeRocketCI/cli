@@ -48,6 +48,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
   # Use the ls alias
   krci deployment ls`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if runF != nil {
 				return runF(opts)

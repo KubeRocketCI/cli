@@ -151,7 +151,8 @@ Rules:
 
 - Commands must not mutate user state. `auth login`, `auth logout`, and
   anything that writes to `~/.config/krci/` is out of scope for these
-  tables — cover those in a dedicated, serial suite.
+  tables — cover those in a dedicated, serial suite. Exception: rows that run
+  under `HOME=$(mktemp -d)` and fail argument validation.
 - Time-dependent output (relative timestamps like `1h ago`) is matched
   with loose regexes, not literal strings.
 - Name-dependent output (an actual pipeline run name) is always

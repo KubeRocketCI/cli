@@ -52,6 +52,7 @@ The portal URL must be configured via one of:
   # Log in using an environment variable
   export KRCI_PORTAL_URL=https://portal.example.com
   krci auth login`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if runF != nil {
 				return runF(opts)

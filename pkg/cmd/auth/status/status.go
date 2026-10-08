@@ -76,6 +76,7 @@ data.expiresAt on success; error.message on failure.`,
 
   # JSON (for scripts and AI agents)
   krci auth status -o json`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := validateOutputFormat(opts.OutputFormat); err != nil {
 				return err

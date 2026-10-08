@@ -30,6 +30,7 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 		Short:   "Clear stored credentials",
 		Long:    "Remove all locally stored tokens and credentials. You will need to run 'krci auth login' again.",
 		Example: "  krci auth logout",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if runF != nil {
 				return runF(opts)

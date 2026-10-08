@@ -31,8 +31,9 @@ type Factory struct {
 }
 
 // New creates a Factory wired to real system resources.
-// Config, TokenProvider, and RestClient are lazily resolved after Cobra
-// parses command-line flags (triggered by PersistentPreRunE on the root command).
+// Config, TokenProvider, and RestClient resolve on first call, from a command's
+// run function after Cobra has parsed flags. A command that never calls them
+// never reads the config file.
 func New() *Factory {
 	f := &Factory{
 		IOStreams: iostreams.System(),

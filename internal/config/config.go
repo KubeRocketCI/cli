@@ -71,8 +71,8 @@ func BindFlags(cmd *cobra.Command) {
 	_ = viper.BindPFlags(pf)
 }
 
-// Resolve reads the merged config AFTER Cobra has parsed flags.
-// Call this from PersistentPreRunE so flags are available.
+// Resolve reads the merged config. Call it after Cobra has parsed flags, from
+// a command's run function (via Factory.Config).
 func Resolve() (*Config, error) {
 	configDir := DefaultConfigDir()
 
