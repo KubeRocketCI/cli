@@ -75,8 +75,21 @@ The expect field is a semicolon-separated list of predicates. All must hold.
 | stdout_json.<jsonpath>!=<literal>  | stdout parses as JSON and field differs     |
 | stdout_json.<jsonpath>:exists      | jsonpath key exists (any value, incl. null) |
 | stdout_json.<jsonpath>:len=<N>     | array at jsonpath has exactly N elements    |
+| stdout_json.<jsonpath>~/<regex>/   | field, as text, matches regex               |
+| stdout-json~/<assertion>/          | stdout parses as JSON and assertion holds   |
 | stdout_empty                       | stdout is zero bytes                        |
 | duration_lt=<N>s                   | command finished in under N seconds         |
+
+### stdout-json assertions
+
+The body of `stdout-json~/…/` is one of, with `<path>` a jq-style path
+such as `.data.items` (`\.` in the table is a literal dot):
+
+- `<path> is array|number|boolean|string|object`
+- `<path> == <JSON literal>`, `<path> in [<JSON literal>, …]`
+- `<path> length == <N>`, `<path> contains "<text>"`
+- `every item <field> == <JSON literal>` or `… in [ … ]`: holds for each
+  element of `.data.items`
 
 ### Regex rules (important — most false failures start here)
 

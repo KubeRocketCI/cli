@@ -4,8 +4,8 @@ Self-contained Tekton manifests used by the `krci pipelinerun start` e2e rows
 in `../test-cases.md`. Files are the source of truth — apply with
 `kubectl apply -f` and the cluster matches what's checked in (no drift).
 
-All pipelines run a single inline `taskSpec` that calls `busybox` and echoes
-its inputs. None of them reach external systems, push artifacts, or write to
+All pipelines run a single inline `taskSpec` that calls `busybox`; it echoes
+its inputs or emits fixed results. None of them reach external systems, push artifacts, or write to
 git. They are safe to start repeatedly. All resource names use a synthetic
 `krci-cli-e2e-*` prefix and the manifests carry no organisation-specific
 identifiers — drop them into any namespace on any KubeRocketCI cluster.
@@ -20,6 +20,7 @@ identifiers — drop them into any namespace on any KubeRocketCI cluster.
 | `pipeline-bare.yaml` | Pipeline `krci-cli-e2e-bare` | No KRCI labels at all. Proves the CLI can start any valid Tekton Pipeline regardless of the KubeRocketCI labelling convention. | `PR-S-BARE` |
 | `pipeline-with-tt.yaml` | Pipeline `krci-cli-e2e-with-tt` | Paired with `trigger-template.yaml`. Exercises the TriggerTemplate branch of `createPipelineRunDraftFromPipeline` — placeholder resolution and label sanitization. | `PR-S-TT-OK`, `PR-S-TT-DRY` |
 | `trigger-template.yaml` | TriggerTemplate `krci-cli-e2e-tt` | Resourcetemplate uses `$(tt.params.X)` placeholders that resolve against `pipeline-with-tt.yaml`'s param defaults. | (paired with above) |
+| `pipeline-results.yaml` | Pipeline `krci-cli-e2e-results` | Labelled `pipelinetype: build`; emits the `VCS_TAG` result of a build. A started run is a build run with results (`BUILD_RUN_NAME`). | `PR-J-05` |
 
 ## Apply
 
@@ -36,6 +37,9 @@ Verify:
 kubectl -n <namespace> get pipeline.tekton.dev,triggertemplate.triggers.tekton.dev \
   -l app.edp.epam.com/pipelinetype=tests
 ```
+
+`krci-cli-e2e-results` carries `pipelinetype: build` and is not listed by this
+selector.
 
 ## Smoke test (after apply)
 
@@ -71,6 +75,9 @@ kubectl -n <namespace> get pipeline.tekton.dev,triggertemplate.triggers.tekton.d
 
 # TriggerTemplate happy path — real run.
 ./dist/krci pipelinerun start krci-cli-e2e-with-tt -o json
+
+# A build run with a VCS_TAG result (BUILD_RUN_NAME).
+./dist/krci pipelinerun start krci-cli-e2e-results -o json
 ```
 
 ## Cleanup
@@ -83,18 +90,27 @@ To remove the fixture resources themselves:
 kubectl delete -n <namespace> -f source/cli/e2e/pipelinerun/fixtures/
 ```
 
-To purge accumulated runs (label selector picks up runs from any of the
-fixture pipelines because every fixture sets `pipelinetype: tests` on either
-the Pipeline or — via TT-resolved labels — the resulting PipelineRun):
+To purge accumulated runs (label selector picks up runs from the fixture
+pipelines that set `pipelinetype: tests` on either the Pipeline or — via
+TT-resolved labels — the resulting PipelineRun):
 
 ```sh
 kubectl -n <namespace> delete pipelinerun.tekton.dev \
   -l app.edp.epam.com/pipelinetype=tests
 ```
 
+`pipeline-results.yaml` is labelled `pipelinetype: build`. Select its runs by
+pipeline name, never by type, which would also match real builds:
+
+```sh
+kubectl -n <namespace> delete pipelinerun.tekton.dev \
+  -l tekton.dev/pipeline=krci-cli-e2e-results
+```
+
 ## Why these manifests look the way they do
 
-- **Labelled `pipelinetype: tests`.** Distinguishes these fixtures from
+- **Labelled `pipelinetype: tests`**, except `pipeline-results.yaml`
+  (`build`; purge its runs by pipeline name, see Cleanup). Distinguishes these fixtures from
   KubeRocketCI's real pipelines (build/review/deploy/clean/security/release).
   Filter via `kubectl get pipeline.tekton.dev
   -l app.edp.epam.com/pipelinetype=tests` or the same selector in the portal
@@ -102,9 +118,9 @@ kubectl -n <namespace> delete pipelinerun.tekton.dev \
 - **`app.edp.epam.com/*` label keys are upstream KubeRocketCI definitions**
   and cannot be renamed — the portal reads exactly those keys to drive
   TriggerTemplate lookup, codebase filters, and pipelinetype filters. The
-  values used in this bundle (`tests`, `krci-cli-e2e`, `""`) are synthetic
+  values used in this bundle (`tests`, `build`, `krci-cli-e2e`, `""`) are synthetic
   and carry no organisation-specific data.
-- **`triggertemplate` label is empty** on the `noop` and `required` fixtures.
+- **`triggertemplate` label is empty** on the `noop`, `required` and `results` fixtures.
   The portal's Pipeline Zod schema requires both labels to be present, but
   `getTriggerTemplateLabel` treats an empty string as "absent" and skips the
   TT lookup — so `start` works without us having to also create a TT.
