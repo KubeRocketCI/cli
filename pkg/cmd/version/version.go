@@ -15,6 +15,7 @@ func NewCmdVersion(ios *iostreams.IOStreams, version, commit, date string) *cobr
 	return &cobra.Command{
 		Use:   "version",
 		Short: "Print krci CLI version",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			_, err := fmt.Fprintf(ios.Out,
 				"krci version %s (commit: %s, built: %s)\n",

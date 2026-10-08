@@ -9,35 +9,6 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// GuardFlagValues prepends validateStringFlags to the Args check of every
-// runnable leaf command under root; a leaf without Args gets
-// cobra.ArbitraryArgs. Group commands keep their nil Args and cobra's
-// unknown-command check. Call once, after every AddCommand and after
-// InitDefaultHelpCmd and InitDefaultCompletionCmd on the root; cobra otherwise
-// adds those two commands inside Execute, unwrapped.
-func GuardFlagValues(root *cobra.Command) {
-	for _, c := range root.Commands() {
-		GuardFlagValues(c)
-	}
-
-	if root.HasSubCommands() || !root.Runnable() {
-		return
-	}
-
-	args := root.Args
-	if args == nil {
-		args = cobra.ArbitraryArgs
-	}
-
-	root.Args = func(cmd *cobra.Command, a []string) error {
-		if err := validateStringFlags(cmd); err != nil {
-			return err
-		}
-
-		return args(cmd, a)
-	}
-}
-
 // validateStringFlags rejects a set string, stringSlice or stringArray flag
 // with a value starting with "-": pflag reads "--status --pr 53" as
 // status="--pr".

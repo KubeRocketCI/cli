@@ -26,12 +26,6 @@ func NewCmdRoot(f *cmdutil.Factory, v, commit, date string) *cobra.Command {
 		Version:       v,
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
-			// Warm the config cache after Cobra has parsed all flags.
-			// Subcommand RunE functions receive the cached result instantly.
-			_, err := f.Config()
-			return err
-		},
 	}
 
 	config.BindFlags(cmd)
@@ -48,11 +42,11 @@ func NewCmdRoot(f *cmdutil.Factory, v, commit, date string) *cobra.Command {
 	)
 
 	// Cobra adds help and completion inside Execute; add them now so
-	// GuardFlagValues covers them.
+	// FinalizeTree covers them.
 	cmd.InitDefaultHelpCmd()
 	cmd.InitDefaultCompletionCmd()
 
-	cmdutil.GuardFlagValues(cmd)
+	cmdutil.FinalizeTree(cmd)
 
 	return cmd
 }

@@ -71,12 +71,13 @@ Fast, idempotent, no portal — these are the first line of defence.
 | PR-H-09  | `krci pipelinerun list --help`           | offline | —     | `exit=0; stdout~/--deployment string/; stdout~/--env string/; stdout~/review, build, deploy, clean/`                     |
 | PR-H-10  | `krci pipelinerun list --help`           | offline | —     | `exit=0; stdout~/succeeded, failed, running, timeout, cancelled/; stdout~/--logs.*none until the run finishes/; stdout~/--reason.*none until the run finishes/` |
 | PR-H-11  | `krci pipelinerun get --help`            | offline | —     | `exit=0; stdout~/--logs.*none until the run finishes/; stdout~/--reason.*none until the run finishes/` |
+| PR-H-12  | `krci pipelinerun lst`                   | offline | —     | `exit=1; stderr~/unknown command "lst" for "krci pipelinerun"/; stdout!~/^Available Commands:$/`                    |
 
 ## 2. Argument validation (env: `offline`)
 
 Wrong shape of invocation must fail fast with a helpful message and a
 non-zero exit. These catch cobra/pflag wiring regressions and the root
-flag-value guard (`cmdutil.GuardFlagValues`).
+flag-value guard (`cmdutil.FinalizeTree`).
 
 | ID       | Command                                                         | Env     | Setup | Expect                                                                                           |
 |----------|------------------------------------------------------------------|---------|-------|--------------------------------------------------------------------------------------------------|

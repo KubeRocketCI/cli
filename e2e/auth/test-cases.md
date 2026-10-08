@@ -1,9 +1,10 @@
 # `krci auth` — e2e test cases
 
 Covers the `auth` command group: `login`, `status`, and `logout`. Source:
-`pkg/cmd/auth/` and `docs/auth.md`. This file exercises **`status`** — `login`
-needs a browser and `logout` destroys the session other rows depend on, so
-both stay out of the parallel run.
+`pkg/cmd/auth/` and `docs/auth.md`. This file exercises **`status`**. `login`
+(needs a browser) and `logout` (destroys the session other rows depend on)
+appear only as rejected-argument rows under `HOME=$(mktemp -d)` (AU-V-04,
+AU-V-05).
 
 `krci auth status` reports the signed-in user and exits `1` without a valid
 session, which makes it usable as a shell guard. `-o json` wraps the same
@@ -38,6 +39,8 @@ The orchestrator fills these; the table never hard-codes them.
 | AU-V-01  | `krci auth status -o yaml`       | offline | —     | `exit=1; stderr~/unknown output format/`        |
 | AU-V-02  | `krci auth status --unknown`     | offline | —     | `exit=1; stderr~/unknown flag: --unknown/`      |
 | AU-V-03  | `krci auth status extra`         | offline | —     | `exit=1; stderr~/unknown command "extra"/`      |
+| AU-V-04  | `HOME=$(mktemp -d) krci auth logout extra` | offline | — | `exit=1; stderr~/unknown command "extra"/; stderr!~/Logged out/` |
+| AU-V-05  | `HOME=$(mktemp -d) krci auth login extra`  | offline | — | `exit=1; stderr~/unknown command "extra"/` |
 
 ## 3. No session (env: `offline`)
 

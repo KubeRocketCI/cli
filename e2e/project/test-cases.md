@@ -57,6 +57,7 @@ Fast, idempotent, no portal — these are the first line of defence.
 | PROJ-D-H-02 | `krci proj --help`                      | offline | —     | `exit=0; stdout~/Manage projects \(Codebases\)/`                                                                                 |
 | PROJ-D-H-03 | `krci project deployments --help`       | offline | —     | `exit=0; stdout~/^Usage:$/; stdout~/^\s+krci project deployments <project> \[flags\]$/; stdout~/-o, --output string/`           |
 | PROJ-D-H-04 | `krci project`                          | offline | —     | `exit=0; stdout~/^Available Commands:$/; stdout~/^\s+deployments\s/; stdout~/^\s+get\s/; stdout~/^\s+list\s/`                   |
+| PROJ-D-H-05 | `krci project lst`                      | offline | —     | `exit=1; stderr~/unknown command "lst" for "krci project"/; stdout!~/^Available Commands:$/`                               |
 
 ## 2. Argument validation (env: `offline`)
 
