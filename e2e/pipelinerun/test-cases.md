@@ -25,7 +25,7 @@ your own portal):
 | `{{RUN_NAME}}` | A real run name (copy from `list -o json`).     | `krci-cli-e2e-noop-run-m8z4m` |
 | `{{FAILED_RUN_NAME}}` | A run whose status is Failed.            | `krci-cli-e2e-noop-run-a1b2c` |
 | `{{SUCCEEDED_RUN_NAME}}` | A run whose status is Succeeded.      | `krci-cli-e2e-noop-run-k7p2q` |
-| `{{BUILD_RUN_NAME}}` | A succeeded build run still in the cluster (finished minutes ago, not yet pruned to Tekton Results). | `build-my-app-main-zhqvj` |
+| `{{BUILD_RUN_NAME}}` | A succeeded build run still in the cluster: start `krci-cli-e2e-results` and wait for it to succeed right before the run. | `krci-cli-e2e-results-run-b3n9d` |
 | `{{RUNNING_RUN_NAME}}` | A run that stays in progress while the rows execute: start `krci-cli-e2e-noop` with `--param sleep-seconds=600` right before the run. | `krci-cli-e2e-noop-run-x7k2p` |
 | `{{DEPLOYMENT}}` | A deployment with at least one deploy run.       | `demo`                |
 | `{{ENV}}`     | An environment of DEPLOYMENT with at least one deploy run. | `dev`       |
@@ -107,15 +107,17 @@ flag-value guard (`cmdutil.FinalizeTree`).
 ## 3. Global flag wiring (env: `offline`)
 
 The only persistent flag is `--portal-url`, and it must also bind to
-`KRCI_PORTAL_URL`. We don't need a real portal here — any reachable URL
-that returns non-2xx is enough to prove the flag landed.
+`KRCI_PORTAL_URL`. Each row runs under an empty `HOME` with `KRCI_TOKEN`,
+`KRCI_CLUSTER_NAME` and `KRCI_NAMESPACE` set, so the command reaches the
+portal dial without a stored session. The unresolvable host in stderr shows
+which URL was used.
 
 | ID       | Command                                                                 | Env     | Setup                                     | Expect                                                                 |
 |----------|--------------------------------------------------------------------------|---------|--------------------------------------------|------------------------------------------------------------------------|
 | PR-G-01  | `krci --help`                                                           | offline | —                                          | `exit=0; stdout~/--portal-url string/`                                 |
-| PR-G-02  | `krci --portal-url https://invalid.example.invalid pipelinerun list`    | offline | —                                          | `exit=1; stderr~/invalid\.example\.invalid/`                           |
-| PR-G-03  | `KRCI_PORTAL_URL=https://invalid.example.invalid krci pipelinerun list` | offline | env var exported                           | `exit=1; stderr~/invalid\.example\.invalid/`                           |
-| PR-G-04  | `KRCI_PORTAL_URL=https://env.example.invalid krci --portal-url https://flag.example.invalid pipelinerun list` | offline | env var exported | `exit=1; stderr~/flag\.example\.invalid/; stderr!~/env\.example\.invalid/` |
+| PR-G-02  | `HOME=$(mktemp -d) KRCI_TOKEN=x KRCI_CLUSTER_NAME=c KRCI_NAMESPACE=ns krci --portal-url https://invalid.example.invalid pipelinerun list` | offline | —                                          | `exit=1; stderr~/invalid\.example\.invalid/`                           |
+| PR-G-03  | `HOME=$(mktemp -d) KRCI_TOKEN=x KRCI_CLUSTER_NAME=c KRCI_NAMESPACE=ns KRCI_PORTAL_URL=https://invalid.example.invalid krci pipelinerun list` | offline | env var exported                           | `exit=1; stderr~/invalid\.example\.invalid/`                           |
+| PR-G-04  | `HOME=$(mktemp -d) KRCI_TOKEN=x KRCI_CLUSTER_NAME=c KRCI_NAMESPACE=ns KRCI_PORTAL_URL=https://env.example.invalid krci --portal-url https://flag.example.invalid pipelinerun list` | offline | env var exported | `exit=1; stderr~/flag\.example\.invalid/; stderr!~/env\.example\.invalid/` |
 
 ## 4. `list` — filters against a real portal (env: `portal`)
 
@@ -201,7 +203,7 @@ If the OpenAPI client drifts, these break first.
 | PR-J-02  | `krci pipelinerun list --project {{PROJECT}} --pr {{PR}} -o json`    | portal | PR run has git metadata | `exit=0; stdout_json.pipelineRuns.0.prNumber:exists; stdout_json.pipelineRuns.0.prUrl:exists; stdout_json.pipelineRuns.0.branch:exists; stdout_json.pipelineRuns.0.commitSha:exists; stdout_json.pipelineRuns.0.author:exists` |
 | PR-J-03  | `krci pipelinerun get {{RUN_NAME}} -o json`                          | portal | run exists | `exit=0; stdout_json.pipelineRuns.0.portalUrl:exists`                                                     |
 | PR-J-04  | `krci pipelinerun get {{FAILED_RUN_NAME}} --reason -o json`         | portal | failed run | `exit=0; stdout_json.tasks.0.name:exists; stdout_json.tasks.0.status:exists`                              |
-| PR-J-05  | `krci pipelinerun get {{BUILD_RUN_NAME}} -o json`                   | portal | build run still in the cluster | `exit=0; stdout_json.pipelineRuns.0.type=build; stdout_json.pipelineRuns.0.results.VCS_TAG:exists`   |
+| PR-J-05  | `krci pipelinerun get {{BUILD_RUN_NAME}} -o json`                   | portal | run of `krci-cli-e2e-results`, succeeded | `exit=0; stdout_json.pipelineRuns.0.type=build; stdout_json.pipelineRuns.0.results.VCS_TAG:exists`   |
 
 ## 9. Auth gating (env: `auth` absent)
 
@@ -210,8 +212,10 @@ must print a helpful hint pointing at `krci auth login`.
 
 | ID       | Command                                      | Env      | Setup                       | Expect                                                                  |
 |----------|-----------------------------------------------|----------|------------------------------|-------------------------------------------------------------------------|
-| PR-A-01  | `krci pipelinerun list`                      | no-auth  | tokens removed / expired     | `exit=1; stderr~/authentication required/; stderr~/krci auth login/`    |
-| PR-A-02  | `krci pipelinerun get some-run`              | no-auth  | tokens removed / expired     | `exit=1; stderr~/authentication required/; stderr~/krci auth login/`    |
+| PR-A-01  | `krci pipelinerun list`                      | no-auth  | no stored session            | `exit=1; stderr~/not authenticated/; stderr~/krci auth login/`          |
+| PR-A-02  | `krci pipelinerun get some-run`              | no-auth  | no stored session            | `exit=1; stderr~/not authenticated/; stderr~/krci auth login/`          |
+| PR-A-03  | `KRCI_TOKEN=not-a-token krci pipelinerun list` | portal | the portal rejects the token | `exit=1; stderr~/authentication required/; stderr~/krci auth login/`    |
+| PR-A-04  | `KRCI_TOKEN=not-a-token krci pipelinerun get some-run` | portal | the portal rejects the token | `exit=1; stderr~/authentication required/; stderr~/krci auth login/` |
 
 > Rows in section 9 mutate/observe auth state — the orchestrator must run
 > them serially, **after** all other sections, and restore the prior

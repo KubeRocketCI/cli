@@ -41,9 +41,9 @@ non-zero exit.
 
 | ID         | Command                                                             | Env     | Setup | Expect                                                                                                             |
 |------------|----------------------------------------------------------------------|---------|-------|--------------------------------------------------------------------------------------------------------------------|
-| SCA-V-01   | `krci sca get`                                                       | offline | —     | `exit=1; stderr~/requires a KubeRocketCI codebase name/`                                                           |
-| SCA-V-02   | `krci sca components`                                                | offline | —     | `exit=1; stderr~/requires a KubeRocketCI codebase name/`                                                           |
-| SCA-V-03   | `krci sca findings`                                                  | offline | —     | `exit=1; stderr~/requires a KubeRocketCI codebase name/`                                                           |
+| SCA-V-01   | `krci sca get`                                                       | offline | —     | `exit=1; stderr~/requires a KubeRocketCI project name/`                                                           |
+| SCA-V-02   | `krci sca components`                                                | offline | —     | `exit=1; stderr~/requires a KubeRocketCI project name/`                                                           |
+| SCA-V-03   | `krci sca findings`                                                  | offline | —     | `exit=1; stderr~/requires a KubeRocketCI project name/`                                                           |
 | SCA-V-04   | `krci sca get svc --pr 42`                                           | offline | —     | `exit=1; stderr~/unknown flag: --pr/`                                                                              |
 | SCA-V-05   | `krci sca components svc --pr 42`                                    | offline | —     | `exit=1; stderr~/unknown flag: --pr/`                                                                              |
 | SCA-V-06   | `krci sca findings svc --pr 42`                                      | offline | —     | `exit=1; stderr~/unknown flag: --pr/`                                                                              |
@@ -113,7 +113,7 @@ When `--branch` is omitted, the Portal reads `Codebase.spec.defaultBranch`.
 | ID         | Command                                                          | Env    | Setup                                        | Expect                                                                                       |
 |------------|-------------------------------------------------------------------|--------|----------------------------------------------|----------------------------------------------------------------------------------------------|
 | SCA-B-01   | `krci sca get {{CODEBASE_OK}}`                                    | portal | spec.defaultBranch set                       | `exit=0; stdout~/{{CODEBASE_OK}} @ /`                                                        |
-| SCA-B-02   | `krci sca get {{CODEBASE_MISSING}}`                               | portal | no Codebase CR                               | `exit=1; stderr~/codebase {{CODEBASE_MISSING}} not found/; stderr~/krci sca list --search=/` |
+| SCA-B-02   | `krci sca get {{CODEBASE_MISSING}}`                               | portal | no Codebase CR                               | `exit=1; stderr~/project {{CODEBASE_MISSING}} not found/; stderr~/krci sca list --search=/` |
 
 ## 8. Error envelopes (env: `portal`)
 
