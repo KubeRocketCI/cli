@@ -1,0 +1,1 @@
+Error: fetching live pipeline runs: obtaining auth token: not authenticated: run 'krci auth login'

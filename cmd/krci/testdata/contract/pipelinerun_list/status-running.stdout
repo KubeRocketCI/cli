@@ -1,0 +1,17 @@
+{
+  "pipelineRuns": [
+    {
+      "name": "build-my-app-main-r2b3c",
+      "portalUrl": "{{PORTAL}}/c/in-cluster/cicd/pipelineruns/ns/build-my-app-main-r2b3c",
+      "status": "Running",
+      "pipeline": "github-my-app-app-build-default",
+      "project": "my-app",
+      "branch": "main",
+      "author": "dev-user",
+      "type": "build",
+      "startTime": "2026-01-02T10:00:00Z",
+      "duration": "2m 3s",
+      "commitSha": "1f2e3d4c5b6a79881726354a5b6c7d8e9f012345"
+    }
+  ]
+}

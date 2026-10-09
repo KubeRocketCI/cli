@@ -1,0 +1,1 @@
+Error: pipeline run "build-my-app-main-f9x8y" finished with status Failed; diagnose: krci pipelinerun get build-my-app-main-f9x8y --reason

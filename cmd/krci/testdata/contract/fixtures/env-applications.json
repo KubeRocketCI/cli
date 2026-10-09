@@ -1,0 +1,59 @@
+{
+  "apiVersion": "v1",
+  "kind": "List",
+  "metadata": {},
+  "items": [
+    {
+      "apiVersion": "argoproj.io/v1alpha1",
+      "kind": "Application",
+      "metadata": {
+        "name": "my-pipeline-dev-my-app",
+        "namespace": "ns",
+        "labels": {
+          "app.edp.epam.com/app-name": "my-app",
+          "app.edp.epam.com/pipeline": "my-pipeline",
+          "app.edp.epam.com/stage": "dev"
+        }
+      },
+      "spec": {
+        "sources": [
+          {
+            "repoURL": "https://git.example.com/my-org/my-app.git",
+            "targetRevision": "build/1.2.3",
+            "path": "deploy-templates",
+            "helm": {
+              "parameters": [
+                {"name": "image.tag", "value": "1.2.3"},
+                {"name": "image.repository", "value": "registry.example.com/my-app"}
+              ]
+            }
+          }
+        ]
+      },
+      "status": {
+        "health": {"status": "Healthy"},
+        "sync": {"status": "OutOfSync"},
+        "summary": {
+          "externalURLs": ["https://my-app-dev.example.com"],
+          "images": [
+            "registry.example.com/my-app-sidecar:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111",
+            "registry.example.com/my-app:1.2.3@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+          ]
+        },
+        "conditions": [
+          {
+            "type": "SyncError",
+            "message": "one or more objects failed to apply",
+            "lastTransitionTime": "2026-01-02T09:00:40Z"
+          }
+        ],
+        "operationState": {
+          "phase": "Failed",
+          "message": "one or more objects failed to apply",
+          "startedAt": "2026-01-02T09:00:00Z",
+          "finishedAt": "2026-01-02T09:00:30Z"
+        }
+      }
+    }
+  ]
+}

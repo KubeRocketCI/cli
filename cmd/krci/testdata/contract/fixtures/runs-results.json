@@ -1,0 +1,47 @@
+{
+  "results": [
+    {
+      "name": "ns/results/1b4e28ba-2fa1-41d2-883f-0016d3cca427",
+      "uid": "1b4e28ba-2fa1-41d2-883f-0016d3cca427",
+      "create_time": "2026-01-02T09:53:15Z",
+      "update_time": "2026-01-02T09:53:20Z",
+      "etag": "1b4e28ba-1767347600",
+      "annotations": {
+        "object.metadata.name": "review-my-app-main-s1a2b",
+        "app.edp.epam.com/codebase": "my-app-from-results",
+        "app.edp.epam.com/pipelinetype": "review",
+        "tekton.dev/pipeline": "github-my-app-app-review"
+      },
+      "summary": {
+        "record": "ns/results/1b4e28ba-2fa1-41d2-883f-0016d3cca427/records/1b4e28ba-2fa1-41d2-883f-0016d3cca427",
+        "type": "tekton.dev/v1.PipelineRun",
+        "status": "SUCCESS",
+        "start_time": "2026-01-02T09:50:01Z",
+        "end_time": "2026-01-02T09:53:10Z"
+      }
+    },
+    {
+      "name": "ns/results/6ec0bd7f-11c0-43da-975e-2a8ad9ebae0b",
+      "uid": "6ec0bd7f-11c0-43da-975e-2a8ad9ebae0b",
+      "create_time": "2026-01-02T09:31:10Z",
+      "update_time": "2026-01-02T09:31:15Z",
+      "etag": "6ec0bd7f-1767346275",
+      "annotations": {
+        "object.metadata.name": "deploy-my-pipeline-dev-d4e5f",
+        "app.edp.epam.com/pipelinetype": "deploy",
+        "app.edp.epam.com/cdpipeline": "my-pipeline",
+        "app.edp.epam.com/cdstage": "my-pipeline-dev",
+        "app.edp.epam.com/git-author": "release-bot",
+        "tekton.dev/pipeline": "deploy"
+      },
+      "summary": {
+        "record": "ns/results/6ec0bd7f-11c0-43da-975e-2a8ad9ebae0b/records/6ec0bd7f-11c0-43da-975e-2a8ad9ebae0b",
+        "type": "tekton.dev/v1.PipelineRun",
+        "status": "FAILURE",
+        "start_time": "2026-01-02T09:30:00Z",
+        "end_time": "2026-01-02T09:31:05Z"
+      }
+    }
+  ],
+  "nextPageToken": ""
+}

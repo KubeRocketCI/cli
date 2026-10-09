@@ -1,0 +1,85 @@
+{
+  "apiVersion": "v1",
+  "kind": "List",
+  "metadata": {},
+  "items": [
+    {
+      "apiVersion": "tekton.dev/v1",
+      "kind": "PipelineRun",
+      "metadata": {
+        "name": "build-my-app-main-r2b3c",
+        "namespace": "ns",
+        "creationTimestamp": "2026-01-02T09:59:58Z",
+        "labels": {
+          "app.edp.epam.com/codebase": "my-app",
+          "app.edp.epam.com/pipelinetype": "build",
+          "app.edp.epam.com/git-branch": "main",
+          "tekton.dev/pipeline": "github-my-app-app-build-default"
+        },
+        "annotations": {
+          "results.tekton.dev/resultAnnotations": "{\"app.edp.epam.com/git-author\":\"dev-user\",\"app.edp.epam.com/git-branch\":\"main\",\"app.edp.epam.com/git-commit-sha\":\"1f2e3d4c5b6a79881726354a5b6c7d8e9f012345\",\"app.edp.epam.com/git-change-number\":\"${tt.params.changeNumber}\"}"
+        }
+      },
+      "spec": {
+        "pipelineRef": {
+          "name": "github-my-app-app-build-default"
+        }
+      },
+      "status": {
+        "startTime": "2026-01-02T10:00:00Z",
+        "conditions": [
+          {
+            "type": "Succeeded",
+            "status": "Unknown",
+            "reason": "Running",
+            "message": "Tasks Completed: 1 (Failed: 0, Cancelled 0), Incomplete: 2, Skipped: 0"
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "tekton.dev/v1",
+      "kind": "PipelineRun",
+      "metadata": {
+        "name": "review-my-app-main-s1a2b",
+        "namespace": "ns",
+        "creationTimestamp": "2026-01-02T09:49:58Z",
+        "labels": {
+          "app.edp.epam.com/codebase": "my-app",
+          "app.edp.epam.com/pipelinetype": "review",
+          "app.edp.epam.com/git-branch": "feature-login",
+          "app.edp.epam.com/git-author": "dev-user",
+          "app.edp.epam.com/git-change-number": "42",
+          "app.edp.epam.com/git-target-branch": "main",
+          "tekton.dev/pipeline": "github-my-app-app-review"
+        },
+        "annotations": {
+          "app.edp.epam.com/git-change-url": "https://git.example.com/my-org/my-app/pull/42",
+          "app.edp.epam.com/git-commit-sha": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567"
+        }
+      },
+      "spec": {
+        "pipelineRef": {
+          "name": "github-my-app-app-review"
+        }
+      },
+      "status": {
+        "startTime": "2026-01-02T09:50:00Z",
+        "completionTime": "2026-01-02T09:53:10Z",
+        "conditions": [
+          {
+            "type": "Succeeded",
+            "status": "True",
+            "reason": "Succeeded",
+            "message": "Tasks Completed: 3 (Failed: 0, Cancelled 0), Skipped: 0"
+          }
+        ],
+        "results": [
+          {"name": "VCS_TAG", "value": "review/1.0.0-SNAPSHOT.4"},
+          {"name": "IMAGE_TAGS", "value": ["1.0.0-SNAPSHOT.4", "latest"]},
+          {"name": "BUILD_INFO", "value": {"version": "1.0.0", "commit": "0a1b2c3"}}
+        ]
+      }
+    }
+  ]
+}

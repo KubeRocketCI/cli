@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "1",
+  "error": {
+    "message": "authentication required: unauthorized: please run 'krci auth login'\n\nRun: krci auth login"
+  }
+}
