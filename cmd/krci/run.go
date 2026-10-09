@@ -14,6 +14,11 @@ import (
 	"github.com/KubeRocketCI/cli/pkg/cmd/root"
 )
 
+// exitInterrupted is the exit code of a command ended by context cancellation,
+// for any signal (128+SIGINT). main replaces it with death by the received
+// signal where the platform supports it.
+const exitInterrupted = 130
+
 // run executes the CLI over stdout and stderr and returns the exit code.
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	return runWith(ctx, args, cmdutil.New(iostreams.FromWriters(os.Stdin, stdout, stderr)))
@@ -36,6 +41,11 @@ func runWith(ctx context.Context, args []string, f *cmdutil.Factory) int {
 	configure(f, cmd.PersistentFlags())
 
 	if err := cmd.ExecuteContext(ctx); err != nil {
+		// Reads ctx, not err: wrapped errors do not always carry the context error.
+		if ctx.Err() != nil {
+			return exitInterrupted
+		}
+
 		printError(ios.ErrOut, err)
 
 		return 1

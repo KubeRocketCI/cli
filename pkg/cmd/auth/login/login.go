@@ -17,7 +17,7 @@ import (
 )
 
 // clusterFetchFunc fetches cluster configuration from a portal URL using a bearer token.
-type clusterFetchFunc func(portalURL, token string) (*portal.ClusterConfig, error)
+type clusterFetchFunc func(ctx context.Context, portalURL, token string) (*portal.ClusterConfig, error)
 
 // LoginOptions holds all inputs for the login command.
 type LoginOptions struct {
@@ -79,7 +79,7 @@ func loginRun(cmd *cobra.Command, opts *LoginOptions) error {
 	// Mutate the factory-cached pointer so TokenProvider() (which holds the
 	// same *config.Config) sees the discovered issuer URL during construction.
 	if cfg.IssuerURL == "" {
-		issuerURL, err := portal.FetchOIDCConfig(cfg.PortalURL)
+		issuerURL, err := portal.FetchOIDCConfig(cmd.Context(), cfg.PortalURL)
 		if err != nil {
 			if errors.Is(err, portal.ErrHTTPSRequired) {
 				return fmt.Errorf("invalid portal URL: %w", err)
@@ -115,7 +115,9 @@ func loginRun(cmd *cobra.Command, opts *LoginOptions) error {
 		_, _ = fmt.Fprintf(opts.IO.ErrOut, "Warning: could not save config: %v\n", err)
 	}
 
-	return nil
+	// Checked after Save: an interrupted login keeps the token and portal URL,
+	// and the process still dies by the signal.
+	return cmd.Context().Err()
 }
 
 // populateClusterConfig fetches cluster name and namespace from the portal
@@ -128,7 +130,16 @@ func populateClusterConfig(
 		return
 	}
 
-	fetchClusterMetadata(ctx, tp, cfg, errOut, fetch)
+	err := fetchClusterMetadata(ctx, tp, cfg, errOut, fetch)
+
+	// Cancelled: no warnings; loginRun returns ctx.Err().
+	if ctx.Err() != nil {
+		return
+	}
+
+	if err != nil {
+		_, _ = fmt.Fprintf(errOut, "Warning: %v\n", err)
+	}
 
 	if cfg.Namespace == "" {
 		_, _ = fmt.Fprintf(errOut,
@@ -139,17 +150,15 @@ func populateClusterConfig(
 func fetchClusterMetadata(
 	ctx context.Context, tp auth.TokenProvider, cfg *config.Config,
 	errOut io.Writer, fetch clusterFetchFunc,
-) {
+) error {
 	tok, err := tp.GetToken(ctx)
 	if err != nil {
-		_, _ = fmt.Fprintf(errOut, "Warning: could not get token for cluster config: %v\n", err)
-		return
+		return fmt.Errorf("could not get token for cluster config: %w", err)
 	}
 
-	clusterCfg, err := fetch(cfg.PortalURL, tok)
+	clusterCfg, err := fetch(ctx, cfg.PortalURL, tok)
 	if err != nil {
-		_, _ = fmt.Fprintf(errOut, "Warning: could not fetch cluster config: %v\n", err)
-		return
+		return fmt.Errorf("could not fetch cluster config: %w", err)
 	}
 
 	if cfg.ClusterName == "" && clusterCfg.ClusterName != "" {
@@ -165,4 +174,6 @@ func fetchClusterMetadata(
 				"Warning: portal returned invalid namespace %q, ignoring\n", clusterCfg.DefaultNamespace)
 		}
 	}
+
+	return nil
 }

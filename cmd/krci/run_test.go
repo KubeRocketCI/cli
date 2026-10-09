@@ -195,6 +195,36 @@ func TestRunWith(t *testing.T) {
 	}
 }
 
+func TestRunWith_CancelledContext(t *testing.T) {
+	cases := map[string]runCase{
+		"failing command exits 130 without output": {
+			args:       []string{"project", "list"},
+			wantCode:   130,
+			wantOut:    empty(),
+			wantErrOut: empty(),
+		},
+		"succeeding command exits 0": {
+			args:       []string{"version"},
+			wantOut:    prefix("krci version "),
+			wantErrOut: empty(),
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			isolatedConfigDir(t)
+
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+
+			var out, errb bytes.Buffer
+
+			code := runWith(ctx, tc.args, newFactory(&out, &errb))
+			tc.check(t, code, out.String(), errb.String())
+		})
+	}
+}
+
 func TestRunWith_NilArgsIgnoreProcessArgs(t *testing.T) {
 	isolatedConfigDir(t)
 

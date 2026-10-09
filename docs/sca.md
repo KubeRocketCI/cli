@@ -175,6 +175,10 @@ krci sca findings payments-api -o json | jq -r '.data.items[].vulnerability.vuln
 | `0`  | Command succeeded (including `status=NONE` payloads)                      |
 | `1`  | Any failure — validation, auth, not-found, upstream unavailable, bad flag |
 
+An interrupted command dies by the signal (shell status 130 for SIGINT, 143 for
+SIGTERM; `130` on Windows) instead of exiting `1`. See
+[json-schemas.md](json-schemas.md) for its stdout and stderr output.
+
 ## JSON output
 
 Every command emits a stable `{ "schemaVersion": "1", "data": { … } }`

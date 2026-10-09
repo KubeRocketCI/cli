@@ -1,6 +1,7 @@
 package cmdutil
 
 import (
+	"context"
 	"errors"
 
 	"github.com/KubeRocketCI/cli/internal/iostreams"
@@ -19,9 +20,17 @@ func HandleAuthError(err error) error {
 }
 
 // PrintError writes err to stdout as the JSON error envelope when -o json is
-// selected. It returns err, so the root command prints the message on stderr
-// and exits 1.
+// selected and err does not report context cancellation. It returns err, so the
+// root command prints the message on stderr and exits 1, or exits silently if
+// the command was interrupted.
 func PrintError(ios *iostreams.IOStreams, outputFormat, schemaVersion string, err error) error {
+	// Matches only while main cancels with context.WithCancel: under
+	// signal.NotifyContext, net/http returns the signal cause, which does not
+	// wrap context.Canceled.
+	if errors.Is(err, context.Canceled) {
+		return err
+	}
+
 	if output.ResolveFormat(outputFormat) == output.FormatJSON {
 		_ = output.PrintJSONErrorEnvelope(ios.Out, schemaVersion, err)
 	}

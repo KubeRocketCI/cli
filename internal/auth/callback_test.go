@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -24,7 +25,7 @@ func TestCallbackSuccess(t *testing.T) {
 	errCh := make(chan error, 1)
 
 	go func() {
-		r, e := waitForCallback(listener, state, 5*time.Second)
+		r, e := waitForCallback(t.Context(), listener, state, 5*time.Second)
 		if e != nil {
 			errCh <- e
 			return
@@ -60,7 +61,7 @@ func TestCallbackStateMismatchKeepsListening(t *testing.T) {
 	errCh := make(chan error, 1)
 
 	go func() {
-		r, e := waitForCallback(listener, state, 5*time.Second)
+		r, e := waitForCallback(t.Context(), listener, state, 5*time.Second)
 		if e != nil {
 			errCh <- e
 			return
@@ -101,7 +102,7 @@ func TestCallbackOAuthError(t *testing.T) {
 	errCh := make(chan error, 1)
 
 	go func() {
-		_, e := waitForCallback(listener, "state", 5*time.Second)
+		_, e := waitForCallback(t.Context(), listener, "state", 5*time.Second)
 		errCh <- e
 	}()
 
@@ -124,8 +125,56 @@ func TestCallbackTimeout(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 
-	_, err = waitForCallback(listener, "state", 100*time.Millisecond)
-	require.Error(t, err)
+	_, err = waitForCallback(t.Context(), listener, "state", 100*time.Millisecond)
+	require.EqualError(t, err, "authentication timed out after 100ms")
+	assert.NotErrorIs(t, err, context.Canceled)
+}
+
+func TestCallbackCancel(t *testing.T) {
+	t.Parallel()
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	addr := listener.Addr().String()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	errCh := make(chan error, 1)
+
+	go func() {
+		_, e := waitForCallback(ctx, listener, "state", time.Minute)
+		errCh <- e
+	}()
+
+	// The server accepts connections in order: once the 404 arrives, the idle
+	// connection dialed before it is tracked by the server.
+	idle, err := net.Dial("tcp", addr)
+	require.NoError(t, err)
+
+	defer idle.Close()
+
+	resp, err := http.Get("http://" + addr + "/x")
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+
+	cancel()
+
+	select {
+	case err := <-errCh:
+		require.ErrorIs(t, err, context.Canceled)
+		assert.EqualError(t, err, "authentication cancelled: context canceled")
+	case <-time.After(time.Second):
+		t.Fatal("waitForCallback did not return within 1s of cancellation")
+	}
+
+	conn, err := net.DialTimeout("tcp", addr, time.Second)
+	if err == nil {
+		conn.Close()
+		t.Fatal("listener still accepts connections after cancellation")
+	}
 }
 
 func TestGenerateState(t *testing.T) {
