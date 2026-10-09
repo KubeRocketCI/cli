@@ -30,7 +30,7 @@ func NewCmdRoot(f *cmdutil.Factory, v, commit, date string) *cobra.Command {
 		SilenceErrors: true,
 	}
 
-	config.BindFlags(cmd)
+	config.AddFlags(cmd.PersistentFlags())
 
 	cmd.AddCommand(
 		auth.NewCmdAuth(f),
