@@ -18,6 +18,12 @@ written to stderr. The envelope is printed for an error met after the flags and
 arguments are validated: no portal configured, no valid session, a Portal
 error. A rejected flag or argument is reported on stderr only.
 
+An interrupted command (SIGINT or SIGTERM) cancels in-flight work and dies by
+that signal (shell status 130 for SIGINT, 143 for SIGTERM). As PID 1 it exits
+with that status; on Windows it exits `130`. No `Error:` line is written. Under
+`-o json` the error envelope is omitted when the error reports the
+cancellation.
+
 `schemaVersion` is a fixed string (`"1"` for every verb listed below) so
 scripts can detect future breaking changes by checking the version.
 

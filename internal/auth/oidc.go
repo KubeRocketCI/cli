@@ -91,7 +91,7 @@ func (p *tokenProvider) login(ctx context.Context) (*UserInfo, error) {
 		fmt.Fprintf(os.Stderr, "Warning: could not open browser: %v\n", err)
 	}
 
-	result, err := waitForCallback(listener, state, 5*time.Minute)
+	result, err := waitForCallback(ctx, listener, state, 5*time.Minute)
 	if err != nil {
 		return nil, err
 	}

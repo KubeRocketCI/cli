@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,7 +30,7 @@ func TestFetchOIDCConfig_RequiresHTTPS(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := FetchOIDCConfig(tt.portalURL)
+			_, err := FetchOIDCConfig(t.Context(), tt.portalURL)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "portal URL must use HTTPS")
 		})
@@ -91,7 +92,7 @@ func TestFetchOIDCConfig(t *testing.T) {
 			defer srv.Close()
 
 			// Use http:// for test server (validatePortalURL requires https, so bypass it)
-			issuerURL, err := fetchOIDCConfig(srv.URL)
+			issuerURL, err := fetchOIDCConfig(t.Context(), srv.URL)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -109,7 +110,7 @@ func TestFetchOIDCConfig(t *testing.T) {
 func TestFetchClusterConfig_RequiresHTTPS(t *testing.T) {
 	t.Parallel()
 
-	_, err := FetchClusterConfig("http://portal.example.com", "token")
+	_, err := FetchClusterConfig(t.Context(), "http://portal.example.com", "token")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "portal URL must use HTTPS")
 }
@@ -161,7 +162,7 @@ func TestFetchClusterConfig(t *testing.T) {
 			srv := httptest.NewServer(tt.handler)
 			defer srv.Close()
 
-			cfg, err := fetchClusterConfig(srv.URL, "test-token")
+			cfg, err := fetchClusterConfig(t.Context(), srv.URL, "test-token")
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -173,6 +174,97 @@ func TestFetchClusterConfig(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantCluster, cfg.ClusterName)
 			assert.Equal(t, tt.wantNS, cfg.DefaultNamespace)
+		})
+	}
+}
+
+// fetchers adapts both fetches to one signature. cluster uses a fixed token.
+var fetchers = map[string]struct {
+	fetch      func(ctx context.Context, portalURL string) error
+	errPrefix  string
+	urlPathEnd string
+}{
+	"OIDC": {
+		fetch: func(ctx context.Context, portalURL string) error {
+			_, err := fetchOIDCConfig(ctx, portalURL)
+			return err
+		},
+		errPrefix:  "requesting OIDC config: Get ",
+		urlPathEnd: "/rest/v1/config/oidc",
+	},
+	"cluster": {
+		fetch: func(ctx context.Context, portalURL string) error {
+			_, err := fetchClusterConfig(ctx, portalURL, "test-token")
+			return err
+		},
+		errPrefix:  "requesting cluster config: Get ",
+		urlPathEnd: "/rest/v1/config",
+	},
+}
+
+func TestFetchConfig_RequestErrorText(t *testing.T) {
+	t.Parallel()
+
+	for name, tc := range fetchers {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			srv := httptest.NewServer(http.NotFoundHandler())
+			portalURL := srv.URL
+			srv.Close()
+
+			err := tc.fetch(t.Context(), portalURL)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.errPrefix+`"`+portalURL+tc.urlPathEnd+`": `)
+		})
+	}
+}
+
+func TestFetchConfig_CancelInFlight(t *testing.T) {
+	t.Parallel()
+
+	for name, tc := range fetchers {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			started := make(chan struct{})
+			release := make(chan struct{})
+
+			srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+				close(started)
+
+				select {
+				case <-r.Context().Done():
+				case <-release:
+				}
+			}))
+			// Cleanups run last-in first-out: the handler is released before the server closes.
+			t.Cleanup(srv.Close)
+			t.Cleanup(func() { close(release) })
+
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			errCh := make(chan error, 1)
+
+			go func() { errCh <- tc.fetch(ctx, srv.URL) }()
+
+			select {
+			case <-started:
+			case <-time.After(5 * time.Second):
+				t.Fatal("request did not reach the server")
+			}
+
+			cancel()
+
+			// Client.Timeout surfaces as DeadlineExceeded; Canceled proves the
+			// caller's ctx ended the request.
+			select {
+			case err := <-errCh:
+				require.ErrorIs(t, err, context.Canceled)
+			case <-time.After(5 * time.Second):
+				t.Fatal("fetch did not return within 5s of cancellation")
+			}
 		})
 	}
 }

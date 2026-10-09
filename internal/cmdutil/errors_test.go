@@ -2,6 +2,7 @@ package cmdutil
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -65,6 +66,18 @@ func TestPrintError(t *testing.T) {
 			assert.JSONEq(t, tt.wantStdout, stdout.String())
 		})
 	}
+}
+
+func TestPrintError_CancelledWritesNoEnvelope(t *testing.T) {
+	t.Parallel()
+
+	stdout := &bytes.Buffer{}
+	ios := &iostreams.IOStreams{Out: stdout, ErrOut: &bytes.Buffer{}}
+
+	cancelled := fmt.Errorf("calling sonar list: %w", context.Canceled)
+
+	assert.Equal(t, cancelled, PrintError(ios, "json", "7", cancelled))
+	assert.Empty(t, stdout.String())
 }
 
 func TestHandleError_EnvelopeCarriesTheLoginHint(t *testing.T) {

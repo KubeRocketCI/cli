@@ -34,7 +34,11 @@ const errorHTML = `<!DOCTYPE html>
 // It validates the state parameter and returns the authorization code.
 // Invalid requests (wrong state, missing code) are rejected with HTTP errors but
 // do NOT terminate the server — only a valid success or an IdP error response is terminal.
-func waitForCallback(listener net.Listener, expectedState string, timeout time.Duration) (*callbackResult, error) {
+// The wait ends after timeout or when ctx is cancelled; cancellation returns an
+// error wrapping ctx.Err().
+func waitForCallback(
+	ctx context.Context, listener net.Listener, expectedState string, timeout time.Duration,
+) (*callbackResult, error) {
 	resultCh := make(chan *callbackResult, 1)
 	errCh := make(chan error, 1)
 
@@ -91,17 +95,23 @@ func waitForCallback(listener net.Listener, expectedState string, timeout time.D
 		}
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	waitCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	select {
 	case result := <-resultCh:
-		_ = srv.Shutdown(ctx)
+		_ = srv.Shutdown(waitCtx)
 		return result, nil
 	case err := <-errCh:
-		_ = srv.Shutdown(ctx)
+		_ = srv.Shutdown(waitCtx)
 		return nil, fmt.Errorf("auth callback: %w", err)
-	case <-ctx.Done():
+	case <-waitCtx.Done():
+		if ctx.Err() != nil {
+			// Close drops idle browser preconnects; Shutdown waits on them for 5 s.
+			_ = srv.Close()
+			return nil, fmt.Errorf("authentication cancelled: %w", ctx.Err())
+		}
+
 		_ = srv.Shutdown(context.Background())
 		return nil, fmt.Errorf("authentication timed out after %v", timeout)
 	}
