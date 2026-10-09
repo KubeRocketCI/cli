@@ -1,0 +1,3 @@
+Error: authentication required: fetching live pipeline runs: unauthorized: please run 'krci auth login'
+
+Run: krci auth login

@@ -1,0 +1,57 @@
+{
+  "pipelineRuns": [
+    {
+      "name": "build-my-app-main-r2b3c",
+      "portalUrl": "{{PORTAL}}/c/in-cluster/cicd/pipelineruns/ns/build-my-app-main-r2b3c",
+      "status": "Running",
+      "pipeline": "github-my-app-app-build-default",
+      "project": "my-app",
+      "branch": "main",
+      "author": "dev-user",
+      "type": "build",
+      "startTime": "2026-01-02T10:00:00Z",
+      "duration": "2m 3s",
+      "commitSha": "1f2e3d4c5b6a79881726354a5b6c7d8e9f012345"
+    },
+    {
+      "name": "review-my-app-main-s1a2b",
+      "portalUrl": "{{PORTAL}}/c/in-cluster/cicd/pipelineruns/ns/review-my-app-main-s1a2b",
+      "status": "Succeeded",
+      "pipeline": "github-my-app-app-review",
+      "project": "my-app",
+      "branch": "feature-login",
+      "prNumber": "42",
+      "prUrl": "https://git.example.com/my-org/my-app/pull/42",
+      "author": "dev-user",
+      "type": "review",
+      "startTime": "2026-01-02T09:50:00Z",
+      "duration": "3m 10s",
+      "targetBranch": "main",
+      "commitSha": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+      "results": {
+        "BUILD_INFO": {
+          "commit": "0a1b2c3",
+          "version": "1.0.0"
+        },
+        "IMAGE_TAGS": [
+          "1.0.0-SNAPSHOT.4",
+          "latest"
+        ],
+        "VCS_TAG": "review/1.0.0-SNAPSHOT.4"
+      }
+    },
+    {
+      "name": "deploy-my-pipeline-dev-d4e5f",
+      "portalUrl": "{{PORTAL}}/c/in-cluster/cicd/pipelineruns/ns/deploy-my-pipeline-dev-d4e5f",
+      "status": "Failed",
+      "pipeline": "deploy",
+      "project": "",
+      "author": "release-bot",
+      "type": "deploy",
+      "startTime": "2026-01-02T09:30:00Z",
+      "duration": "1m 5s",
+      "deployment": "my-pipeline",
+      "env": "dev"
+    }
+  ]
+}

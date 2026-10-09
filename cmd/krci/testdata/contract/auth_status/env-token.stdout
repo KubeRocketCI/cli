@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1",
+  "data": {
+    "authenticated": true,
+    "user": "dev@example.com",
+    "name": "Dev User",
+    "groups": [
+      "developers"
+    ],
+    "expiresAt": "2100-01-01T00:00:00Z"
+  }
+}

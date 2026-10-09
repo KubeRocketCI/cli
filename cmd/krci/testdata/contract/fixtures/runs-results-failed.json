@@ -1,0 +1,23 @@
+{
+  "results": [
+    {
+      "name": "ns/results/3f2504e0-4f89-41d3-9a0c-0305e82c3301",
+      "uid": "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
+      "create_time": "2026-01-02T09:45:35Z",
+      "update_time": "2026-01-02T09:45:40Z",
+      "annotations": {
+        "object.metadata.name": "build-my-app-main-f9x8y",
+        "app.edp.epam.com/codebase": "my-app",
+        "app.edp.epam.com/pipelinetype": "build",
+        "tekton.dev/pipeline": "github-my-app-app-build-default"
+      },
+      "summary": {
+        "record": "ns/results/3f2504e0-4f89-41d3-9a0c-0305e82c3301/records/9a7b3c1d-5e6f-4a8b-9c0d-1e2f3a4b5c6d",
+        "type": "tekton.dev/v1.PipelineRun",
+        "status": "FAILURE",
+        "start_time": "2026-01-02T09:40:00Z",
+        "end_time": "2026-01-02T09:45:30Z"
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "kind": "created",
+  "row": {
+    "name": "build-my-app-main-x9k2p",
+    "status": "Pending",
+    "project": "my-app",
+    "pr": "",
+    "author": "dev-user",
+    "type": "build",
+    "started": "2026-01-02T10:02:00Z",
+    "duration": ""
+  }
+}

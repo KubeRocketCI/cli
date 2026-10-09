@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "1",
+  "error": {
+    "message": "authentication required: listing events in namespace \"my-pipeline-dev\": unauthorized: please run 'krci auth login'\n\nRun: krci auth login"
+  }
+}

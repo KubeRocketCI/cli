@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "1",
+  "data": {
+    "deployment": "my-pipeline",
+    "env": "dev",
+    "cluster": "in-cluster",
+    "namespace": "my-pipeline-dev",
+    "events": [
+      {
+        "type": "Warning",
+        "reason": "Failed",
+        "message": "Failed to pull image \"registry.example.com/metrics:0.9\": not found",
+        "involvedObject": {
+          "kind": "Pod",
+          "name": "my-app-7d9f8b6c5-abcde"
+        },
+        "count": 4,
+        "firstSeen": "2026-01-02T09:00:25Z",
+        "lastSeen": "2026-01-02T09:06:00Z",
+        "source": "kubelet"
+      },
+      {
+        "type": "Warning",
+        "reason": "BackOff",
+        "message": "Back-off restarting failed container app in pod my-app-7d9f8b6c5-abcde",
+        "involvedObject": {
+          "kind": "Pod",
+          "name": "my-app-7d9f8b6c5-abcde"
+        },
+        "count": 5,
+        "firstSeen": "2026-01-02T09:02:10Z",
+        "lastSeen": "2026-01-02T09:04:45Z",
+        "source": "kubelet"
+      },
+      {
+        "type": "Normal",
+        "reason": "Scheduled",
+        "message": "Successfully assigned my-pipeline-dev/my-app-7d9f8b6c5-abcde to node-1",
+        "involvedObject": {
+          "kind": "Pod",
+          "name": "my-app-7d9f8b6c5-abcde"
+        },
+        "count": 1,
+        "firstSeen": "2026-01-02T09:00:10Z",
+        "lastSeen": "2026-01-02T09:00:10Z",
+        "source": "default-scheduler"
+      },
+      {
+        "type": "Normal",
+        "reason": "ScalingReplicaSet",
+        "message": "Scaled up replica set my-app-7d9f8b6c5 to 1",
+        "involvedObject": {
+          "kind": "Deployment",
+          "name": "my-app"
+        },
+        "count": 1,
+        "firstSeen": "2026-01-02T09:00:05Z",
+        "lastSeen": "2026-01-02T09:00:05Z",
+        "source": "deployment-controller"
+      }
+    ]
+  }
+}

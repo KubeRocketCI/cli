@@ -1,0 +1,57 @@
+{
+  "taskRuns": [
+    {
+      "apiVersion": "tekton.dev/v1",
+      "kind": "TaskRun",
+      "metadata": {
+        "name": "build-my-app-main-f9x8y-compile",
+        "namespace": "ns",
+        "uid": "c0a80101-0000-4000-8000-000000000002"
+      },
+      "spec": {},
+      "status": {
+        "podName": "build-my-app-main-f9x8y-compile-pod",
+        "startTime": "2026-01-02T09:41:00Z",
+        "completionTime": "2026-01-02T09:45:20Z",
+        "conditions": [
+          {
+            "type": "Succeeded",
+            "status": "False",
+            "reason": "Failed",
+            "message": "\"step-compile\" exited with code 2"
+          }
+        ],
+        "steps": [
+          {"name": "prepare", "container": "step-prepare", "terminated": {"exitCode": 0, "reason": "Completed"}},
+          {"name": "compile", "container": "step-compile", "terminated": {"exitCode": 2, "reason": "Error"}}
+        ]
+      }
+    },
+    {
+      "apiVersion": "tekton.dev/v1",
+      "kind": "TaskRun",
+      "metadata": {
+        "name": "build-my-app-main-f9x8y-fetch-repository",
+        "namespace": "ns",
+        "uid": "c0a80101-0000-4000-8000-000000000001"
+      },
+      "spec": {},
+      "status": {
+        "podName": "build-my-app-main-f9x8y-fetch-repository-pod",
+        "startTime": "2026-01-02T09:40:05Z",
+        "completionTime": "2026-01-02T09:40:35Z",
+        "conditions": [
+          {
+            "type": "Succeeded",
+            "status": "True",
+            "reason": "Succeeded",
+            "message": "All Steps have completed executing"
+          }
+        ],
+        "steps": [
+          {"name": "clone", "container": "step-clone", "terminated": {"exitCode": 0, "reason": "Completed"}}
+        ]
+      }
+    }
+  ]
+}

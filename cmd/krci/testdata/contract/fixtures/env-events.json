@@ -1,0 +1,44 @@
+{
+  "apiVersion": "v1",
+  "kind": "List",
+  "metadata": {},
+  "items": [
+    {
+      "type": "Normal",
+      "reason": "ScalingReplicaSet",
+      "message": "Scaled up replica set my-app-7d9f8b6c5 to 1\n",
+      "involvedObject": {"kind": "Deployment", "name": "my-app"},
+      "count": 1,
+      "firstTimestamp": "2026-01-02T09:00:05Z",
+      "lastTimestamp": "2026-01-02T09:00:05Z",
+      "source": {"component": "deployment-controller"}
+    },
+    {
+      "type": "Warning",
+      "reason": "BackOff",
+      "message": "Back-off restarting failed container app in pod my-app-7d9f8b6c5-abcde",
+      "involvedObject": {"kind": "Pod", "name": "my-app-7d9f8b6c5-abcde"},
+      "count": 5,
+      "firstTimestamp": "2026-01-02T09:02:10Z",
+      "lastTimestamp": "2026-01-02T09:04:45Z",
+      "source": {"component": "kubelet"}
+    },
+    {
+      "type": "Warning",
+      "reason": "Failed",
+      "message": "Failed to pull image \"registry.example.com/metrics:0.9\": not found",
+      "involvedObject": {"kind": "Pod", "name": "my-app-7d9f8b6c5-abcde"},
+      "eventTime": "2026-01-02T09:00:25Z",
+      "series": {"count": 4, "lastObservedTime": "2026-01-02T09:06:00Z"},
+      "reportingComponent": "kubelet"
+    },
+    {
+      "type": "Normal",
+      "reason": "Scheduled",
+      "message": "Successfully assigned my-pipeline-dev/my-app-7d9f8b6c5-abcde to node-1",
+      "involvedObject": {"kind": "Pod", "name": "my-app-7d9f8b6c5-abcde"},
+      "eventTime": "2026-01-02T09:00:10Z",
+      "reportingComponent": "default-scheduler"
+    }
+  ]
+}

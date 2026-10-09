@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1",
+  "data": {
+    "name": "my-app-release-k8s7q",
+    "status": "Running",
+    "project": "my-app",
+    "pr": "42",
+    "author": "dev-user",
+    "type": "release",
+    "started": "2026-01-02T10:00:00Z",
+    "duration": "2m3s"
+  }
+}

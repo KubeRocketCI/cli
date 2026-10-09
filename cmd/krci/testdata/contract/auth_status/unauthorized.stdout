@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "1",
+  "error": {
+    "message": "not authenticated: the portal rejected the token"
+  }
+}

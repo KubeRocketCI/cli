@@ -1,0 +1,15 @@
+{
+  "apiVersion": "v2.edp.epam.com/v1",
+  "kind": "CDPipeline",
+  "metadata": {
+    "name": "my-pipeline",
+    "namespace": "ns",
+    "creationTimestamp": "2025-12-01T07:55:00Z"
+  },
+  "spec": {
+    "name": "my-pipeline",
+    "applications": ["my-app", "my-api"],
+    "deploymentType": "container"
+  },
+  "status": {"status": "created", "available": true}
+}

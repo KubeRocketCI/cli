@@ -1,0 +1,17 @@
+{
+  "pipelineRuns": [
+    {
+      "name": "build-my-app-main-f9x8y",
+      "portalUrl": "{{PORTAL}}/c/in-cluster/cicd/pipelineruns/ns/build-my-app-main-f9x8y",
+      "status": "Failed",
+      "pipeline": "github-my-app-app-build-default",
+      "project": "my-app",
+      "branch": "main",
+      "author": "dev-user",
+      "type": "build",
+      "startTime": "2026-01-02T09:40:00Z",
+      "duration": "5m 30s",
+      "commitSha": "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432"
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "1",
+  "data": {
+    "deployment": "my-pipeline",
+    "env": "dev",
+    "status": "created",
+    "detailedMessage": "environment is ready",
+    "description": "Development environment",
+    "order": 0,
+    "infrastructure": {
+      "cluster": "in-cluster",
+      "namespace": "my-pipeline-dev",
+      "triggerType": "Manual",
+      "deployPipeline": "deploy-with-autotests",
+      "cleanPipeline": "clean"
+    },
+    "qualityGates": [
+      {
+        "type": "manual",
+        "stepName": "approve",
+        "autotestName": null,
+        "branchName": null
+      },
+      {
+        "type": "autotests",
+        "stepName": "smoke",
+        "autotestName": "my-autotests",
+        "branchName": "main"
+      }
+    ],
+    "projects": [
+      {
+        "name": "my-api",
+        "status": null,
+        "sync": null,
+        "version": null,
+        "imageTag": null,
+        "imageDigest": null,
+        "ingressUrls": [],
+        "argocdUrl": null,
+        "deployedAt": null,
+        "valuesOverride": null,
+        "conditions": [],
+        "operation": null
+      },
+      {
+        "name": "my-app",
+        "status": "healthy",
+        "sync": "outofsync",
+        "version": "1.2.3",
+        "imageTag": "1.2.3",
+        "imageDigest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "ingressUrls": [
+          "https://my-app-dev.example.com"
+        ],
+        "argocdUrl": "/applications/my-pipeline-dev-my-app",
+        "deployedAt": "2026-01-02T09:00:30Z",
+        "valuesOverride": true,
+        "conditions": [
+          {
+            "type": "SyncError",
+            "message": "one or more objects failed to apply",
+            "lastTransitionTime": "2026-01-02T09:00:40Z"
+          }
+        ],
+        "operation": {
+          "phase": "Failed",
+          "message": "one or more objects failed to apply",
+          "startedAt": "2026-01-02T09:00:00Z",
+          "finishedAt": "2026-01-02T09:00:30Z"
+        }
+      }
+    ]
+  }
+}

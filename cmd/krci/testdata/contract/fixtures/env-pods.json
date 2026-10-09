@@ -1,0 +1,121 @@
+{
+  "apiVersion": "v1",
+  "kind": "List",
+  "metadata": {},
+  "items": [
+    {
+      "metadata": {
+        "name": "redis-0",
+        "creationTimestamp": "2026-01-02T08:50:00Z",
+        "labels": {"app.kubernetes.io/instance": "redis"},
+        "ownerReferences": [{"kind": "StatefulSet", "name": "redis", "controller": true}]
+      },
+      "spec": {
+        "nodeName": "node-2",
+        "containers": [{"name": "redis", "image": "registry.example.com/redis:7.2"}]
+      },
+      "status": {
+        "phase": "Failed",
+        "reason": "Evicted",
+        "message": "The node was low on resource: memory.",
+        "conditions": [
+          {"type": "DisruptionTarget", "status": "True", "reason": "TerminationByKubelet", "message": "The node was low on resource: memory.", "lastTransitionTime": "2026-01-02T08:58:00Z"},
+          {"type": "Ready", "status": "False", "reason": "PodFailed", "lastTransitionTime": "2026-01-02T08:58:05Z"},
+          {"type": "PodScheduled", "status": "True", "lastTransitionTime": "2026-01-02T08:50:00Z"}
+        ],
+        "containerStatuses": [
+          {
+            "name": "redis",
+            "imageID": "docker-pullable://registry.example.com/redis@sha256:2222222222222222222222222222222222222222222222222222222222222222",
+            "ready": false,
+            "started": false,
+            "restartCount": 0,
+            "state": {
+              "terminated": {
+                "reason": "ContainerStatusUnknown",
+                "message": "The container could not be located when the pod was terminated",
+                "exitCode": 137,
+                "startedAt": "2026-01-02T08:50:05Z",
+                "finishedAt": "2026-01-02T08:58:00Z"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "my-app-7d9f8b6c5-abcde",
+        "creationTimestamp": "2026-01-02T09:00:10Z",
+        "labels": {"app.kubernetes.io/instance": "my-app"},
+        "ownerReferences": [{"kind": "ReplicaSet", "name": "my-app-7d9f8b6c5", "controller": true}]
+      },
+      "spec": {
+        "nodeName": "node-1",
+        "initContainers": [
+          {"name": "migrate", "image": "registry.example.com/my-app-migrate:1.2.3"},
+          {"name": "proxy", "image": "registry.example.com/proxy:2.0", "restartPolicy": "Always"}
+        ],
+        "containers": [
+          {"name": "app", "image": "registry.example.com/my-app:1.2.3"},
+          {"name": "metrics", "image": "registry.example.com/metrics:0.9"}
+        ]
+      },
+      "status": {
+        "phase": "Running",
+        "conditions": [
+          {"type": "Initialized", "status": "True", "lastTransitionTime": "2026-01-02T09:00:21Z"},
+          {"type": "Ready", "status": "False", "reason": "ContainersNotReady", "message": "containers with unready status: [app metrics]", "lastTransitionTime": "2026-01-02T09:04:40Z"},
+          {"type": "PodScheduled", "status": "True", "lastTransitionTime": "2026-01-02T09:00:10Z"}
+        ],
+        "initContainerStatuses": [
+          {
+            "name": "migrate",
+            "imageID": "registry.example.com/my-app-migrate@sha256:3333333333333333333333333333333333333333333333333333333333333333",
+            "ready": false,
+            "started": false,
+            "restartCount": 0,
+            "state": {
+              "terminated": {"reason": "Completed", "exitCode": 0, "startedAt": "2026-01-02T09:00:15Z", "finishedAt": "2026-01-02T09:00:20Z"}
+            }
+          },
+          {
+            "name": "proxy",
+            "imageID": "registry.example.com/proxy@sha256:4444444444444444444444444444444444444444444444444444444444444444",
+            "ready": true,
+            "started": true,
+            "restartCount": 0,
+            "state": {"running": {"startedAt": "2026-01-02T09:00:21Z"}}
+          }
+        ],
+        "containerStatuses": [
+          {
+            "name": "app",
+            "imageID": "registry.example.com/my-app@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "ready": false,
+            "started": true,
+            "restartCount": 2,
+            "state": {"running": {"startedAt": "2026-01-02T09:04:50Z"}},
+            "lastState": {
+              "terminated": {
+                "reason": "OOMKilled",
+                "message": "memory limit exceeded",
+                "exitCode": 137,
+                "startedAt": "2026-01-02T09:02:00Z",
+                "finishedAt": "2026-01-02T09:04:40Z"
+              }
+            }
+          },
+          {
+            "name": "metrics",
+            "imageID": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "ready": false,
+            "started": false,
+            "restartCount": 0,
+            "state": {"waiting": {"reason": "ImagePullBackOff", "message": "Back-off pulling image \"registry.example.com/metrics:0.9\""}}
+          }
+        ]
+      }
+    }
+  ]
+}

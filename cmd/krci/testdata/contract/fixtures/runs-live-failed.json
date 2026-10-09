@@ -1,0 +1,43 @@
+{
+  "apiVersion": "v1",
+  "kind": "List",
+  "metadata": {},
+  "items": [
+    {
+      "apiVersion": "tekton.dev/v1",
+      "kind": "PipelineRun",
+      "metadata": {
+        "name": "build-my-app-main-f9x8y",
+        "namespace": "ns",
+        "creationTimestamp": "2026-01-02T09:39:58Z",
+        "labels": {
+          "app.edp.epam.com/codebase": "my-app",
+          "app.edp.epam.com/pipelinetype": "build",
+          "app.edp.epam.com/git-branch": "main",
+          "app.edp.epam.com/git-author": "dev-user",
+          "tekton.dev/pipeline": "github-my-app-app-build-default"
+        },
+        "annotations": {
+          "app.edp.epam.com/git-commit-sha": "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432"
+        }
+      },
+      "spec": {
+        "pipelineRef": {
+          "name": "github-my-app-app-build-default"
+        }
+      },
+      "status": {
+        "startTime": "2026-01-02T09:40:00Z",
+        "completionTime": "2026-01-02T09:45:30Z",
+        "conditions": [
+          {
+            "type": "Succeeded",
+            "status": "False",
+            "reason": "Failed",
+            "message": "Tasks Completed: 2 (Failed: 1, Cancelled 0), Skipped: 3"
+          }
+        ]
+      }
+    }
+  ]
+}
