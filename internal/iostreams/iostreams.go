@@ -17,11 +17,23 @@ type IOStreams struct {
 // System returns an IOStreams wired to the real os.Stdin/Stdout/Stderr,
 // with TTY state detected from os.Stdout.
 func System() *IOStreams {
+	return FromWriters(os.Stdin, os.Stdout, os.Stderr)
+}
+
+// FromWriters returns an IOStreams over the given streams, with TTY state
+// detected from out. Only a terminal *os.File is a TTY.
+func FromWriters(in io.Reader, out, errOut io.Writer) *IOStreams {
+	return New(in, out, errOut, isTerminal(out))
+}
+
+// New returns an IOStreams over the given streams. isTTY is the value
+// IsStdoutTTY reports.
+func New(in io.Reader, out, errOut io.Writer, isTTY bool) *IOStreams {
 	return &IOStreams{
-		In:     os.Stdin,
-		Out:    os.Stdout,
-		ErrOut: os.Stderr,
-		isTTY:  isTerminal(os.Stdout),
+		In:     in,
+		Out:    out,
+		ErrOut: errOut,
+		isTTY:  isTTY,
 	}
 }
 

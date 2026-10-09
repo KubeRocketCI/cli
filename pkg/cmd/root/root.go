@@ -2,6 +2,8 @@
 package root
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
@@ -44,9 +46,27 @@ func NewCmdRoot(f *cmdutil.Factory, v, commit, date string) *cobra.Command {
 	// Cobra adds help and completion inside Execute; add them now so
 	// FinalizeTree covers them.
 	cmd.InitDefaultHelpCmd()
+	redirectUnknownHelpTopic(cmd)
 	cmd.InitDefaultCompletionCmd()
 
 	cmdutil.FinalizeTree(cmd)
 
 	return cmd
+}
+
+// Cobra writes an unknown help topic through OutOrStderr, which SetOut redirects to stdout; keep it on stderr.
+func redirectUnknownHelpTopic(cmd *cobra.Command) {
+	help, _, _ := cmd.Find([]string{"help"})
+	defaultRun := help.Run
+
+	help.Run = func(c *cobra.Command, args []string) {
+		if target, _, err := c.Root().Find(args); target == nil || err != nil {
+			_, _ = fmt.Fprintf(c.ErrOrStderr(), "Unknown help topic %#q\n", args)
+			_, _ = fmt.Fprint(c.ErrOrStderr(), c.Root().UsageString())
+
+			return
+		}
+
+		defaultRun(c, args)
+	}
 }

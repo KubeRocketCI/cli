@@ -277,8 +277,7 @@ func TestStatus_EnvToken_FactoryClientSendsBearer(t *testing.T) {
 
 	tp := &mockTokenProvider{info: &auth.UserInfo{Email: "ci@example.com", FromEnv: true}}
 
-	f := cmdutil.New()
-	f.IOStreams = &iostreams.IOStreams{Out: &bytes.Buffer{}, ErrOut: &bytes.Buffer{}}
+	f := cmdutil.New(iostreams.New(nil, &bytes.Buffer{}, &bytes.Buffer{}, false))
 	f.Config = func() (*config.Config, error) {
 		return &config.Config{PortalURL: p.url, ClusterName: "in-cluster", Namespace: "ns"}, nil
 	}

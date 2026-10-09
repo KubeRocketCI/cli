@@ -30,13 +30,13 @@ type Factory struct {
 	RestClient    func() (*restapi.ClientWithResponses, error)
 }
 
-// New creates a Factory wired to real system resources.
+// New creates a Factory over ios, which must be non-nil.
 // Config, TokenProvider, and RestClient resolve on first call, from a command's
 // run function after Cobra has parsed flags. A command that never calls them
 // never reads the config file.
-func New() *Factory {
+func New(ios *iostreams.IOStreams) *Factory {
 	f := &Factory{
-		IOStreams: iostreams.System(),
+		IOStreams: ios,
 	}
 
 	var (

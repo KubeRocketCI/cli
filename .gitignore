@@ -1,5 +1,6 @@
 # binary
-krci
+/krci
+/cmd/krci/krci
 
 # build output
 dist/
