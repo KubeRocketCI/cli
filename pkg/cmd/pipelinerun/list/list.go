@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"charm.land/lipgloss/v2"
 	"github.com/spf13/cobra"
@@ -23,6 +24,7 @@ type ListOptions struct {
 	IO            *iostreams.IOStreams
 	RestClient    func() (*restapi.ClientWithResponses, error)
 	Config        func() (*config.Config, error)
+	Now           func() time.Time
 	Project       string
 	PRNumber      int
 	Author        string
@@ -43,6 +45,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		RestClient: f.RestClient,
 		Config:     f.Config,
+		Now:        f.Now,
 	}
 
 	cmd := &cobra.Command{
@@ -140,7 +143,8 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		return err
 	}
 
-	svc := portal.NewPipelineRunService(client, cfg.PortalURL, cfg.ClusterName, cfg.Namespace)
+	svc := portal.NewPipelineRunService(client, cfg.PortalURL, cfg.ClusterName, cfg.Namespace,
+		portal.WithNow(opts.Now))
 
 	result, err := svc.List(ctx, portal.PipelineRunListOptions{
 		Filter: portal.PipelineRunFilter{

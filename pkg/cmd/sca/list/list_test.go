@@ -5,13 +5,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/KubeRocketCI/cli/pkg/cmd/sca/internal/scatestutil"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
 )
 
 func TestList_RejectsPositionalArgs(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCmdList(scatestutil.NewFactory(), nil)
+	cmd := NewCmdList(cmdtest.NewFactory(), nil)
 	cmd.SetArgs([]string{"frobnicate"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -25,7 +25,7 @@ func TestList_RejectsPositionalArgs(t *testing.T) {
 func TestList_RejectsUnknownOutputFormat(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCmdList(scatestutil.NewFactory(), nil)
+	cmd := NewCmdList(cmdtest.NewFactory(), nil)
 	cmd.SetArgs([]string{"-o", "yaml"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -48,7 +48,7 @@ func TestList_PageBounds(t *testing.T) {
 		{[]string{"--page-size", "1000"}, "--page-size must be between 1 and 500"},
 	}
 	for _, tc := range cases {
-		cmd := NewCmdList(scatestutil.NewFactory(), nil)
+		cmd := NewCmdList(cmdtest.NewFactory(), nil)
 		cmd.SetArgs(tc.args)
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetErr(&bytes.Buffer{})
@@ -69,7 +69,7 @@ func TestList_RunFInjection(t *testing.T) {
 		return nil
 	}
 
-	cmd := NewCmdList(scatestutil.NewFactory(), runF)
+	cmd := NewCmdList(cmdtest.NewFactory(), runF)
 	cmd.SetArgs([]string{"--page", "3", "--page-size", "50", "--search", "pay",
 		"--include-inactive", "--include-children", "-o", "json"})
 	cmd.SetOut(&bytes.Buffer{})

@@ -313,6 +313,8 @@ func TestStageEnv_InvertsCDStage(t *testing.T) {
 
 // --- mapK8sPipelineRunInfo ---
 
+var testNow = time.Date(2024, time.January, 1, 12, 0, 0, 0, time.UTC)
+
 func TestMapK8sPipelineRunInfo_DeploymentAndEnv(t *testing.T) {
 	t.Parallel()
 
@@ -325,9 +327,13 @@ func TestMapK8sPipelineRunInfo_DeploymentAndEnv(t *testing.T) {
 		Metadata: restapi.K8sList_200_Items_Metadata{Name: "deploy-demo-dev-ab12", Labels: &labels},
 	}
 
-	got := mapK8sPipelineRunInfo(item)
+	got := mapK8sPipelineRunInfo(item, testNow)
 	assert.Equal(t, "demo", got.Deployment)
 	assert.Equal(t, "dev", got.Env, "env is the stage name, not the Stage resource name")
+}
+
+func makeCondition(condStatus, reason string) []any {
+	return []any{map[string]any{"type": "Succeeded", "status": condStatus, "reason": reason}}
 }
 
 func TestMapK8sPipelineRunInfo(t *testing.T) {
@@ -353,10 +359,6 @@ func TestMapK8sPipelineRunInfo(t *testing.T) {
 			item.Status = &status
 		}
 		return item
-	}
-
-	makeCondition := func(condStatus, reason string) []any {
-		return []any{map[string]any{"type": "Succeeded", "status": condStatus, "reason": reason}}
 	}
 
 	tests := []struct {
@@ -473,9 +475,89 @@ func TestMapK8sPipelineRunInfo(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := mapK8sPipelineRunInfo(tt.item)
+			got := mapK8sPipelineRunInfo(tt.item, testNow)
 			assert.Equal(t, tt.wantStatus, got.Status, "Status")
 			assert.Equal(t, tt.wantStart, got.StartTime, "StartTime")
+		})
+	}
+}
+
+func TestMapK8sPipelineRunInfo_Duration(t *testing.T) {
+	t.Parallel()
+
+	running := func(start time.Time) map[string]any {
+		return map[string]any{"startTime": start.Format(time.RFC3339), "conditions": makeCondition("Unknown", "")}
+	}
+	completed := func(start, end time.Time) map[string]any {
+		return map[string]any{
+			"startTime":      start.Format(time.RFC3339),
+			"completionTime": end.Format(time.RFC3339),
+			"conditions":     makeCondition(conditionStatusTrue, ""),
+		}
+	}
+
+	start := testNow.Add(-3 * time.Hour)
+
+	tests := []struct {
+		name   string
+		status map[string]any
+		now    time.Time
+		want   string
+	}{
+		{
+			name:   "running measures to now",
+			status: running(testNow.Add(-2*time.Minute - 3*time.Second)),
+			now:    testNow,
+			want:   "2m 3s",
+		},
+		{
+			name:   "running with hours",
+			status: running(testNow.Add(-time.Hour - 2*time.Minute - 3*time.Second)),
+			now:    testNow,
+			want:   "1h 2m 3s",
+		},
+		{
+			name:   "running under a minute",
+			status: running(testNow.Add(-7 * time.Second)),
+			now:    testNow,
+			want:   "7s",
+		},
+		{
+			name:   "running that starts after now has no duration",
+			status: running(testNow.Add(time.Minute)),
+			now:    testNow,
+			want:   "",
+		},
+		{
+			name:   "running that starts at now has no duration",
+			status: running(testNow),
+			now:    testNow,
+			want:   "",
+		},
+		{
+			name:   "completed measures start to completion, now before start",
+			status: completed(start, start.Add(3*time.Minute)),
+			now:    start.Add(-time.Hour),
+			want:   "3m 0s",
+		},
+		{
+			name:   "completed measures start to completion, now long after",
+			status: completed(start, start.Add(3*time.Minute)),
+			now:    start.Add(30 * 24 * time.Hour),
+			want:   "3m 0s",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			item := &restapi.K8sList_200_Items_Item{
+				Metadata: restapi.K8sList_200_Items_Metadata{Name: "run-duration"},
+				Status:   &tt.status,
+			}
+
+			assert.Equal(t, tt.want, mapK8sPipelineRunInfo(item, tt.now).Duration)
 		})
 	}
 }
@@ -507,7 +589,7 @@ func TestMapK8sPipelineRunInfo_Labels(t *testing.T) {
 		}(),
 	}
 
-	got := mapK8sPipelineRunInfo(item)
+	got := mapK8sPipelineRunInfo(item, testNow)
 	assert.Equal(t, "run-labels", got.Name)
 	assert.Equal(t, "my-app", got.Project)
 	assert.Equal(t, "review", got.Type)
@@ -537,7 +619,7 @@ func TestMapK8sPipelineRunInfo_Results(t *testing.T) {
 		Status:   &status,
 	}
 
-	got := mapK8sPipelineRunInfo(item)
+	got := mapK8sPipelineRunInfo(item, testNow)
 	assert.Equal(t, map[string]any{
 		"VCS_TAG": "build/1.0.0-SNAPSHOT.3",
 		"IMAGES":  []any{"app:1.0.0", "app:latest"},
@@ -545,7 +627,7 @@ func TestMapK8sPipelineRunInfo_Results(t *testing.T) {
 
 	withoutResults := map[string]any{"conditions": status["conditions"]}
 	item.Status = &withoutResults
-	assert.Nil(t, mapK8sPipelineRunInfo(item).Results, "a run without results must omit the field")
+	assert.Nil(t, mapK8sPipelineRunInfo(item, testNow).Results, "a run without results must omit the field")
 }
 
 func TestParseResultAnnotations(t *testing.T) {
@@ -833,7 +915,7 @@ func TestMergePipelineRuns_SortAcrossPrecisions(t *testing.T) {
 // paths fail the test.
 type pathHandlers map[string]http.HandlerFunc
 
-func newMockPortal(t *testing.T, handlers pathHandlers) *PipelineRunService {
+func newMockPortal(t *testing.T, handlers pathHandlers, opts ...Option) *PipelineRunService {
 	t.Helper()
 
 	mux := http.NewServeMux()
@@ -847,7 +929,7 @@ func newMockPortal(t *testing.T, handlers pathHandlers) *PipelineRunService {
 	client, err := restapi.NewClientWithResponses(srv.URL)
 	require.NoError(t, err)
 
-	return NewPipelineRunService(client, "", "", "ns")
+	return NewPipelineRunService(client, "", "", "ns", opts...)
 }
 
 func writeJSONOK(w http.ResponseWriter, body string) {
@@ -922,6 +1004,57 @@ func TestGet_RunningPipelineSkipsResults(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result.PipelineRuns, 1)
 	assert.Equal(t, StatusRunning, result.PipelineRuns[0].Status)
+}
+
+// runningRunBody lists two runs in progress that started at 10:00:00Z.
+const runningRunBody = `{"apiVersion":"v1","kind":"List","metadata":{},"items":[
+	{"metadata":{"name":"run-running"},
+	 "status":{"startTime":"2024-01-01T10:00:00Z","conditions":[{"type":"Succeeded","status":"Unknown"}]}},
+	{"metadata":{"name":"run-running-too"},
+	 "status":{"startTime":"2024-01-01T10:00:00Z","conditions":[{"type":"Succeeded","status":"Unknown"}]}}]}`
+
+// TestRunningDuration_UsesTheInjectedClock: running durations are measured to
+// the injected clock, read once per listing.
+func TestRunningDuration_UsesTheInjectedClock(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2024, time.January, 1, 10, 2, 3, 0, time.UTC)
+
+	var reads atomic.Int32
+
+	s := newMockPortal(t, pathHandlers{
+		"/v1/resources/list": func(w http.ResponseWriter, _ *http.Request) { writeJSONOK(w, runningRunBody) },
+		"/v1/pipeline-runs":  func(w http.ResponseWriter, _ *http.Request) { writeJSONOK(w, `{"results":[]}`) },
+	}, WithNow(func() time.Time {
+		reads.Add(1)
+
+		return now
+	}))
+
+	list, err := s.List(context.Background(), PipelineRunListOptions{})
+	require.NoError(t, err)
+	require.Len(t, list.PipelineRuns, 2)
+	assert.EqualValues(t, 1, reads.Load(), "one clock read per listing")
+
+	for _, run := range list.PipelineRuns {
+		assert.Equal(t, "2m 3s", run.Duration, run.Name)
+	}
+
+	got, err := s.Get(context.Background(), "run-running", PipelineRunGetOptions{})
+	require.NoError(t, err)
+	require.Len(t, got.PipelineRuns, 1)
+	assert.Equal(t, "2m 3s", got.PipelineRuns[0].Duration)
+	assert.EqualValues(t, 2, reads.Load(), "one clock read per listing")
+}
+
+func TestNewPipelineRunService_ClockDefaultsToTimeNow(t *testing.T) {
+	t.Parallel()
+
+	before := time.Now()
+	got := NewPipelineRunService(nil, "", "", "ns").now()
+	after := time.Now()
+
+	assert.False(t, got.Before(before) || got.After(after), "default clock must be time.Now")
 }
 
 func TestGet_CompletedK8sResultsNotFoundFallsBackToK8s(t *testing.T) {
