@@ -14,8 +14,9 @@ import (
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
 )
 
-// Not parallel: NewCmdRoot binds its persistent flags into the global viper.
 func TestRoot_ArgsValidation(t *testing.T) {
+	t.Parallel()
+
 	cases := map[string]struct {
 		argv string
 		want string
@@ -42,6 +43,8 @@ func TestRoot_ArgsValidation(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			cmd := NewCmdRoot(cmdtest.NewFactory(), "test", "", "")
 			cmd.SetArgs(strings.Fields(tc.argv))
 			cmd.SetOut(&bytes.Buffer{})
@@ -57,6 +60,8 @@ func TestRoot_ArgsValidation(t *testing.T) {
 // Config resolves only in commands that use it: help and version work while
 // the config file is broken; a portal command reports the config error.
 func TestRoot_ConfigErrorOnlyWhereUsed(t *testing.T) {
+	t.Parallel()
+
 	cases := map[string]struct {
 		argv    string
 		wantOut string
@@ -72,6 +77,8 @@ func TestRoot_ConfigErrorOnlyWhereUsed(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			f := cmdtest.NewFactory()
 			f.Config = func() (*config.Config, error) {
 				return nil, errors.New("loading config: parsing config: bad portal-url")
@@ -107,12 +114,16 @@ func TestRoot_ConfigErrorOnlyWhereUsed(t *testing.T) {
 // SetOut sends cobra's command and flag deprecation notices to stdout
 // (spf13/cobra#1708); redirectUnknownHelpTopic covers only the help-topic path.
 func TestRoot_NoDeprecations(t *testing.T) {
+	t.Parallel()
+
 	if got := deprecations(NewCmdRoot(cmdtest.NewFactory(), "test", "", "")); len(got) > 0 {
 		t.Errorf("deprecations = %v, want none: route their notices to stderr as redirectUnknownHelpTopic does", got)
 	}
 }
 
 func TestDeprecations_FindsCommandsAndFlags(t *testing.T) {
+	t.Parallel()
+
 	root := NewCmdRoot(cmdtest.NewFactory(), "test", "", "")
 	list, _, _ := root.Find([]string{"project", "list"})
 	list.Deprecated = "use x"

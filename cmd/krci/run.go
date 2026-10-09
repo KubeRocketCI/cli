@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 
+	"github.com/spf13/pflag"
+
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
@@ -31,7 +33,7 @@ func runWith(ctx context.Context, args []string, f *cmdutil.Factory) int {
 	cmd.SetOut(ios.Out)
 	cmd.SetErr(ios.ErrOut)
 
-	configure()
+	configure(f, cmd.PersistentFlags())
 
 	if err := cmd.ExecuteContext(ctx); err != nil {
 		printError(ios.ErrOut, err)
@@ -42,8 +44,11 @@ func runWith(ctx context.Context, args []string, f *cmdutil.Factory) int {
 	return 0
 }
 
-// configure loads defaults, KRCI_* env bindings, and the config file into the
-// global viper. Must run before ExecuteContext.
-func configure() { config.Init() }
+// configure binds configuration to fs and routes the config-read warning to the
+// Factory's stderr. Must run after the root command exists and before
+// ExecuteContext.
+func configure(f *cmdutil.Factory, fs *pflag.FlagSet) {
+	f.SetConfigResolver(config.New(fs, f.IOStreams.ErrOut).Resolve)
+}
 
 func printError(w io.Writer, err error) { _, _ = fmt.Fprintf(w, "Error: %v\n", err) }

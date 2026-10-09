@@ -5,11 +5,12 @@ package config
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
@@ -35,55 +36,63 @@ func DefaultConfigDir() string {
 	return filepath.Join(home, ".config", "krci")
 }
 
-// Init sets up Viper defaults and reads the config file.
-// Call this early — before Cobra parses flags.
-func Init() {
+// Loader resolves a Config from flags, env vars, the config file, and defaults.
+type Loader struct {
+	v         *viper.Viper
+	configDir string
+}
+
+// AddFlags registers the configuration flags on fs.
+func AddFlags(fs *pflag.FlagSet) {
+	fs.String("portal-url", "", "KubeRocketCI Portal URL")
+}
+
+// New builds a Loader over fs: flags > env > file > defaults. Register the
+// flags on fs before calling New; flags added later are not bound. New reads
+// the config file once; a file that exists but cannot be read or parsed is
+// reported on w and ignored. Flag values are read when Resolve runs. w must be
+// non-nil.
+func New(fs *pflag.FlagSet, w io.Writer) *Loader {
 	configDir := DefaultConfigDir()
 
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath(configDir)
+	v := viper.New()
+	v.SetConfigName("config")
+	v.SetConfigType("yaml")
+	v.AddConfigPath(configDir)
 
-	viper.SetEnvPrefix("KRCI")
-	viper.AutomaticEnv()
-	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	v.SetEnvPrefix("KRCI")
+	v.AutomaticEnv()
+	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
-	viper.SetDefault("issuer-url", "")
-	viper.SetDefault("client-id", "krci-cli")
-	viper.SetDefault("scopes", "openid email profile")
-	viper.SetDefault("portal-url", "")
-	viper.SetDefault("cluster-name", "")
-	viper.SetDefault("namespace", "")
+	v.SetDefault("issuer-url", "")
+	v.SetDefault("client-id", "krci-cli")
+	v.SetDefault("scopes", "openid email profile")
+	v.SetDefault("portal-url", "")
+	v.SetDefault("cluster-name", "")
+	v.SetDefault("namespace", "")
 
-	if err := viper.ReadInConfig(); err != nil {
+	_ = v.BindPFlags(fs)
+
+	if err := v.ReadInConfig(); err != nil {
 		var notFound viper.ConfigFileNotFoundError
 		if !errors.As(err, &notFound) {
-			fmt.Fprintf(os.Stderr, "Warning: error reading config file: %v\n", err)
+			_, _ = fmt.Fprintf(w, "Warning: error reading config file: %v\n", err)
 		}
 	}
+
+	return &Loader{v: v, configDir: configDir}
 }
 
-// BindFlags registers persistent flags on the root command and binds them to Viper.
-func BindFlags(cmd *cobra.Command) {
-	pf := cmd.PersistentFlags()
-	pf.String("portal-url", "", "KubeRocketCI Portal URL")
-
-	_ = viper.BindPFlags(pf)
-}
-
-// Resolve reads the merged config. Call it after Cobra has parsed flags, from
-// a command's run function (via Factory.Config).
-func Resolve() (*Config, error) {
-	configDir := DefaultConfigDir()
-
+// Resolve returns the merged configuration. Call it after the flags are parsed.
+func (l *Loader) Resolve() (*Config, error) {
 	var cfg Config
-	if err := viper.Unmarshal(&cfg); err != nil {
+	if err := l.v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("parsing config: %w", err)
 	}
 
 	cfg.PortalURL = strings.TrimRight(cfg.PortalURL, "/")
-	cfg.ConfigDir = configDir
-	cfg.TokenPath = filepath.Join(configDir, "tokens.enc")
+	cfg.ConfigDir = l.configDir
+	cfg.TokenPath = filepath.Join(l.configDir, "tokens.enc")
 	cfg.KeyringService = "krci"
 
 	return &cfg, nil

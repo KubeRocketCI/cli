@@ -3,6 +3,7 @@ package cmdutil
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -21,44 +22,49 @@ import (
 const DefaultHTTPTimeout = 45 * time.Second
 
 // Factory holds lazy-func dependencies shared across all CLI commands.
-// Each func is memoized: the first call resolves the dependency; subsequent calls
-// return the cached result instantly.
+// Config memoizes the first successful result and retries after a failure;
+// TokenProvider and RestClient memoize their first result, including an error.
+// Commands copy the func values when NewCmdRoot builds the tree; reassigning a
+// field afterwards does not reach them. Set the config source through
+// SetConfigResolver.
 type Factory struct {
 	IOStreams     *iostreams.IOStreams
 	Config        func() (*config.Config, error)
 	TokenProvider func() (auth.TokenProvider, error)
 	RestClient    func() (*restapi.ClientWithResponses, error)
+
+	muCfg   sync.Mutex // guards resolve and cfg
+	resolve func() (*config.Config, error)
+	cfg     *config.Config // first successful resolve result
 }
 
 // New creates a Factory over ios, which must be non-nil.
 // Config, TokenProvider, and RestClient resolve on first call, from a command's
-// run function after Cobra has parsed flags. A command that never calls them
-// never reads the config file.
+// run function after Cobra has parsed flags. Config reads from the resolver set
+// by SetConfigResolver and memoizes the first successful result.
 func New(ios *iostreams.IOStreams) *Factory {
 	f := &Factory{
 		IOStreams: ios,
+		resolve: func() (*config.Config, error) {
+			return nil, errors.New("config resolver not set")
+		},
 	}
 
-	var (
-		muCfg        sync.Mutex
-		cachedConfig *config.Config
-	)
-
 	f.Config = func() (*config.Config, error) {
-		muCfg.Lock()
-		defer muCfg.Unlock()
+		f.muCfg.Lock()
+		defer f.muCfg.Unlock()
 
-		if cachedConfig != nil {
-			return cachedConfig, nil
+		if f.cfg != nil {
+			return f.cfg, nil
 		}
 
-		cfg, err := config.Resolve()
+		cfg, err := f.resolve()
 		if err != nil {
 			return nil, fmt.Errorf("loading config: %w", err)
 		}
 
-		cachedConfig = cfg
-		return cachedConfig, nil
+		f.cfg = cfg
+		return f.cfg, nil
 	}
 
 	var (
@@ -140,4 +146,13 @@ func New(ios *iostreams.IOStreams) *Factory {
 	}
 
 	return f
+}
+
+// SetConfigResolver sets the source Config reads from. Call before the first
+// Config call; a value memoized earlier is kept.
+func (f *Factory) SetConfigResolver(r func() (*config.Config, error)) {
+	f.muCfg.Lock()
+	defer f.muCfg.Unlock()
+
+	f.resolve = r
 }
