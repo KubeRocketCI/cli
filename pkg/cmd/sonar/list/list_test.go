@@ -6,20 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/KubeRocketCI/cli/internal/cmdutil"
-	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/portal"
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
 )
 
-func newFactory() *cmdutil.Factory {
-	return &cmdutil.Factory{
-		IOStreams: &iostreams.IOStreams{Out: &bytes.Buffer{}, ErrOut: &bytes.Buffer{}},
-		RestClient: func() (*restapi.ClientWithResponses, error) {
-			return nil, nil
-		},
-	}
-}
+var newFactory = cmdtest.NewFactory
 
 func TestList_RejectsPositionalArgs(t *testing.T) {
 	t.Parallel()

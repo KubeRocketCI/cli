@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
@@ -101,6 +102,28 @@ func TestList_EnvironmentFilterEndToEnd(t *testing.T) {
 	}
 }
 
+// runningLiveRun is one live run in progress that started at 10:10:00Z.
+const runningLiveRun = `
+	{"metadata":{"name":"build-my-app-live1"},
+	 "status":{"startTime":"2024-01-01T10:10:00Z","conditions":[{"type":"Succeeded","status":"Unknown"}]}}`
+
+// TestList_RunningDurationUsesTheFactoryClock: the duration of a running run is
+// measured to f.Now.
+func TestList_RunningDurationUsesTheFactoryClock(t *testing.T) {
+	t.Parallel()
+
+	f, out := cmdtest.NewPortalFactory(t, liveRunsHandler(runningLiveRun, &atomic.Value{}))
+	f.Now = func() time.Time { return time.Date(2024, time.January, 1, 10, 12, 3, 0, time.UTC) }
+
+	if err := cmdtest.Execute(NewCmdList, f, []string{"--status", "running", "-o", "json"}); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+
+	if want := `"duration": "2m 3s"`; !strings.Contains(out.String(), want) {
+		t.Errorf("want %s, got:\n%s", want, out.String())
+	}
+}
+
 // TestList_ReasonOnARunningRun: the newest match is still running, so it has no tasks, and the
 // result says why in both views.
 func TestList_ReasonOnARunningRun(t *testing.T) {
@@ -125,10 +148,7 @@ func TestList_ReasonOnARunningRun(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			f, out := cmdtest.NewPortalFactory(t, liveRunsHandler(`
-				{"metadata":{"name":"build-my-app-live1"},
-				 "status":{"startTime":"2024-01-01T10:10:00Z","conditions":[{"type":"Succeeded","status":"Unknown"}]}}`,
-				&atomic.Value{}))
+			f, out := cmdtest.NewPortalFactory(t, liveRunsHandler(runningLiveRun, &atomic.Value{}))
 
 			if err := cmdtest.Execute(NewCmdList, f, tc.args); err != nil {
 				t.Fatalf("Execute: %v", err)

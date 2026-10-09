@@ -6,13 +6,13 @@ import (
 	"testing"
 
 	"github.com/KubeRocketCI/cli/internal/portal"
-	"github.com/KubeRocketCI/cli/pkg/cmd/sca/internal/scatestutil"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
 )
 
 func TestComponents_RejectsInvalidSeverity(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCmdComponents(scatestutil.NewFactory(), nil)
+	cmd := NewCmdComponents(cmdtest.NewFactory(), nil)
 	cmd.SetArgs([]string{"svc", "--severity", "garbage"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -27,7 +27,7 @@ func TestComponents_RunFCapturesFlags(t *testing.T) {
 	t.Parallel()
 
 	var captured *ComponentsOptions
-	cmd := NewCmdComponents(scatestutil.NewFactory(), func(o *ComponentsOptions) error {
+	cmd := NewCmdComponents(cmdtest.NewFactory(), func(o *ComponentsOptions) error {
 		captured = o
 		return nil
 	})
@@ -57,7 +57,7 @@ func TestComponents_PageBounds(t *testing.T) {
 		{"svc", "--page-size", "0"},
 		{"svc", "--page-size", "1000"},
 	} {
-		cmd := NewCmdComponents(scatestutil.NewFactory(), nil)
+		cmd := NewCmdComponents(cmdtest.NewFactory(), nil)
 		cmd.SetArgs(args)
 		cmd.SetOut(&bytes.Buffer{})
 		cmd.SetErr(&bytes.Buffer{})
@@ -70,7 +70,7 @@ func TestComponents_PageBounds(t *testing.T) {
 func TestComponents_RejectsPRFlag(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCmdComponents(scatestutil.NewFactory(), nil)
+	cmd := NewCmdComponents(cmdtest.NewFactory(), nil)
 	cmd.SetArgs([]string{"svc", "--pr", "42"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})

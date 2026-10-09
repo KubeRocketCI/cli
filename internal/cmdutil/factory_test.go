@@ -3,6 +3,7 @@ package cmdutil
 import (
 	"errors"
 	"io"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -102,4 +103,30 @@ func TestFactoryConfig_DoesNotCacheFailure(t *testing.T) {
 	cfg, err := f.Config()
 	require.NoError(t, err)
 	assert.Equal(t, "ns", cfg.Namespace)
+}
+
+// TestNew_SetsEveryFuncField: every exported func field of a Factory built by
+// New is non-nil.
+func TestNew_SetsEveryFuncField(t *testing.T) {
+	t.Parallel()
+
+	v := reflect.ValueOf(newTestFactory()).Elem()
+	checked := 0
+
+	for i := range v.NumField() {
+		field := v.Type().Field(i)
+		if !field.IsExported() || field.Type.Kind() != reflect.Func {
+			continue
+		}
+
+		checked++
+
+		if v.Field(i).IsNil() {
+			t.Errorf("Factory.%s is nil", field.Name)
+		}
+	}
+
+	if checked == 0 {
+		t.Error("Factory has no exported func fields to check")
+	}
 }

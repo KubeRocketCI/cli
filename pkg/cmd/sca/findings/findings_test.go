@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/KubeRocketCI/cli/internal/portal"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
 	"github.com/KubeRocketCI/cli/pkg/cmd/sca/internal/scatestutil"
 )
 
@@ -13,7 +14,7 @@ func TestFindings_RunFInjection(t *testing.T) {
 	t.Parallel()
 
 	var captured *FindingsOptions
-	cmd := NewCmdFindings(scatestutil.NewFactory(), func(o *FindingsOptions) error {
+	cmd := NewCmdFindings(cmdtest.NewFactory(), func(o *FindingsOptions) error {
 		captured = o
 		return nil
 	})
@@ -38,7 +39,7 @@ func TestFindings_RunFInjection(t *testing.T) {
 func TestFindings_RejectsInvalidSeverity(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCmdFindings(scatestutil.NewFactory(), nil)
+	cmd := NewCmdFindings(cmdtest.NewFactory(), nil)
 	cmd.SetArgs([]string{"svc", "--severity", "garbage"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -52,7 +53,7 @@ func TestFindings_RejectsInvalidSeverity(t *testing.T) {
 func TestFindings_RejectsEmptySource(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCmdFindings(scatestutil.NewFactory(), nil)
+	cmd := NewCmdFindings(cmdtest.NewFactory(), nil)
 	cmd.SetArgs([]string{"svc", "--source", ""})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -66,7 +67,7 @@ func TestFindings_RejectsEmptySource(t *testing.T) {
 func TestFindings_RejectsPRFlag(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCmdFindings(scatestutil.NewFactory(), nil)
+	cmd := NewCmdFindings(cmdtest.NewFactory(), nil)
 	cmd.SetArgs([]string{"svc", "--pr", "42"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -79,7 +80,7 @@ func TestFindings_RejectsPRFlag(t *testing.T) {
 func TestFindings_RequiresCodebase(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCmdFindings(scatestutil.NewFactory(), nil)
+	cmd := NewCmdFindings(cmdtest.NewFactory(), nil)
 	cmd.SetArgs([]string{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -92,7 +93,7 @@ func TestFindings_RequiresCodebase(t *testing.T) {
 func TestFindings_SeverityFlagUsageVerbatim(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCmdFindings(scatestutil.NewFactory(), nil)
+	cmd := NewCmdFindings(cmdtest.NewFactory(), nil)
 	usage := scatestutil.FlagUsage(t, cmd, "severity")
 	if !strings.Contains(usage, "inclusive") || !strings.Contains(usage, "UNASSIGNED") {
 		t.Errorf("--severity usage must document inclusive semantics + UNASSIGNED, got %q", usage)

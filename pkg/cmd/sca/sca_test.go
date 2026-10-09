@@ -3,15 +3,13 @@ package sca
 import (
 	"testing"
 
-	"github.com/KubeRocketCI/cli/internal/cmdutil"
-	"github.com/KubeRocketCI/cli/internal/iostreams"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
 )
 
 func TestNewCmdSca(t *testing.T) {
 	t.Parallel()
 
-	f := &cmdutil.Factory{IOStreams: &iostreams.IOStreams{}}
-	cmd := NewCmdSca(f)
+	cmd := NewCmdSca(cmdtest.NewFactory())
 
 	if cmd.Use != "sca" {
 		t.Errorf("Use = %q", cmd.Use)

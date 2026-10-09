@@ -1,3 +1,4 @@
+// Package scatestutil holds helpers shared by the krci sca verb tests.
 package scatestutil
 
 import (

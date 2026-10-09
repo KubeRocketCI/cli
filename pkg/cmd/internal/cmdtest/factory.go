@@ -4,30 +4,37 @@ package cmdtest
 
 import (
 	"bytes"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/KubeRocketCI/cli/internal/auth"
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 )
 
-// NewFactory returns a *cmdutil.Factory wired with in-memory I/O buffers and
-// stub Config/RestClient functions suitable for verb-level Cobra tests.
-// Config returns the supplied cluster + namespace; RestClient returns nil
-// (callers either inject runF to bypass the network or replace RestClient).
+// NewFactory returns cmdutil.New over in-memory I/O buffers for verb-level
+// Cobra tests. The config resolver returns cluster in-cluster and namespace ns.
+// RestClient returns nil: inject runF to bypass the network or replace it.
+// TokenProvider returns an error: replace it to drive a verb that needs a token.
+// Other fields keep the cmdutil.New defaults.
 func NewFactory() *cmdutil.Factory {
-	return &cmdutil.Factory{
-		IOStreams: iostreams.New(nil, &bytes.Buffer{}, &bytes.Buffer{}, false),
-		Config: func() (*config.Config, error) {
-			return &config.Config{ClusterName: "in-cluster", Namespace: "ns"}, nil
-		},
-		RestClient: func() (*restapi.ClientWithResponses, error) {
-			return nil, nil
-		},
+	f := cmdutil.New(iostreams.New(nil, &bytes.Buffer{}, &bytes.Buffer{}, false))
+
+	f.SetConfigResolver(func() (*config.Config, error) {
+		return &config.Config{ClusterName: "in-cluster", Namespace: "ns"}, nil
+	})
+	f.RestClient = func() (*restapi.ClientWithResponses, error) {
+		return nil, nil
 	}
+	f.TokenProvider = func() (auth.TokenProvider, error) {
+		return nil, errors.New("cmdtest: TokenProvider is not stubbed")
+	}
+
+	return f
 }
 
 // NewPortalFactory returns NewFactory with a RestClient that talks to a mock

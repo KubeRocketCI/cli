@@ -30,6 +30,7 @@ type GetOptions struct {
 	IO            *iostreams.IOStreams
 	RestClient    func() (*restapi.ClientWithResponses, error)
 	Config        func() (*config.Config, error)
+	Now           func() time.Time
 	Name          string
 	OutputFormat  string
 	IncludeLogs   bool
@@ -46,6 +47,7 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 		IO:         f.IOStreams,
 		RestClient: f.RestClient,
 		Config:     f.Config,
+		Now:        f.Now,
 	}
 
 	cmd := &cobra.Command{
@@ -113,7 +115,8 @@ func getRun(ctx context.Context, opts *GetOptions) error {
 		return err
 	}
 
-	svc := portal.NewPipelineRunService(client, cfg.PortalURL, cfg.ClusterName, cfg.Namespace)
+	svc := portal.NewPipelineRunService(client, cfg.PortalURL, cfg.ClusterName, cfg.Namespace,
+		portal.WithNow(opts.Now))
 
 	result, err := fetchRun(ctx, svc, opts)
 	if err != nil {

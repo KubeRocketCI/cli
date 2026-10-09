@@ -86,23 +86,43 @@ var pipelineRunResourceConfig = restapi.K8sListJSONBody{
 	},
 }
 
+// Option configures service constructors.
+type Option func(*options)
+
+type options struct {
+	now func() time.Time
+}
+
+// WithNow sets the clock that measures the duration of runs still in progress.
+// Default: time.Now. now must be non-nil.
+func WithNow(now func() time.Time) Option {
+	return func(o *options) { o.now = now }
+}
+
 // PipelineRunService provides access to pipeline run data via the portal's REST API.
 type PipelineRunService struct {
 	client      *restapi.ClientWithResponses
 	portalURL   string
 	clusterName string
 	namespace   string
+	now         func() time.Time
 }
 
 // NewPipelineRunService creates a PipelineRunService.
 func NewPipelineRunService(
-	client *restapi.ClientWithResponses, portalURL, clusterName, namespace string,
+	client *restapi.ClientWithResponses, portalURL, clusterName, namespace string, opts ...Option,
 ) *PipelineRunService {
+	o := options{now: time.Now}
+	for _, opt := range opts {
+		opt(&o)
+	}
+
 	return &PipelineRunService{
 		client:      client,
 		portalURL:   portalURL,
 		clusterName: clusterName,
 		namespace:   namespace,
+		now:         o.now,
 	}
 }
 
@@ -486,9 +506,10 @@ func (s *PipelineRunService) fetchLiveRuns(ctx context.Context, filter PipelineR
 		return []PipelineRunInfo{}, nil
 	}
 
+	now := s.now()
 	runs := make([]PipelineRunInfo, 0, len(resp.JSON200.Items))
 	for i := range resp.JSON200.Items {
-		info := mapK8sPipelineRunInfo(&resp.JSON200.Items[i])
+		info := mapK8sPipelineRunInfo(&resp.JSON200.Items[i], now)
 
 		// Branch, author and PR resolve from resultAnnotations. matchesFilter applies every filter client-side.
 		if !matchesFilter(info, filter) {
@@ -550,7 +571,8 @@ func matchesStatus(actualStatus, filterStatus string) bool {
 }
 
 // mapK8sPipelineRunInfo converts a K8s PipelineRun item to the display model.
-func mapK8sPipelineRunInfo(item *restapi.K8sList_200_Items_Item) PipelineRunInfo {
+// now is the instant a running run's duration is measured to.
+func mapK8sPipelineRunInfo(item *restapi.K8sList_200_Items_Item, now time.Time) PipelineRunInfo {
 	info := PipelineRunInfo{
 		Name: item.Metadata.Name,
 	}
@@ -625,7 +647,7 @@ func mapK8sPipelineRunInfo(item *restapi.K8sList_200_Items_Item) PipelineRunInfo
 				}
 			} else if info.Status == StatusRunning {
 				if start, err := time.Parse(time.RFC3339, info.StartTime); err == nil {
-					if d := time.Since(start); d > 0 {
+					if d := now.Sub(start); d > 0 {
 						info.Duration = formatDuration(d)
 					}
 				}

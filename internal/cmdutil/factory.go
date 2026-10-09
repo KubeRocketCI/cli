@@ -33,6 +33,10 @@ type Factory struct {
 	TokenProvider func() (auth.TokenProvider, error)
 	RestClient    func() (*restapi.ClientWithResponses, error)
 
+	// Now is the clock for running pipeline-run durations. Default: time.Now.
+	// Set it before the command is built.
+	Now func() time.Time
+
 	muCfg   sync.Mutex // guards resolve and cfg
 	resolve func() (*config.Config, error)
 	cfg     *config.Config // first successful resolve result
@@ -45,6 +49,7 @@ type Factory struct {
 func New(ios *iostreams.IOStreams) *Factory {
 	f := &Factory{
 		IOStreams: ios,
+		Now:       time.Now,
 		resolve: func() (*config.Config, error) {
 			return nil, errors.New("config resolver not set")
 		},

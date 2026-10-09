@@ -137,6 +137,23 @@ func TestGet_WithoutWaitAFailedRunExitsZero(t *testing.T) {
 	}
 }
 
+// TestGet_RunningDurationUsesTheFactoryClock: the duration of a running run is
+// measured to f.Now.
+func TestGet_RunningDurationUsesTheFactoryClock(t *testing.T) {
+	t.Parallel()
+
+	f, out := newFactory(t, runJSON("Unknown", "Running"))
+	f.Now = func() time.Time { return time.Date(2024, time.January, 1, 10, 2, 3, 0, time.UTC) }
+
+	if err := execute(f, "run-x", "-o", "json"); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+
+	if want := `"duration": "2m 3s"`; !strings.Contains(out.String(), want) {
+		t.Errorf("want %s, got:\n%s", want, out.String())
+	}
+}
+
 // TestGet_ReasonOnARunningRun: a run still in progress has no tasks, and the
 // result says why in both views.
 func TestGet_ReasonOnARunningRun(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/KubeRocketCI/cli/internal/portal"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
 	"github.com/KubeRocketCI/cli/pkg/cmd/sca/internal/scatestutil"
 )
 
@@ -18,7 +19,7 @@ const (
 func TestGet_RequiresExactlyOneArg(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCmdGet(scatestutil.NewFactory(), nil)
+	cmd := NewCmdGet(cmdtest.NewFactory(), nil)
 	cmd.SetArgs([]string{})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -31,7 +32,7 @@ func TestGet_RequiresExactlyOneArg(t *testing.T) {
 func TestGet_RejectsInvalidCodebase(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCmdGet(scatestutil.NewFactory(), nil)
+	cmd := NewCmdGet(cmdtest.NewFactory(), nil)
 	cmd.SetArgs([]string{"Not_A_DNS_Label"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -45,7 +46,7 @@ func TestGet_RejectsInvalidCodebase(t *testing.T) {
 func TestGet_RejectsPRFlag(t *testing.T) {
 	t.Parallel()
 	// --pr is intentionally not registered on sca verbs. cobra must reject it.
-	cmd := NewCmdGet(scatestutil.NewFactory(), nil)
+	cmd := NewCmdGet(cmdtest.NewFactory(), nil)
 	cmd.SetArgs([]string{"svc", "--pr", "42"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -60,7 +61,7 @@ func TestGet_RunFInjectionWithBranch(t *testing.T) {
 	t.Parallel()
 
 	var captured *GetOptions
-	cmd := NewCmdGet(scatestutil.NewFactory(), func(o *GetOptions) error {
+	cmd := NewCmdGet(cmdtest.NewFactory(), func(o *GetOptions) error {
 		captured = o
 		return nil
 	})
@@ -79,7 +80,7 @@ func TestGet_RunFInjectionWithBranch(t *testing.T) {
 func TestGet_BranchFlagUsageStringIsVerbatim(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCmdGet(scatestutil.NewFactory(), nil)
+	cmd := NewCmdGet(cmdtest.NewFactory(), nil)
 	usage := scatestutil.FlagUsage(t, cmd, "branch")
 	if !strings.Contains(usage, "Dep-Track project 'version'") {
 		t.Errorf("--branch usage must reference Dep-Track version field: %q", usage)

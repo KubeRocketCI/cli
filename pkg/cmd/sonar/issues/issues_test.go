@@ -6,22 +6,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/KubeRocketCI/cli/internal/cmdutil"
-	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
 )
 
-func newFactory() *cmdutil.Factory {
-	return &cmdutil.Factory{
-		IOStreams: &iostreams.IOStreams{Out: &bytes.Buffer{}, ErrOut: &bytes.Buffer{}},
-		RestClient: func() (*restapi.ClientWithResponses, error) {
-			// Not exercised because tests stop at validation.
-			return nil, nil
-		},
-	}
-}
+var newFactory = cmdtest.NewFactory
 
 func TestIssues_InvalidProjectKey(t *testing.T) {
 	t.Parallel()
