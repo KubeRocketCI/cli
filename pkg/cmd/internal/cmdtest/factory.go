@@ -20,7 +20,7 @@ import (
 // (callers either inject runF to bypass the network or replace RestClient).
 func NewFactory() *cmdutil.Factory {
 	return &cmdutil.Factory{
-		IOStreams: &iostreams.IOStreams{Out: &bytes.Buffer{}, ErrOut: &bytes.Buffer{}},
+		IOStreams: iostreams.New(nil, &bytes.Buffer{}, &bytes.Buffer{}, false),
 		Config: func() (*config.Config, error) {
 			return &config.Config{ClusterName: "in-cluster", Namespace: "ns"}, nil
 		},

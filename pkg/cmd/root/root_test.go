@@ -3,8 +3,12 @@ package root
 import (
 	"bytes"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
@@ -98,4 +102,56 @@ func TestRoot_ConfigErrorOnlyWhereUsed(t *testing.T) {
 			}
 		})
 	}
+}
+
+// SetOut sends cobra's command and flag deprecation notices to stdout
+// (spf13/cobra#1708); redirectUnknownHelpTopic covers only the help-topic path.
+func TestRoot_NoDeprecations(t *testing.T) {
+	if got := deprecations(NewCmdRoot(cmdtest.NewFactory(), "test", "", "")); len(got) > 0 {
+		t.Errorf("deprecations = %v, want none: route their notices to stderr as redirectUnknownHelpTopic does", got)
+	}
+}
+
+func TestDeprecations_FindsCommandsAndFlags(t *testing.T) {
+	root := NewCmdRoot(cmdtest.NewFactory(), "test", "", "")
+	list, _, _ := root.Find([]string{"project", "list"})
+	list.Deprecated = "use x"
+
+	if err := root.PersistentFlags().MarkDeprecated("portal-url", "use x"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := list.Flags().MarkShorthandDeprecated("output", "use --output"); err != nil {
+		t.Fatal(err)
+	}
+
+	want := []string{"krci --portal-url", "krci project list", "krci project list -o"}
+	if got := deprecations(root); !slices.Equal(got, want) {
+		t.Errorf("deprecations = %v, want %v", got, want)
+	}
+}
+
+// deprecations lists every command, flag and flag shorthand in the tree marked deprecated.
+func deprecations(c *cobra.Command) []string {
+	var found []string
+
+	if c.Deprecated != "" {
+		found = append(found, c.CommandPath())
+	}
+
+	c.LocalFlags().VisitAll(func(f *pflag.Flag) {
+		if f.Deprecated != "" {
+			found = append(found, c.CommandPath()+" --"+f.Name)
+		}
+
+		if f.ShorthandDeprecated != "" {
+			found = append(found, c.CommandPath()+" -"+f.Shorthand)
+		}
+	})
+
+	for _, sub := range c.Commands() {
+		found = append(found, deprecations(sub)...)
+	}
+
+	return found
 }

@@ -1,12 +1,8 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"os"
-
-	"github.com/KubeRocketCI/cli/internal/cmdutil"
-	"github.com/KubeRocketCI/cli/internal/config"
-	"github.com/KubeRocketCI/cli/pkg/cmd/root"
 )
 
 // Build-time variables injected via ldflags.
@@ -17,12 +13,5 @@ var (
 )
 
 func main() {
-	config.Init()
-
-	f := cmdutil.New()
-
-	if err := root.NewCmdRoot(f, version, commit, date).Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
+	os.Exit(run(context.Background(), os.Args[1:], os.Stdout, os.Stderr))
 }
