@@ -197,9 +197,6 @@ should guard on `.data.items[].metrics != null` before indexing counts.
 
 ## `krci sca get <codebase>`
 
-Two variants: `status: "OK"` when the codebase has a Dep-Track project; `status: "NONE"`
-when the Portal's lookup returned no project for the resolved `(name, branch)` pair.
-
 ```json
 {
   "schemaVersion": "1",
@@ -231,12 +228,15 @@ when the Portal's lookup returned no project for the resolved `(name, branch)` p
 }
 ```
 
+`status` is `"OK"`. When Dependency-Track has no project for the resolved
+`(name, branch)` pair, `get`, `components`, and `findings` exit `1` with the
+[error envelope](#error-envelope):
+
 ```json
-{ "schemaVersion": "1", "data": { "status": "NONE" } }
+{ "schemaVersion": "1", "error": { "message": "project payments-api not found — use 'krci sca list --search=payments-api' to find projects known to Dep-Track" } }
 ```
 
-When `status` is `"NONE"` the `project` and `metrics` fields are absent. CLI exit is `0`
-in both cases.
+With `--branch` the message is `project <codebase> not found`.
 
 ## `krci sca components <codebase>`
 
@@ -271,8 +271,8 @@ in both cases.
 }
 ```
 
-`status` is `"OK"` for a bound codebase and `"NONE"` for an unbound one (with
-`items: [], totalCount: 0`). `outdated` is a server-side flag from Dep-Track —
+`status` is `"OK"`; a codebase and branch unknown to Dependency-Track is an error, as for
+[`sca get`](#krci-sca-get-codebase). `outdated` is a server-side flag from Dep-Track —
 no client-side semver comparison is performed. When `--severity=<min>` is passed,
 the CLI additionally filters client-side to rows whose metrics contain at least
 one finding of severity `>= min` (inclusive).

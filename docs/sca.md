@@ -95,15 +95,19 @@ krci sca get payments-api --branch=release/1.0
 krci sca get payments-api -o json | jq -r '.data.project.riskScore'
 ```
 
-When the codebase has no Dep-Track binding:
+When Dependency-Track has no project for the codebase and branch (the branch was never
+scanned), `get`, `components`, and `findings` exit `1`:
 
 ```bash
 $ krci sca get infra-gitops
-status: NONE — no SCA scanner bound for infra-gitops @ main
+Error: project infra-gitops not found — use 'krci sca list --search=infra-gitops' to find projects known to Dep-Track
+$ krci sca get infra-gitops --branch=release/9.9
+Error: project infra-gitops not found
 ```
 
-`status=NONE` always exits `0` — scripting consumers can branch on
-`.data.status`.
+The same error is returned for a codebase that does not exist. With `--branch` the
+Portal queries Dependency-Track by name and version only and does not read the Codebase.
+`krci sca list --search=<codebase>` lists the versions Dependency-Track has.
 
 ## `sca components`
 
@@ -172,7 +176,7 @@ krci sca findings payments-api -o json | jq -r '.data.items[].vulnerability.vuln
 
 | Exit | Meaning                                                                   |
 |------|---------------------------------------------------------------------------|
-| `0`  | Command succeeded (including `status=NONE` payloads)                      |
+| `0`  | Command succeeded, including a list with no rows                          |
 | `1`  | Any failure — validation, auth, not-found, upstream unavailable, bad flag |
 
 An interrupted command dies by the signal (shell status 130 for SIGINT, 143 for
