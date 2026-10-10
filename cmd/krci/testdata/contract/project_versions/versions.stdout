@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "1",
+  "data": {
+    "project": "my-app",
+    "streams": [
+      {
+        "branch": "feature-x",
+        "image": "registry.example.com/my-org/my-app",
+        "versions": [
+          {
+            "name": "feature-x-20251203-100000",
+            "created": "2025-12-03T10:05:00Z"
+          }
+        ]
+      },
+      {
+        "branch": "hotfix",
+        "image": "registry.example.com/my-org/my-app",
+        "versions": []
+      },
+      {
+        "branch": "main",
+        "image": "registry.example.com/my-org/my-app",
+        "versions": [
+          {
+            "name": "main-20251202-090000",
+            "created": "2025-12-02T09:05:00Z",
+            "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          },
+          {
+            "name": "main-20251201-080000",
+            "created": "2025-12-01T08:05:00Z",
+            "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        ]
+      }
+    ]
+  }
+}

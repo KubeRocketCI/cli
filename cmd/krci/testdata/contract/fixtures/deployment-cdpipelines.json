@@ -1,0 +1,40 @@
+{
+  "apiVersion": "v2.edp.epam.com/v1",
+  "kind": "CDPipelineList",
+  "metadata": {"resourceVersion": "1004"},
+  "items": [
+    {
+      "apiVersion": "v2.edp.epam.com/v1",
+      "kind": "CDPipeline",
+      "metadata": {"name": "my-pipeline", "namespace": "ns", "creationTimestamp": "2025-12-01T07:55:00Z"},
+      "spec": {
+        "name": "my-pipeline",
+        "applications": ["my-app", "my-api"],
+        "inputDockerStreams": ["my-app-main", "my-api-main"],
+        "deploymentType": "container"
+      },
+      "status": {"status": "created", "available": true, "result": "success", "value": "active"}
+    },
+    {
+      "apiVersion": "v2.edp.epam.com/v1",
+      "kind": "CDPipeline",
+      "metadata": {"name": "api-pipeline", "namespace": "ns", "creationTimestamp": "2025-12-01T07:58:00Z"},
+      "spec": {
+        "name": "api-pipeline",
+        "description": "API pipeline",
+        "applications": ["my-api"],
+        "inputDockerStreams": ["my-api-main"],
+        "deploymentType": "container"
+      },
+      "status": {
+        "status": "created",
+        "available": true,
+        "last_time_updated": "2025-12-01T07:58:05Z",
+        "username": "system",
+        "action": "setup_initial_structure",
+        "result": "success",
+        "value": "active"
+      }
+    }
+  ]
+}

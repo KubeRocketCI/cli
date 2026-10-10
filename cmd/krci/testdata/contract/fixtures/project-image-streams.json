@@ -1,0 +1,59 @@
+{
+  "apiVersion": "v2.edp.epam.com/v1",
+  "kind": "CodebaseImageStreamList",
+  "metadata": {"resourceVersion": "1003"},
+  "items": [
+    {
+      "apiVersion": "v2.edp.epam.com/v1",
+      "kind": "CodebaseImageStream",
+      "metadata": {
+        "name": "my-app-main",
+        "namespace": "ns",
+        "creationTimestamp": "2025-12-01T07:32:00Z",
+        "labels": {"app.edp.epam.com/codebase": "my-app", "app.edp.epam.com/codebasebranch": "my-app-main"}
+      },
+      "spec": {
+        "codebase": "my-app",
+        "imageName": "registry.example.com/my-org/my-app",
+        "tags": [
+          {
+            "name": "main-20251201-080000",
+            "created": "2025-12-01T08:05:00Z",
+            "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          {
+            "name": "main-20251202-090000",
+            "created": "2025-12-02T09:05:00Z",
+            "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "v2.edp.epam.com/v1",
+      "kind": "CodebaseImageStream",
+      "metadata": {
+        "name": "my-app-feature-x-7c1d2",
+        "namespace": "ns",
+        "creationTimestamp": "2025-12-03T09:01:00Z",
+        "labels": {"app.edp.epam.com/codebase": "my-app", "app.edp.epam.com/codebasebranch": "my-app-feature-x-7c1d2"}
+      },
+      "spec": {
+        "codebase": "my-app",
+        "imageName": "registry.example.com/my-org/my-app",
+        "tags": [{"name": "feature-x-20251203-100000", "created": "2025-12-03T10:05:00Z"}]
+      }
+    },
+    {
+      "apiVersion": "v2.edp.epam.com/v1",
+      "kind": "CodebaseImageStream",
+      "metadata": {
+        "name": "my-app-hotfix",
+        "namespace": "ns",
+        "creationTimestamp": "2025-12-04T09:00:00Z",
+        "labels": {"app.edp.epam.com/codebase": "my-app"}
+      },
+      "spec": {"codebase": "my-app", "imageName": "registry.example.com/my-org/my-app"}
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "my-app",
+  "namespace": "ns",
+  "type": "application",
+  "language": "go",
+  "buildTool": "go",
+  "framework": "gin",
+  "gitServer": "gitlab",
+  "gitUrl": "https://git.example.com/my-org/my-app",
+  "status": "created",
+  "available": true
+}

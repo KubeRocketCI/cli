@@ -1,0 +1,42 @@
+{
+  "apiVersion": "v2.edp.epam.com/v1",
+  "kind": "CodebaseBranchList",
+  "metadata": {"resourceVersion": "1002"},
+  "items": [
+    {
+      "apiVersion": "v2.edp.epam.com/v1",
+      "kind": "CodebaseBranch",
+      "metadata": {
+        "name": "my-app-main",
+        "namespace": "ns",
+        "creationTimestamp": "2025-12-01T07:31:00Z",
+        "labels": {"app.edp.epam.com/codebase": "my-app", "app.edp.epam.com/codebaseName": "my-app"}
+      },
+      "spec": {
+        "branchName": "main",
+        "codebaseName": "my-app",
+        "release": false,
+        "pipelines": {"build": "gitlab-go-gin-app-build-default", "review": "gitlab-go-gin-app-review"}
+      },
+      "status": {"status": "created", "result": "success", "value": "active"}
+    },
+    {
+      "apiVersion": "v2.edp.epam.com/v1",
+      "kind": "CodebaseBranch",
+      "metadata": {
+        "name": "my-app-feature-x-7c1d2",
+        "namespace": "ns",
+        "creationTimestamp": "2025-12-03T09:00:00Z",
+        "labels": {"app.edp.epam.com/codebase": "my-app", "app.edp.epam.com/codebaseName": "my-app"}
+      },
+      "spec": {
+        "branchName": "feature-x",
+        "codebaseName": "my-app",
+        "fromCommit": "main",
+        "release": false,
+        "pipelines": {"build": "gitlab-go-gin-app-build-default", "review": "gitlab-go-gin-app-review"}
+      },
+      "status": {"status": "created", "result": "success", "value": "active"}
+    }
+  ]
+}

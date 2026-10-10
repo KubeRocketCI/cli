@@ -1,0 +1,49 @@
+{
+  "name": "my-pipeline",
+  "namespace": "ns",
+  "applications": [
+    "my-app",
+    "my-api"
+  ],
+  "status": "created",
+  "available": true,
+  "stages": [
+    {
+      "name": "dev",
+      "order": 0,
+      "triggerType": "Manual",
+      "qualityGates": [
+        {
+          "name": "approve",
+          "type": "manual"
+        },
+        {
+          "name": "smoke",
+          "type": "autotests"
+        }
+      ],
+      "namespace": "my-pipeline-dev",
+      "clusterName": "in-cluster",
+      "description": "Development environment",
+      "status": "created",
+      "detailedMessage": "environment is ready",
+      "available": true
+    },
+    {
+      "name": "qa",
+      "order": 1,
+      "triggerType": "Auto",
+      "qualityGates": [
+        {
+          "name": "approve",
+          "type": "manual"
+        }
+      ],
+      "namespace": "my-pipeline-qa",
+      "clusterName": "in-cluster",
+      "description": "QA environment",
+      "status": "created",
+      "available": true
+    }
+  ]
+}
