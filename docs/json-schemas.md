@@ -1,22 +1,37 @@
 # CLI JSON Output Schemas
 
-All JSON output produced by `krci` commands with `-o json` follows a single
-envelope shape:
+`krci` commands with `-o json` print one of two shapes.
+
+**Envelope verbs** wrap the payload:
 
 ```json
 { "schemaVersion": "1", "data": <payload> }
 ```
 
-On error, the envelope is:
+On error they print the error envelope on stdout:
 
 ```json
 { "schemaVersion": "1", "error": { "message": "<human-readable>" } }
 ```
 
-The exit code is `1` on any error. The plain-text error message is also
-written to stderr. The envelope is printed for an error met after the flags and
-arguments are validated: no portal configured, no valid session, a Portal
-error. A rejected flag or argument is reported on stderr only.
+The error envelope is printed for an error met after the flags and arguments
+are validated: no portal configured, no valid session, a Portal error.
+
+**Bare verbs** print the payload itself and never print an error envelope; on
+error stdout is empty, except `pipelinerun get --wait` for a run that did not
+succeed, which prints the run and then exits `1`. The bare verbs are
+[`pipelinerun list`](#krci-pipelinerun-list),
+[`pipelinerun get`](#krci-pipelinerun-get-name),
+[`project list`](#krci-project-list),
+[`project get`](#krci-project-get-name),
+[`deployment list`](#krci-deployment-list), and
+[`deployment get`](#krci-deployment-get-name). Moving them to the envelope is
+a breaking change.
+
+Every error exits `1` and writes `Error: <message>` to stderr. A rejected flag
+or argument is reported on stderr only. Each verb's cases, exit codes, and
+error text are listed in
+[json-contract-inventory.md](json-contract-inventory.md).
 
 An interrupted command (SIGINT or SIGTERM) cancels in-flight work and dies by
 that signal (shell status 130 for SIGINT, 143 for SIGTERM). As PID 1 it exits
@@ -24,8 +39,8 @@ with that status; on Windows it exits `130`. No `Error:` line is written. Under
 `-o json` the error envelope is omitted when the error reports the
 cancellation.
 
-`schemaVersion` is a fixed string (`"1"` for every verb listed below) so
-scripts can detect future breaking changes by checking the version.
+`schemaVersion` is a fixed string (`"1"` for every envelope verb) so scripts
+can detect future breaking changes by checking the version.
 
 ## `krci sonar list`
 
@@ -45,7 +60,7 @@ scripts can detect future breaking changes by checking the version.
 }
 ```
 
-`visibility`, `lastAnalysisDate`, and `revision` are **optional** — SonarQube's `/api/components/search` (the upstream used by the non-admin flow) does not return them, so they are typically absent from the `list` response. Use `krci sonar get <project> -o json` for full per-project metadata.
+`visibility`, `lastAnalysisDate`, and `revision` are **optional** — SonarQube's `/api/components/search` (the upstream used by the non-admin flow) does not return them, so they are typically absent from the `list` response. `qualityGateStatus` is omitted for a project without a gate result. Use `krci sonar get <project> -o json` for full per-project metadata.
 
 ## `krci sonar get <project>`
 
@@ -65,7 +80,7 @@ raw numeric string.
     "key": "payments-api",
     "name": "payments-api",
     "visibility": "private",
-    "lastAnalysisDate": "2026-04-18T09:12:44Z",
+    "lastAnalysisDate": "2026-04-18T09:12:44+0000",
     "revision": "a1b2c3d",
     "qualityGateStatus": "OK",
     "measures": {
@@ -86,6 +101,10 @@ raw numeric string.
   }
 }
 ```
+
+`visibility`, `lastAnalysisDate`, `revision`, and `qualityGateStatus` are always
+present, `""` when SonarQube reports none. Dates keep SonarQube's offset format
+(`+0000`), not RFC3339 `Z`.
 
 ## `krci sonar gate <project>`
 
@@ -112,6 +131,8 @@ raw numeric string.
 `status` is always one of `OK | WARN | ERROR | NONE`.
 `NONE` indicates the project is Sonar-bound but has never been analyzed;
 `conditions` is `[]` in that case (never omitted); exit code is still `0`.
+`comparator`, `errorThreshold`, and `actualValue` are omitted when SonarQube
+reports none.
 
 **JSON-to-table field-name mapping.** The table headers are intentionally
 short while the JSON keys follow SonarQube's native names:
@@ -145,13 +166,19 @@ Pagination is only carried on the structured `paging` object — the flat
         "project": "payments-api",
         "line": 142,
         "message": "Use a stronger algorithm — SHA-1 is cryptographically broken.",
-        "author": "alice@example.com",
-        "creationDate": "2026-04-12T08:44:10Z"
+        "effort": "10min",
+        "debt": "10min",
+        "creationDate": "2026-04-12T08:44:10+0000",
+        "updateDate": "2026-04-12T08:44:10+0000",
+        "tags": ["cwe"]
       }
     ]
   }
 }
 ```
+
+`line`, `effort`, `debt`, `updateDate`, and `tags` are omitted when SonarQube
+reports none. `author` is omitted: the Portal does not pass it through.
 
 Enum values:
 
@@ -175,7 +202,7 @@ Enum values:
         "isLatest": true,
         "lastBomImport": 1713456000000,
         "lastBomImportFormat": "CycloneDX 1.4",
-        "riskScore": 12.5,
+        "lastVulnerabilityAnalysis": 1713459600000,
         "metrics": {
           "critical": 1,
           "high": 3,
@@ -191,9 +218,15 @@ Enum values:
 }
 ```
 
-`lastBomImport` is a Unix milliseconds timestamp. `metrics` is optional — the upstream
+`lastBomImport` and `lastVulnerabilityAnalysis` are Unix milliseconds timestamps. `metrics` is optional — the upstream
 payload omits it for projects that have never had a BOM uploaded; downstream consumers
-should guard on `.data.items[].metrics != null` before indexing counts.
+should guard on `.data.items[].metrics != null` before indexing counts. `metrics` also
+carries `components` and `vulnerableComponents` when non-zero.
+
+Omitted when empty, zero, or false: `classifier`, `active`, `isLatest`,
+`lastBomImport`, `lastBomImportFormat`, `lastVulnerabilityAnalysis`, `riskScore`.
+`riskScore` is currently always omitted: the Portal does not map
+Dependency-Track's `lastInheritedRiskScore`.
 
 ## `krci sca get <codebase>`
 
@@ -212,7 +245,14 @@ should guard on `.data.items[].metrics != null` before indexing counts.
       "lastBomImport": 1713456000000,
       "lastBomImportFormat": "CycloneDX 1.4",
       "lastVulnerabilityAnalysis": 1713459600000,
-      "riskScore": 12.5
+      "metrics": {
+        "critical": 1,
+        "high": 3,
+        "medium": 8,
+        "low": 2,
+        "unassigned": 0,
+        "vulnerabilities": 14
+      }
     },
     "metrics": {
       "critical": 1,
@@ -227,6 +267,9 @@ should guard on `.data.items[].metrics != null` before indexing counts.
   }
 }
 ```
+
+`project` has the fields of an [`sca list`](#krci-sca-list) item, `metrics`
+included; the top-level `metrics` adds `components` and `vulnerableComponents`.
 
 `status` is `"OK"`. When Dependency-Track has no project for the resolved
 `(name, branch)` pair, `get`, `components`, and `findings` exit `1` with the
@@ -250,12 +293,8 @@ With `--branch` the message is `project <codebase> not found`.
         "uuid": "5c0e...",
         "name": "log4j-core",
         "version": "2.11.2",
-        "latestVersion": "2.24.0",
-        "outdated": true,
         "group": "org.apache.logging.log4j",
         "license": "Apache-2.0",
-        "isInternal": false,
-        "riskScore": 9.8,
         "metrics": {
           "critical": 1,
           "high": 0,
@@ -266,14 +305,18 @@ With `--branch` the message is `project <codebase> not found`.
         }
       }
     ],
-    "totalCount": 120
+    "totalCount": 120,
+    "truncated": false
   }
 }
 ```
 
 `status` is `"OK"`; a codebase and branch unknown to Dependency-Track is an error, as for
-[`sca get`](#krci-sca-get-codebase). `outdated` is a server-side flag from Dep-Track —
-no client-side semver comparison is performed. When `--severity=<min>` is passed,
+[`sca get`](#krci-sca-get-codebase). `truncated` is always present.
+`latestVersion`, `outdated`, `group`, `license`, `isInternal`, and `riskScore` are
+omitted when empty, zero, or false; `latestVersion`, `outdated`, and `riskScore` are
+currently always omitted because the Portal does not map them. `outdated` is a
+server-side flag from Dep-Track — no client-side semver comparison is performed. When `--severity=<min>` is passed,
 the CLI additionally filters client-side to rows whose metrics contain at least
 one finding of severity `>= min` (inclusive).
 
@@ -308,6 +351,11 @@ one finding of severity `>= min` (inclusive).
   }
 }
 ```
+
+`component.version`, `component.group`, `vulnerability.cvssV3BaseScore`, and
+`vulnerability.cvssV2BaseScore` are omitted when empty or zero.
+`analysis.state` is `""` for an unaudited finding. `attribution` is `{}` when
+Dependency-Track reports no attribution.
 
 Results are sorted by `vulnerability.severity` descending (CRITICAL first), then
 `component.name` ascending, then `vulnerability.vulnId` ascending. Default
@@ -594,6 +642,110 @@ Rules:
 - The errors are those of `krci env pods`; the permission error names the
   events: `listing events in namespace "<namespace>": permission denied`.
 
+## `krci project list`
+
+Bare array, no envelope.
+
+```json
+[
+  {
+    "name": "my-app",
+    "namespace": "ns",
+    "type": "application",
+    "language": "go",
+    "buildTool": "go",
+    "framework": "gin",
+    "gitServer": "gitlab",
+    "gitUrl": "https://git.example.com/my-org/my-app",
+    "status": "created",
+    "available": true
+  },
+  {
+    "name": "my-lib",
+    "namespace": "ns",
+    "type": "library",
+    "language": "python",
+    "buildTool": "python",
+    "framework": "python-3.13",
+    "gitServer": "gitlab",
+    "gitUrl": "https://git.example.com/my-org/my-lib",
+    "status": "failed",
+    "available": false
+  }
+]
+```
+
+Rules:
+
+- One entry per `Codebase`, in the order the Portal returns them; no projects is
+  `[]`.
+- Always present: `name`, `namespace`, `type`, `language`, `buildTool`,
+  `gitServer`, `status` (`""` when unknown), and `available` (`false` when
+  unknown). `framework` and `gitUrl` are omitted when empty.
+- `type` is `application`, `library`, `autotest`, `infrastructure`, or
+  `system`. `status` is the operator's `created`, `in progress`, or `failed`.
+- `-o` is checked after the Portal call: an unknown format with a failing
+  Portal reports the Portal error.
+- Errors are reported on stderr only, e.g. `authentication required: listing
+  projects: unauthorized: please run 'krci auth login'`.
+
+## `krci project get <name>`
+
+Bare object, no envelope: one [`project list`](#krci-project-list) entry.
+
+```json
+{
+  "name": "my-app",
+  "namespace": "ns",
+  "type": "application",
+  "language": "go",
+  "buildTool": "go",
+  "framework": "gin",
+  "gitServer": "gitlab",
+  "gitUrl": "https://git.example.com/my-org/my-app",
+  "status": "created",
+  "available": true
+}
+```
+
+Rules:
+
+- Errors are reported on stderr only: `project "<name>" not found`, or e.g.
+  `authentication required: getting project "<name>": unauthorized: please run
+  'krci auth login'`.
+- `-o` is checked after the Portal call.
+
+## `krci project build <name>`
+
+Envelope verb. `data` is the run the Portal created, the same row as
+[`pipelinerun start`](#krci-pipelinerun-start):
+
+```json
+{
+  "schemaVersion": "1",
+  "data": {
+    "name": "build-my-app-main-x9k2p",
+    "status": "Pending",
+    "project": "my-app",
+    "pr": "",
+    "author": "dev-user",
+    "type": "build",
+    "started": "2026-01-02T10:02:00Z",
+    "duration": ""
+  }
+}
+```
+
+Rules:
+
+- Every field is always present, `""` when unknown; a new run is usually
+  `Pending` with an empty `duration`.
+- With `--dry-run`, `data` is the rendered `PipelineRun`, as for
+  `pipelinerun start`.
+- Errors print the error envelope; the messages are listed in
+  [project.md](project.md#errors). Rejected flags (`-o`, `--param`, `--branch`)
+  are reported on stderr only.
+
 ## `krci project deployments <project>`
 
 ```json
@@ -703,6 +855,90 @@ Rules:
 - An empty `streams` is success (exit `0`); an unknown project is an error
   envelope with `project '<name>' not found` and exit `1`.
 
+## `krci deployment list`
+
+Bare array, no envelope.
+
+```json
+[
+  {
+    "name": "my-pipeline",
+    "namespace": "ns",
+    "applications": ["my-app", "my-api"],
+    "stages": ["dev", "qa"],
+    "status": "created",
+    "available": true
+  },
+  {
+    "name": "api-pipeline",
+    "namespace": "ns",
+    "applications": ["my-api"],
+    "stages": [],
+    "description": "API pipeline",
+    "status": "created",
+    "available": true
+  }
+]
+```
+
+Rules:
+
+- One entry per `CDPipeline`, in the order the Portal returns them; no
+  deployments is `[]`.
+- `stages[]` holds the environment names in promotion order (`spec.order`),
+  `[]` for a deployment without environments. `applications` is `null` when the
+  deployment lists none.
+- Always present: `name`, `namespace`, `applications`, `stages`, `status`,
+  `available`. `description` and `detailedMessage` are omitted when empty;
+  `detailedMessage` is set by the operator on a failure.
+- `-o` is checked after the Portal call.
+- Errors are reported on stderr only, e.g. `authentication required:
+  unauthorized: please run 'krci auth login'`.
+
+## `krci deployment get <name>`
+
+Bare object, no envelope.
+
+```json
+{
+  "name": "my-pipeline",
+  "namespace": "ns",
+  "applications": ["my-app", "my-api"],
+  "status": "created",
+  "available": true,
+  "stages": [
+    {
+      "name": "dev",
+      "order": 0,
+      "triggerType": "Manual",
+      "qualityGates": [
+        { "name": "approve", "type": "manual" },
+        { "name": "smoke", "type": "autotests" }
+      ],
+      "namespace": "my-pipeline-dev",
+      "clusterName": "in-cluster",
+      "description": "Development environment",
+      "status": "created",
+      "detailedMessage": "environment is ready",
+      "available": true
+    }
+  ]
+}
+```
+
+Rules:
+
+- `stages[]` is sorted by `order`. It is `null`, not `[]`, for a deployment
+  without environments: guard `jq` paths with `.stages // []`.
+- Stage `qualityGates[]` is `null` when the stage spec has no `qualityGates`.
+- Always present on a stage: `name`, `order`, `triggerType`, `qualityGates`,
+  `namespace`, `status`, `available`. `clusterName`, `description`, and
+  `detailedMessage` are omitted when empty.
+- `description` and `detailedMessage` of the deployment are omitted when empty.
+- `-o` is checked after the Portal call.
+- Errors are reported on stderr only: `deployment "<name>" not found`, or e.g.
+  `authentication required: unauthorized: please run 'krci auth login'`.
+
 ## `krci auth status`
 
 ```json
@@ -720,10 +956,18 @@ Rules:
 
 Rules:
 
-- `authenticated` is always `true` in a success envelope: a missing or
-  expired session is an error (exit `1`) and produces the error envelope
-  below with `not authenticated: run 'krci auth login'` or
-  `session expired: run 'krci auth login'`.
+- `authenticated` is always `true` in a success envelope: a missing,
+  expired, or rejected session is an error (exit `1`) and produces the error
+  envelope below with one of:
+
+  | Condition                           | Message                                              |
+  | ----------------------------------- | ---------------------------------------------------- |
+  | No stored session                   | `not authenticated: run 'krci auth login'`           |
+  | Stored session expired, no refresh  | `session expired: run 'krci auth login'`             |
+  | Expired `KRCI_TOKEN`                | `KRCI_TOKEN has expired: supply a fresh token`       |
+  | Portal rejects the token (401)      | `not authenticated: the portal rejected the token`   |
+  | Portal unreachable or other failure | `verifying the token with the portal: <cause>`       |
+
 - `groups` is always an array (`[]` when none).
 - `expiresAt` is RFC3339 in UTC, `null` when the stored token has no expiry.
 - `user` and `name` are omitted when the token claims cannot be decoded; the
@@ -734,24 +978,190 @@ Rules:
 ```json
 {
   "schemaVersion": "1",
-  "error": { "message": "project payments-api not found" }
+  "error": { "message": "project 'payments-api' not found" }
 }
 ```
 
+The same message follows `Error: ` on stderr. The bare verbs print only the
+stderr line. A message can carry the verb's context, e.g. `listing stages: `,
+before the cause. Messages are pinned per verb in
+[json-contract-inventory.md](json-contract-inventory.md).
+
 Common messages:
 
-| Condition                   | Message                                |
-| --------------------------- | -------------------------------------- |
-| Missing auth token          | `please run 'krci auth login'`         |
-| Unknown project (404)       | `project <name> not found`             |
-| Unknown pull request (404)  | `pull request <id> not found`          |
-| Upstream 5xx / network      | `portal returned HTTP 500: <cause>`    |
+| Condition                                    | Message                                                                                  |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| No session, or the stored session is unusable | `not authenticated: run 'krci auth login'`, after the verb's context                    |
+| Portal rejects the token (401)               | `authentication required: [<context>: ]unauthorized: please run 'krci auth login'`, then a blank line and `Run: krci auth login` |
+| RBAC denied (403)                            | `permission denied`                                                                      |
+| Resource missing (404), no verb-specific text | `resource not found`                                                                    |
+| Portal too old for the command               | `portal has no endpoint for this command (<route>); upgrade the portal`                  |
+| Other status                                 | `portal returned HTTP <code>: <body>`; a long body is cut and ends with `...`            |
+| Network failure                              | the verb's context, then the transport error                                             |
 
+Not-found messages name the resource and differ per verb; see each verb's
+section.
+
+## `krci pipelinerun list`
+
+Bare object, no envelope.
+
+```json
+{
+  "pipelineRuns": [
+    {
+      "name": "build-my-app-main-r2b3c",
+      "portalUrl": "https://portal.example.com/c/in-cluster/cicd/pipelineruns/ns/build-my-app-main-r2b3c",
+      "status": "Running",
+      "pipeline": "github-my-app-app-build-default",
+      "project": "my-app",
+      "branch": "main",
+      "author": "dev-user",
+      "type": "build",
+      "startTime": "2026-01-02T10:00:00Z",
+      "duration": "2m 3s",
+      "commitSha": "1f2e3d4c5b6a79881726354a5b6c7d8e9f012345"
+    },
+    {
+      "name": "review-my-app-main-s1a2b",
+      "portalUrl": "https://portal.example.com/c/in-cluster/cicd/pipelineruns/ns/review-my-app-main-s1a2b",
+      "status": "Succeeded",
+      "pipeline": "github-my-app-app-review",
+      "project": "my-app",
+      "branch": "feature-login",
+      "prNumber": "42",
+      "prUrl": "https://git.example.com/my-org/my-app/pull/42",
+      "author": "dev-user",
+      "type": "review",
+      "startTime": "2026-01-02T09:50:00Z",
+      "duration": "3m 10s",
+      "targetBranch": "main",
+      "commitSha": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+      "results": {
+        "IMAGE_TAGS": ["1.0.0-SNAPSHOT.4", "latest"],
+        "VCS_TAG": "review/1.0.0-SNAPSHOT.4"
+      }
+    },
+    {
+      "name": "deploy-my-pipeline-dev-d4e5f",
+      "portalUrl": "https://portal.example.com/c/in-cluster/cicd/pipelineruns/ns/deploy-my-pipeline-dev-d4e5f",
+      "status": "Failed",
+      "pipeline": "deploy",
+      "project": "",
+      "author": "release-bot",
+      "type": "deploy",
+      "startTime": "2026-01-02T09:30:00Z",
+      "duration": "1m 5s",
+      "deployment": "my-pipeline",
+      "env": "dev"
+    }
+  ]
+}
+```
+
+Rules:
+
+- `pipelineRuns[]` is always an array; no runs is `{"pipelineRuns": []}` and
+  exit `0`.
+- Runs come from the cluster plus one page of Tekton Results records matching
+  the filters, in the backend's order, not by time. A run in both is listed
+  once, from the cluster. Sorted by `startTime`, newest
+  first; a run without a parseable `startTime` sorts last. `--status running`
+  reads the cluster only.
+- Always present: `name`, `status`, `pipeline`, `project`, `startTime`, each
+  `""` when unknown. `project` is `""` for deploy and clean runs.
+- Omitted when empty: `portalUrl`, `branch`, `prNumber`, `prUrl`, `author`,
+  `type`, `duration`, `targetBranch`, `commitSha`, `deployment`, `env`,
+  `results`.
+- `status` is `Succeeded`, `Failed`, `Running`, `Timeout`, or `Cancelled`; `""`
+  for a run in the cluster without conditions.
+- `results` maps the pipeline results by name, each value with its Tekton type
+  (string, array, or object). Only a run still in the cluster carries them.
+- `portalUrl` is omitted when the portal URL or the cluster name is not
+  configured.
+- `duration` is computed by the CLI, never read from the Portal: completion
+  time minus start time for a finished run, the host clock minus start time
+  for a running run, so a running run's value grows between calls. Format:
+  `30s`, `4m 20s`, `1h 2m 3s`. The completion time itself is not emitted.
+  `pipelinerun start` reports the Portal's own format (`2m3s`).
+- `--logs` and `--reason` apply to `pipelineRuns[0]` only and add the fields
+  described under [`pipelinerun get`](#krci-pipelinerun-get-name).
+- `-o` is checked after the Portal call: an unknown format with runs is an
+  error, with no runs the table's `No pipeline runs found` line is printed and
+  the exit code is `0`.
+- Errors are reported on stderr only, e.g. `authentication required: fetching
+  live pipeline runs: unauthorized: please run 'krci auth login'`.
+
+## `krci pipelinerun get <name>`
+
+Bare object, no envelope: the [`pipelinerun list`](#krci-pipelinerun-list)
+object with exactly one entry in `pipelineRuns`. The run is looked up in the
+cluster first, then in Tekton Results.
+
+```json
+{
+  "pipelineRuns": [
+    {
+      "name": "build-my-app-main-f9x8y",
+      "portalUrl": "https://portal.example.com/c/in-cluster/cicd/pipelineruns/ns/build-my-app-main-f9x8y",
+      "status": "Failed",
+      "pipeline": "github-my-app-app-build-default",
+      "project": "my-app",
+      "branch": "main",
+      "author": "dev-user",
+      "type": "build",
+      "startTime": "2026-01-02T09:40:00Z",
+      "duration": "5m 30s",
+      "commitSha": "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432"
+    }
+  ],
+  "tasks": [
+    {
+      "name": "fetch-repository",
+      "status": "Succeeded",
+      "duration": "30s",
+      "message": "All Steps have completed executing"
+    },
+    {
+      "name": "compile",
+      "status": "Failed",
+      "duration": "4m 20s",
+      "failedStep": "compile",
+      "exitCode": 2,
+      "message": "\"step-compile\" exited with code 2",
+      "logs": "... (5 lines truncated)\ncompiling package example.com/my-app/internal/pkg06\n...\nbuild failed\nexit status 2\n"
+    }
+  ]
+}
+```
+
+Rules:
+
+- `--logs` adds `logs`, the full log of the run, not truncated.
+- `--reason` adds `tasks[]`, in start order, task names without the run name
+  prefix. `name` and `status` are always present; `duration`, `failedStep`,
+  `exitCode`, `message`, and `logs` are omitted when empty or zero. Tasks carry
+  no timestamps. `logs` is set for failed tasks only, ANSI codes removed, and
+  keeps the last 25 lines: a longer log starts with `... (<n> lines
+  truncated)`. Without task data, `tasks` is omitted and `tasksUnavailable`
+  gives the reason; the values are listed in
+  [pipelinerun.md](pipelinerun.md#json-output-list--get). `--reason` wins over
+  `--logs`.
+- `--wait` waits for the run to finish: polling interval, timeout, and stderr
+  text are in [Waiting for a run](pipelinerun.md#waiting-for-a-run---wait). A
+  run that does not succeed prints its JSON, then exits `1`.
+- `-o` is not validated: any value other than `json` prints the table.
+- Errors are reported on stderr only: `pipeline run "<name>" not found`; with
+  no session, `fetching live pipeline runs: obtaining auth token: not
+  authenticated: run 'krci auth login'`.
 
 ## `krci pipelinerun start`
 
-The start verb reuses the same column shape as `krci pipelinerun list`. Empty
-cells render as `-` in table mode and as `""` in JSON mode (matches list).
+The start verb prints the run the Portal created. Its table columns match
+`krci pipelinerun list`; its JSON keys do not (`pr` and `started` here,
+`prNumber` and `startTime` in list). Every field is always present, `""` when
+unknown; empty table cells render as `-`. `krci project build` prints the same
+envelope.
 
 ### Success envelope
 
@@ -766,7 +1176,7 @@ cells render as `-` in table mode and as `""` in JSON mode (matches list).
     "author":   "<git author or empty>",
     "type":     "<pipelinetype label or empty>",
     "started":  "<RFC3339 or empty>",
-    "duration": "<m+s or empty>"
+    "duration": "<Portal duration, e.g. 2m3s, or empty>"
   }
 }
 ```
@@ -818,11 +1228,13 @@ All errors exit `1` (per the global rule at the top of this document).
 | Pipeline not found                          | `pipeline '<name>' not found`                                                                 |
 | TriggerTemplate referenced but missing      | `pipeline '<name>' references a TriggerTemplate that does not exist`                          |
 | Malformed TriggerTemplate label             | `pipeline '<name>' has malformed TriggerTemplate label`                                       |
-| Platform admission rejection (400/422)      | `platform rejected request: <HTTP status phrase>` (Portal does not echo K8s admission detail) |
+| Platform rejection (400/408/409/422/429)    | `platform rejected request: <Portal message or HTTP status phrase>`                           |
 | RBAC denied                                 | `permission denied`                                                                           |
-| Portal upstream 5xx                         | `upstream service unavailable: <cause>`                                                       |
-| Duplicate / malformed `--param` / `--label` | `duplicate parameter '<k>'` / `parameter must be key=value` / `label key must not be empty`   |
+| Portal upstream 500/502/503/504             | `upstream service unavailable: <body>`, cut as above                                          |
+| Duplicate / malformed `--param` / `--label` | `duplicate parameter '<k>'` / `parameter must be key=value` / `parameter key must not be empty`, and the same with `label` |
 | `--dry-run` with `-o table`                 | `--dry-run cannot use -o table (use -o json or -o yaml)`                                      |
+| `-o yaml` without `--dry-run`               | `-o yaml requires --dry-run`                                                                  |
+| Unknown `-o`                                | `unknown output format: <format> (use 'json', 'yaml', or 'table')`                            |
 
-Rejected flags (`--param` / `--label` errors, `--dry-run` with `-o table`) are reported on stderr only; no envelope.
+Rejected flags (`--param` / `--label` errors, `-o` errors) are reported on stderr only; no envelope.
 
