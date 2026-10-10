@@ -115,35 +115,30 @@ func TestSCAService_List_401(t *testing.T) {
 	}
 }
 
-func TestSCAService_List_502_MapsToUpstreamUnavailable(t *testing.T) {
+func TestSCAService_List_GatewayStatuses_MapToUpstreamUnavailable(t *testing.T) {
 	t.Parallel()
 
-	handler := func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusBadGateway)
-		w.Write([]byte(`{"error":{"code":"BAD_GATEWAY","message":"DT down"}}`))
-	}
-	client, closer := newTestClient(t, handler)
-	defer closer()
+	const body = `{"error":{"code":"SERVICE_UNAVAILABLE","message":"Dependency-Track integration is not configured"},"debug":"SENTINEL-BODY"}`
 
-	_, err := NewSCAService(client).List(context.Background(), SCAListParams{})
-	if !errors.Is(err, ErrUpstreamUnavailable) {
-		t.Fatalf("want ErrUpstreamUnavailable, got %v", err)
-	}
-}
+	for _, status := range []int{http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			t.Parallel()
 
-func TestSCAService_List_503_MapsToUpstreamUnavailable(t *testing.T) {
-	t.Parallel()
+			handler := func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(status)
+				w.Write([]byte(body))
+			}
+			client, closer := newTestClient(t, handler)
+			defer closer()
 
-	handler := func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		w.Write([]byte(`{"error":{"code":"SERVICE_UNAVAILABLE","message":"not configured"}}`))
-	}
-	client, closer := newTestClient(t, handler)
-	defer closer()
-
-	_, err := NewSCAService(client).List(context.Background(), SCAListParams{})
-	if !errors.Is(err, ErrUpstreamUnavailable) {
-		t.Fatalf("want ErrUpstreamUnavailable, got %v", err)
+			_, err := NewSCAService(client).List(context.Background(), SCAListParams{})
+			if !errors.Is(err, ErrUpstreamUnavailable) {
+				t.Fatalf("want ErrUpstreamUnavailable, got %v", err)
+			}
+			if want := "upstream service unavailable: Dependency-Track integration is not configured"; err.Error() != want {
+				t.Fatalf("want %q, got %q", want, err)
+			}
+		})
 	}
 }
 

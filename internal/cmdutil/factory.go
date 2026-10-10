@@ -17,8 +17,8 @@ import (
 )
 
 // DefaultHTTPTimeout caps every portal REST request. Must exceed the portal's
-// own 30s request timeout so its 408 or truncated:true response arrives before
-// the client aborts as a transport error.
+// 30s upstream client timeout so its 504 arrives before the client aborts as a
+// transport error.
 const DefaultHTTPTimeout = 45 * time.Second
 
 // Factory holds lazy-func dependencies shared across all CLI commands.

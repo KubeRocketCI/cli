@@ -57,6 +57,28 @@ func TestCheckResponse_AuthStatuses(t *testing.T) {
 	}
 }
 
+func TestCheckResponse_GatewayStatuses(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		status   int
+		body     string
+		contains string
+	}{
+		{http.StatusBadGateway, ``, http.StatusText(http.StatusBadGateway)},
+		{http.StatusServiceUnavailable, `{"error":{"code":"SERVICE_UNAVAILABLE","message":"Dependency-Track integration is not configured"}}`, "Dependency-Track integration is not configured"},
+		{http.StatusGatewayTimeout, `{"error":{"code":"GATEWAY_TIMEOUT","message":"Gateway Timeout"}}`, "Gateway Timeout"},
+		{http.StatusGatewayTimeout, `<html>bad gateway page</html>`, http.StatusText(http.StatusGatewayTimeout)},
+	}
+
+	for _, tc := range cases {
+		err := checkResponse(tc.status, []byte(tc.body))
+		if !errors.Is(err, ErrUpstreamUnavailable) || !strings.Contains(err.Error(), tc.contains) {
+			t.Errorf("status %d: got %v", tc.status, err)
+		}
+	}
+}
+
 func TestPlatformStatusError(t *testing.T) {
 	t.Parallel()
 
@@ -70,7 +92,6 @@ func TestPlatformStatusError(t *testing.T) {
 		{http.StatusConflict, ``, ErrPlatformReject, http.StatusText(http.StatusConflict)},
 		{http.StatusUnprocessableEntity, ``, ErrPlatformReject, http.StatusText(http.StatusUnprocessableEntity)},
 		{http.StatusInternalServerError, `boom`, ErrUpstreamUnavailable, "boom"},
-		{http.StatusBadGateway, ``, ErrUpstreamUnavailable, ""},
 	}
 
 	for _, tc := range cases {
@@ -80,7 +101,10 @@ func TestPlatformStatusError(t *testing.T) {
 		}
 	}
 
-	for _, status := range []int{http.StatusOK, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound} {
+	for _, status := range []int{
+		http.StatusOK, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound,
+		http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout,
+	} {
 		if err := platformStatusError(status, nil); err != nil {
 			t.Errorf("status %d: expected nil, got %v", status, err)
 		}

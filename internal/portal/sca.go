@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
@@ -175,19 +174,6 @@ func NewSCAService(client *restapi.ClientWithResponses) *SCAService {
 	return &SCAService{client: client}
 }
 
-// checkSCAResponse extends checkResponse with 502/503 mapping used only by the
-// sca endpoints — Portal translates Dep-Track-reachability failures and
-// unconfigured integration into 502/503 so the CLI can distinguish those from
-// a generic 500.
-func checkSCAResponse(statusCode int, body []byte) error {
-	switch statusCode {
-	case http.StatusBadGateway, http.StatusServiceUnavailable:
-		return fmt.Errorf("%w: %s", ErrUpstreamUnavailable, truncateBody(body))
-	}
-
-	return checkResponse(statusCode, body)
-}
-
 // scaBranchNotFoundErr decodes the 404 body returned by the resolveBranch
 // helper on the Portal side. The body distinguishes `codebase_not_found` vs
 // `default_branch_missing`; the CLI surfaces a matching human-readable message
@@ -278,7 +264,7 @@ func (s *SCAService) List(ctx context.Context, params SCAListParams) (*SCAProjec
 		return nil, fmt.Errorf("calling sca list: %w", err)
 	}
 
-	if err := checkSCAResponse(resp.StatusCode(), resp.Body); err != nil {
+	if err := checkResponse(resp.StatusCode(), resp.Body); err != nil {
 		return nil, err
 	}
 
@@ -303,7 +289,7 @@ func (s *SCAService) Get(ctx context.Context, codebase, branch string) (*SCAProj
 		return nil, fmt.Errorf("calling sca get: %w", err)
 	}
 
-	if err := checkSCAResponse(resp.StatusCode(), resp.Body); err != nil {
+	if err := checkResponse(resp.StatusCode(), resp.Body); err != nil {
 		return nil, scaBranchNotFoundErr(err, resp.Body, codebase, branch)
 	}
 
@@ -337,7 +323,7 @@ func (s *SCAService) Components(ctx context.Context, params SCAComponentsParams)
 		return nil, fmt.Errorf("calling sca components: %w", err)
 	}
 
-	if err := checkSCAResponse(resp.StatusCode(), resp.Body); err != nil {
+	if err := checkResponse(resp.StatusCode(), resp.Body); err != nil {
 		return nil, scaBranchNotFoundErr(err, resp.Body, params.Codebase, params.Branch)
 	}
 
@@ -369,7 +355,7 @@ func (s *SCAService) Findings(ctx context.Context, params SCAFindingsParams) (*S
 		return nil, fmt.Errorf("calling sca findings: %w", err)
 	}
 
-	if err := checkSCAResponse(resp.StatusCode(), resp.Body); err != nil {
+	if err := checkResponse(resp.StatusCode(), resp.Body); err != nil {
 		return nil, scaBranchNotFoundErr(err, resp.Body, params.Codebase, params.Branch)
 	}
 

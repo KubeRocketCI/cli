@@ -136,7 +136,9 @@ Schema: [json-schemas.md](json-schemas.md#krci-sca-list)
 |---|---|---|---|---|
 | projects | `krci sca list -o json` | 0 | envelope | empty |
 | unauthorized | `krci sca list -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
-| upstream-unavailable | `krci sca list -o json` | 1 | error envelope | `Error: upstream unavailable (dependency-track): upstream service unavailable: {"error":{"code":"SERVICE_UNAVAILABLE","message":"Dependency-Track integration is not configured"}}` |
+| upstream-error | `krci sca list -o json` | 1 | error envelope | `Error: upstream unavailable (dependency-track): upstream service unavailable: Bad Gateway` |
+| upstream-unavailable | `krci sca list -o json` | 1 | error envelope | `Error: upstream unavailable (dependency-track): upstream service unavailable: Dependency-Track integration is not configured` |
+| upstream-timeout | `krci sca list -o json` | 1 | error envelope | `Error: upstream unavailable (dependency-track): upstream service unavailable: Gateway Timeout` |
 | unknown-format | `krci sca list -o xml` | 1 | empty | `Error: unknown output format: xml (use 'json' or 'table')` |
 
 ## `krci sca get`

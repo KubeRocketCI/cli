@@ -996,7 +996,8 @@ Common messages:
 | RBAC denied (403)                            | `permission denied`                                                                      |
 | Resource missing (404), no verb-specific text | `resource not found`                                                                    |
 | Portal too old for the command               | `portal has no endpoint for this command (<route>); upgrade the portal`                  |
-| Other status                                 | `portal returned HTTP <code>: <body>`; a long body is cut and ends with `...`            |
+| Portal upstream 502/503/504                  | `upstream service unavailable: <Portal message or HTTP status phrase>`                   |
+| Other status, 500 included                   | `portal returned HTTP <code>: <body>`; a long body is cut and ends with `...`            |
 | Network failure                              | the verb's context, then the transport error                                             |
 
 Not-found messages name the resource and differ per verb; see each verb's
@@ -1230,7 +1231,8 @@ All errors exit `1` (per the global rule at the top of this document).
 | Malformed TriggerTemplate label             | `pipeline '<name>' has malformed TriggerTemplate label`                                       |
 | Platform rejection (400/408/409/422/429)    | `platform rejected request: <Portal message or HTTP status phrase>`                           |
 | RBAC denied                                 | `permission denied`                                                                           |
-| Portal upstream 500/502/503/504             | `upstream service unavailable: <body>`, cut as above                                          |
+| Portal upstream 502/503/504                 | `upstream service unavailable: <Portal message or HTTP status phrase>`                        |
+| Portal upstream 500                         | `upstream service unavailable: <body>`, cut as above                                          |
 | Duplicate / malformed `--param` / `--label` | `duplicate parameter '<k>'` / `parameter must be key=value` / `parameter key must not be empty`, and the same with `label` |
 | `--dry-run` with `-o table`                 | `--dry-run cannot use -o table (use -o json or -o yaml)`                                      |
 | `-o yaml` without `--dry-run`               | `-o yaml requires --dry-run`                                                                  |
