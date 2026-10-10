@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1",
+  "data": {
+    "paging": {
+      "pageIndex": 1,
+      "pageSize": 25,
+      "total": 2
+    },
+    "issues": [
+      {
+        "key": "AZ-issue-0001",
+        "rule": "go:S1192",
+        "severity": "CRITICAL",
+        "type": "CODE_SMELL",
+        "status": "OPEN",
+        "component": "my-app:internal/handler.go",
+        "project": "my-app",
+        "line": 42,
+        "message": "Define a constant instead of duplicating this literal \"application/json\" 3 times.",
+        "effort": "6min",
+        "debt": "6min",
+        "creationDate": "2026-01-02T09:30:00+0000",
+        "updateDate": "2026-01-02T09:31:00+0000",
+        "tags": [
+          "design"
+        ]
+      },
+      {
+        "key": "AZ-issue-0002",
+        "rule": "go:S2259",
+        "severity": "MAJOR",
+        "type": "BUG",
+        "status": "OPEN",
+        "component": "my-app:main.go",
+        "project": "my-app",
+        "message": "Fix this nil dereference.",
+        "creationDate": "2026-01-02T09:30:00+0000"
+      }
+    ]
+  }
+}

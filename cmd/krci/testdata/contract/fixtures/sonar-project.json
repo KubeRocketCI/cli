@@ -1,0 +1,9 @@
+{
+  "key": "my-app",
+  "name": "my-app",
+  "qualifier": "TRK",
+  "visibility": "public",
+  "lastAnalysisDate": "2026-01-02T09:30:00+0000",
+  "measures": {"alert_status": "ERROR", "bugs": "2", "coverage": "45.0", "ncloc": "1200"},
+  "qualityGateStatus": "ERROR"
+}

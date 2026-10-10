@@ -1,0 +1,1 @@
+Error: upstream unavailable (dependency-track): upstream service unavailable: {"error":{"code":"SERVICE_UNAVAILABLE","message":"Dependency-Track integration is not configured"}}

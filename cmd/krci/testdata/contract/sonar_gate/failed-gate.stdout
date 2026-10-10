@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "1",
+  "data": {
+    "projectStatus": {
+      "status": "ERROR",
+      "conditions": [
+        {
+          "metricKey": "new_coverage",
+          "comparator": "LT",
+          "errorThreshold": "80",
+          "actualValue": "45.0",
+          "status": "ERROR"
+        },
+        {
+          "metricKey": "new_bugs",
+          "comparator": "GT",
+          "errorThreshold": "0",
+          "actualValue": "0",
+          "status": "OK"
+        }
+      ]
+    }
+  }
+}

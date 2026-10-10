@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "1",
+  "data": {
+    "status": "OK",
+    "project": {
+      "uuid": "6f1c2d3e-0001-4a5b-8c9d-0e1f2a3b4c5d",
+      "name": "my-app",
+      "version": "main",
+      "classifier": "APPLICATION",
+      "active": true,
+      "isLatest": true,
+      "lastBomImport": 1767344400000,
+      "lastBomImportFormat": "CycloneDX 1.6",
+      "lastVulnerabilityAnalysis": 1767344460000,
+      "metrics": {
+        "critical": 2,
+        "high": 5,
+        "medium": 7,
+        "low": 1,
+        "unassigned": 3,
+        "vulnerabilities": 18
+      }
+    },
+    "metrics": {
+      "critical": 2,
+      "high": 5,
+      "medium": 7,
+      "low": 1,
+      "unassigned": 3,
+      "vulnerabilities": 18,
+      "components": 9,
+      "vulnerableComponents": 3
+    }
+  }
+}

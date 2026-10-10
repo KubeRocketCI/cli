@@ -13,6 +13,7 @@ import (
 	"maps"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -47,6 +48,14 @@ const (
 	cmdEnvPods          = "env pods"
 	cmdEnvEvents        = "env events"
 	cmdAuthStatus       = "auth status"
+	cmdSonarList        = "sonar list"
+	cmdSonarGet         = "sonar get"
+	cmdSonarGate        = "sonar gate"
+	cmdSonarIssues      = "sonar issues"
+	cmdSCAList          = "sca list"
+	cmdSCAGet           = "sca get"
+	cmdSCAComponents    = "sca components"
+	cmdSCAFindings      = "sca findings"
 
 	nameUnauthorized  = "unauthorized"
 	nameUnknownFormat = "unknown-format"
@@ -57,6 +66,7 @@ const (
 
 	startPipeline = "my-app-release"
 	buildProject  = "my-app"
+	scanProject   = "my-app"
 
 	baseCluster   = "in-cluster"
 	baseNamespace = "ns"
@@ -74,6 +84,15 @@ const (
 	pathConfig     = "/rest/v1/config"
 	pathTaskRuns   = pathResults + "/" + failedResult + "/task-runs"
 	pathTaskRunLog = "/rest/v1/task-runs/" + failedResult + "/logs"
+
+	pathSonarList     = "/rest/v1/sonar/list"
+	pathSonarGet      = "/rest/v1/sonar/get"
+	pathSonarGate     = "/rest/v1/sonar/gate"
+	pathSonarIssues   = "/rest/v1/sonar/issues"
+	pathSCAList       = "/rest/v1/sca/list"
+	pathSCAGet        = "/rest/v1/sca/get"
+	pathSCAComponents = "/rest/v1/sca/components"
+	pathSCAFindings   = "/rest/v1/sca/findings"
 )
 
 // envToken is the default KRCI_TOKEN: an unsigned JWT that expires in 2100.
@@ -154,6 +173,40 @@ var contractRows = []contractRow{
 	{cmd: cmdAuthStatus, format: formatJSON, fixture: "config", name: "env-token"},
 	{cmd: cmdAuthStatus, format: formatJSON, fixture: "config-401", wantExit: 1, name: nameUnauthorized},
 	{cmd: cmdAuthStatus, format: formatUnknown, fixture: "none", wantExit: 1, name: nameUnknownFormat},
+
+	{cmd: cmdSonarList, format: formatJSON, fixture: "sonar", name: "projects"},
+	{cmd: cmdSonarList, format: formatJSON, fixture: "sonar-401", wantExit: 1, name: nameUnauthorized},
+	{cmd: cmdSonarList, format: formatUnknown, fixture: "none", wantExit: 1, name: nameUnknownFormat},
+	{cmd: cmdSonarGet, args: []string{scanProject}, format: formatJSON, fixture: "sonar", name: "detail"},
+	{cmd: cmdSonarGet, args: []string{scanProject}, format: formatJSON, fixture: "sonar-401", wantExit: 1,
+		name: nameUnauthorized},
+	{cmd: cmdSonarGet, args: []string{scanProject}, format: formatUnknown, fixture: "none", wantExit: 1,
+		name: nameUnknownFormat},
+	{cmd: cmdSonarGate, args: []string{scanProject, "--branch", "main"}, format: formatJSON, fixture: "sonar",
+		name: "failed-gate"},
+	{cmd: cmdSonarGate, args: []string{scanProject, "--branch", "main"}, format: formatJSON,
+		fixture: "sonar-401", wantExit: 1, name: nameUnauthorized},
+	{cmd: cmdSonarIssues, args: []string{scanProject, "--pr", "42"}, format: formatJSON, fixture: "sonar",
+		name: "issues"},
+	{cmd: cmdSonarIssues, args: []string{scanProject, "--pr", "42"}, format: formatJSON, fixture: "sonar-401",
+		wantExit: 1, name: nameUnauthorized},
+
+	{cmd: cmdSCAList, format: formatJSON, fixture: "sca", name: "projects"},
+	{cmd: cmdSCAList, format: formatJSON, fixture: "sca-401", wantExit: 1, name: nameUnauthorized},
+	{cmd: cmdSCAList, format: formatJSON, fixture: "sca-503", wantExit: 1, name: "upstream-unavailable"},
+	{cmd: cmdSCAList, format: formatUnknown, fixture: "none", wantExit: 1, name: nameUnknownFormat},
+	{cmd: cmdSCAGet, args: []string{scanProject}, format: formatJSON, fixture: "sca", name: "detail"},
+	{cmd: cmdSCAGet, args: []string{scanProject}, format: formatJSON, fixture: "sca-401", wantExit: 1,
+		name: nameUnauthorized},
+	{cmd: cmdSCAGet, args: []string{scanProject}, format: formatUnknown, fixture: "none", wantExit: 1,
+		name: nameUnknownFormat},
+	{cmd: cmdSCAComponents, args: []string{scanProject, "--severity", "high"}, format: formatJSON, fixture: "sca",
+		name: "components"},
+	{cmd: cmdSCAComponents, args: []string{scanProject, "--severity", "high"}, format: formatJSON,
+		fixture: "sca-401", wantExit: 1, name: nameUnauthorized},
+	{cmd: cmdSCAFindings, args: []string{scanProject}, format: formatJSON, fixture: "sca", name: "findings"},
+	{cmd: cmdSCAFindings, args: []string{scanProject}, format: formatJSON, fixture: "sca-401", wantExit: 1,
+		name: nameUnauthorized},
 }
 
 // uncovered lists the -o verbs exempt from the success-row and error-row
@@ -167,23 +220,17 @@ var uncovered = map[string]bool{
 	"project versions":    true,
 	"project deployments": true,
 	"env list":            true,
-	"sonar list":          true,
-	"sonar get":           true,
-	"sonar gate":          true,
-	"sonar issues":        true,
-	"sca list":            true,
-	"sca get":             true,
-	"sca components":      true,
-	"sca findings":        true,
 }
 
 // route answers one request. kind and name match resourceConfig.kind and name
 // of the POST body, empty matching anything. namespace matches the namespace
 // of the POST body or the namespace query, empty for an endpoint that names
-// none. query is a substring of the raw query. bodyContains are substrings of
-// the raw request body. status 0 is 200. body is the response, served as JSON.
+// none. query is a substring of the raw query. params, when set, is the exact
+// set of query parameters. bodyContains are substrings of the raw request
+// body. status 0 is 200. body is the response, served as JSON.
 type route struct {
 	method, path, kind, name, namespace, query string
+	params                                     url.Values
 	bodyContains                               []string
 	status                                     int
 	body                                       string
@@ -200,6 +247,7 @@ func (rt route) matches(r *http.Request, req request) bool {
 		(rt.name == "" || rt.name == req.name) &&
 		rt.namespace == req.namespace &&
 		strings.Contains(r.URL.RawQuery, rt.query) &&
+		(rt.params == nil || maps.EqualFunc(rt.params, r.URL.Query(), slices.Equal[[]string])) &&
 		!slices.ContainsFunc(rt.bodyContains, func(s string) bool { return !strings.Contains(req.body, s) })
 }
 
@@ -228,11 +276,19 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 	}
 
 	unauthorized := file("unauthorized")
-	deny := func(rt route) route {
-		rt.status = http.StatusUnauthorized
-		rt.body = unauthorized
+	fail := func(rt route, status int, body string) route {
+		rt.status, rt.body = status, body
 
 		return rt
+	}
+	deny := func(rt route) route { return fail(rt, http.StatusUnauthorized, unauthorized) }
+	denyAll := func(rts []route) []route {
+		out := make([]route, 0, len(rts))
+		for _, rt := range rts {
+			out = append(out, deny(rt))
+		}
+
+		return out
 	}
 
 	at := func(method, path, body string) route {
@@ -242,6 +298,14 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 	list := func(kind, body string) route {
 		rt := at(http.MethodPost, pathList, body)
 		rt.kind = kind
+
+		return rt
+	}
+
+	// Sonar and sca endpoints name no namespace.
+	getQuery := func(path string, params url.Values, body string) route {
+		rt := at(http.MethodGet, path, body).in("")
+		rt.params = params
 
 		return rt
 	}
@@ -266,6 +330,26 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 	pods := list("Pod", "env-pods").in(envNamespace)
 	events := list("Event", "env-events").in(envNamespace)
 	env := []route{list("Stage", "env-stages"), pipeline, apps, pods, events}
+
+	sonar := []route{
+		getQuery(pathSonarList, url.Values{"page": {"1"}, "pageSize": {"50"}}, "sonar-projects"),
+		getQuery(pathSonarGet, url.Values{"projectKey": {scanProject}}, "sonar-project"),
+		getQuery(pathSonarGate, url.Values{"projectKey": {scanProject}, "branch": {"main"}}, "sonar-gate"),
+		getQuery(pathSonarIssues,
+			url.Values{"projectKey": {scanProject}, "pullRequest": {"42"}, "p": {"1"}, "ps": {"25"}},
+			"sonar-issues"),
+	}
+	scaList := getQuery(pathSCAList, url.Values{
+		"excludeInactive": {"true"}, "onlyRoot": {"true"}, "pageNumber": {"1"}, "pageSize": {"25"},
+	}, "sca-projects")
+	sca := []route{
+		scaList,
+		getQuery(pathSCAGet, url.Values{"codebase": {scanProject}}, "sca-project"),
+		getQuery(pathSCAComponents, url.Values{
+			"codebase": {scanProject}, "pageNumber": {"1"}, "pageSize": {"50"}, "severity": {"CRITICAL,HIGH"},
+		}, "sca-components"),
+		getQuery(pathSCAFindings, url.Values{"codebase": {scanProject}, "suppressed": {"false"}}, "sca-findings"),
+	}
 
 	startParam := start
 	startParam.bodyContains = slices.Concat(start.bodyContains, []string{`"git-revision":"main"`})
@@ -293,6 +377,13 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 		"config":               {cfgRoute},
 		"none":                 {},
 		"config-401":           {deny(cfgRoute)},
+		"sonar":                sonar,
+		"sonar-401":            denyAll(sonar),
+		"sca":                  sca,
+		"sca-401":              denyAll(sca),
+		// sca-unavailable.json has no trailing newline: the 503 message embeds
+		// the body verbatim.
+		"sca-503": {fail(scaList, http.StatusServiceUnavailable, file("sca-unavailable"))},
 	}, files
 }
 

@@ -1,0 +1,10 @@
+{
+  "projectStatus": {
+    "status": "ERROR",
+    "conditions": [
+      {"status": "ERROR", "metricKey": "new_coverage", "comparator": "LT", "errorThreshold": "80", "actualValue": "45.0"},
+      {"status": "OK", "metricKey": "new_bugs", "comparator": "GT", "errorThreshold": "0", "actualValue": "0"}
+    ],
+    "ignoredConditions": false
+  }
+}
