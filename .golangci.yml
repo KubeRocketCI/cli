@@ -5,6 +5,7 @@ run:
 linters:
   default: none
   enable:
+    - depguard
     - dupl
     - errcheck
     - forbidigo
@@ -23,6 +24,42 @@ linters:
     - unparam
     - unused
   settings:
+    depguard:
+      rules:
+        portal:
+          list-mode: lax
+          files:
+            - ${base-path}/internal/portal/**
+          deny:
+            - pkg: github.com/KubeRocketCI/cli/internal/iostreams
+              desc: internal/portal returns results; rendering stays in the command layer
+            - pkg: github.com/KubeRocketCI/cli/internal/output
+              desc: internal/portal returns results; rendering stays in the command layer
+        output:
+          list-mode: lax
+          files:
+            - ${base-path}/internal/output/**
+          deny:
+            - pkg: github.com/KubeRocketCI/cli/internal/portal
+              desc: internal/output renders generic values; portal-specific renderers live under pkg/cmd
+        viper:
+          list-mode: lax
+          files:
+            - $all
+            - "!${base-path}/internal/config/**"
+          deny:
+            - pkg: github.com/spf13/viper
+              desc: configuration is read only through internal/config
+        cobra:
+          list-mode: lax
+          files:
+            - $all
+            - "!${base-path}/pkg/cmd/**"
+            - "!${base-path}/internal/cmdutil/**"
+            - "!${base-path}/cmd/krci/*_test.go"
+          deny:
+            - pkg: github.com/spf13/cobra
+              desc: cobra is imported only by pkg/cmd and internal/cmdutil
     forbidigo:
       analyze-types: true
       forbid:
@@ -30,6 +67,12 @@ linters:
           msg: >-
             writes through OutOrStderr, which SetOut binds to stdout (spf13/cobra#1708);
             write to f.IOStreams.ErrOut or cmd.ErrOrStderr()
+        - pattern: ^os\.Std(in|out|err)$
+          pkg: ^os$
+          msg: &stdstream >-
+            in internal/token and internal/auth, write diagnostics to an io.Writer passed in by the caller, not to process streams
+        - pattern: ^(fmt\.Print(f|ln)?|print|println)$
+          msg: *stdstream
     revive:
       rules:
         - name: comment-spacings
@@ -43,6 +86,38 @@ linters:
       - linters:
           - lll
         path: _test\.go
+      # The os.Std* and print patterns apply to internal/token and internal/auth only.
+      # text must match their msg.
+      - linters:
+          - forbidigo
+        path-except: ^internal/(token|auth)/
+        text: io\.Writer passed in by the caller
+      # Baseline: os.Stderr writes in internal/token. Delete an entry when its write
+      # moves to an injected io.Writer.
+      - linters:
+          - forbidigo
+        path: ^internal/token/store\.go$
+        source: "(removing undecryptable token file|Run 'krci auth login' to re-authenticate|could not remove corrupted file)"
+      - linters:
+          - forbidigo
+        path: ^internal/token/keyring\.go$
+        source: "(OS keyring unavailable|Ensure %s is protected|has permissions %04o|Run: chmod 600)"
+      # Baseline: os.Stderr writes in internal/auth. Delete an entry when its write
+      # moves to an injected io.Writer.
+      - linters:
+          - forbidigo
+        path: ^internal/auth/provider\.go$
+        source: "(Logged in as|Groups: %s|failed to persist refreshed credentials|You may need to re-authenticate)"
+      - linters:
+          - forbidigo
+        path: ^internal/auth/oidc\.go$
+        source: "(Opening browser for authentication|If browser doesn't open|could not open browser)"
+      # Baseline: internal/output imports internal/portal. Delete when the
+      # pipeline-run renderers and the status colors move out of internal/output.
+      - linters:
+          - depguard
+        path: ^internal/output/(output|pipelinerun)(_test)?\.go$
+        text: "'github\\.com/KubeRocketCI/cli/internal/portal'"
     paths:
       - third_party$
       - builtin$
