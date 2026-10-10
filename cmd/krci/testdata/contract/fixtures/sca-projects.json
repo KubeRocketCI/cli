@@ -1,0 +1,39 @@
+{
+  "items": [
+    {
+      "name": "my-app",
+      "version": "main",
+      "classifier": "APPLICATION",
+      "purl": "pkg:application/my-app@main",
+      "uuid": "6f1c2d3e-0001-4a5b-8c9d-0e1f2a3b4c5d",
+      "lastBomImport": 1767344400000,
+      "lastBomImportFormat": "CycloneDX 1.6",
+      "lastInheritedRiskScore": 287,
+      "lastVulnerabilityAnalysis": 1767344460000,
+      "active": true,
+      "isLatest": true,
+      "metrics": {
+        "critical": 2,
+        "high": 5,
+        "medium": 7,
+        "low": 1,
+        "unassigned": 3,
+        "vulnerabilities": 18,
+        "vulnerableComponents": 3,
+        "components": 9
+      }
+    },
+    {
+      "name": "my-app",
+      "version": "feature-x",
+      "classifier": "APPLICATION",
+      "uuid": "6f1c2d3e-0002-4a5b-8c9d-0e1f2a3b4c5d",
+      "lastBomImport": 1767337200000,
+      "lastBomImportFormat": "CycloneDX 1.5",
+      "lastInheritedRiskScore": 0,
+      "active": true,
+      "isLatest": false
+    }
+  ],
+  "totalCount": 2
+}

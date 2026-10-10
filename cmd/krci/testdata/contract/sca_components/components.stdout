@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1",
+  "data": {
+    "status": "OK",
+    "items": [
+      {
+        "uuid": "7a2b3c4d-0001-4e5f-9a0b-1c2d3e4f5a6b",
+        "name": "django",
+        "version": "2.2.0",
+        "metrics": {
+          "critical": 2,
+          "high": 4,
+          "medium": 5,
+          "low": 1,
+          "unassigned": 2,
+          "vulnerabilities": 14
+        }
+      },
+      {
+        "uuid": "7a2b3c4d-0002-4e5f-9a0b-1c2d3e4f5a6b",
+        "name": "snakeyaml",
+        "version": "1.33",
+        "group": "org.yaml",
+        "metrics": {
+          "critical": 0,
+          "high": 1,
+          "medium": 2,
+          "low": 0,
+          "unassigned": 1,
+          "vulnerabilities": 4
+        }
+      }
+    ],
+    "totalCount": 2,
+    "truncated": false
+  }
+}

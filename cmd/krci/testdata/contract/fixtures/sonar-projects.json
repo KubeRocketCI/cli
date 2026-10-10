@@ -1,0 +1,13 @@
+{
+  "projects": [
+    {
+      "key": "my-app",
+      "name": "my-app",
+      "qualifier": "TRK",
+      "measures": {"alert_status": "ERROR", "coverage": "45.0"},
+      "qualityGateStatus": "ERROR"
+    },
+    {"key": "my-lib", "name": "my-lib", "qualifier": "TRK"}
+  ],
+  "paging": {"pageIndex": 1, "pageSize": 50, "total": 2}
+}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1",
+  "data": {
+    "key": "my-app",
+    "name": "my-app",
+    "visibility": "public",
+    "lastAnalysisDate": "2026-01-02T09:30:00+0000",
+    "revision": "",
+    "qualityGateStatus": "ERROR",
+    "measures": {
+      "alert_status": "ERROR",
+      "bugs": "2",
+      "coverage": "45.0",
+      "ncloc": "1200"
+    }
+  }
+}

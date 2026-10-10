@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1",
+  "data": {
+    "projects": [
+      {
+        "key": "my-app",
+        "name": "my-app",
+        "qualityGateStatus": "ERROR"
+      },
+      {
+        "key": "my-lib",
+        "name": "my-lib"
+      }
+    ],
+    "paging": {
+      "pageIndex": 1,
+      "pageSize": 50,
+      "total": 2
+    }
+  }
+}

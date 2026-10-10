@@ -1,0 +1,39 @@
+{
+  "status": "OK",
+  "items": [
+    {
+      "component": {
+        "uuid": "7a2b3c4d-0001-4e5f-9a0b-1c2d3e4f5a6b",
+        "name": "django",
+        "version": "2.2.0",
+        "purl": "pkg:pypi/django@2.2.0"
+      },
+      "vulnerability": {
+        "source": "GITHUB",
+        "vulnId": "GHSA-0000-0000-0001",
+        "title": "SQL injection in column aliases",
+        "severity": "CRITICAL"
+      },
+      "analysis": {"isSuppressed": false},
+      "attribution": {"analyzerIdentity": "INTERNAL_ANALYZER", "attributedOn": 1767344430000}
+    },
+    {
+      "component": {
+        "uuid": "7a2b3c4d-0002-4e5f-9a0b-1c2d3e4f5a6b",
+        "name": "snakeyaml",
+        "group": "org.yaml",
+        "version": "1.33",
+        "purl": "pkg:maven/org.yaml/snakeyaml@1.33"
+      },
+      "vulnerability": {
+        "source": "NVD",
+        "vulnId": "CVE-2026-0001",
+        "severity": "HIGH",
+        "cvssV3BaseScore": 8.3,
+        "cvssV2BaseScore": 6.8
+      },
+      "analysis": {"state": "IN_TRIAGE", "isSuppressed": false}
+    }
+  ],
+  "truncated": false
+}

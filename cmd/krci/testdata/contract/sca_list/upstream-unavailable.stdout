@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "1",
+  "error": {
+    "message": "upstream unavailable (dependency-track): upstream service unavailable: {\"error\":{\"code\":\"SERVICE_UNAVAILABLE\",\"message\":\"Dependency-Track integration is not configured\"}}"
+  }
+}
