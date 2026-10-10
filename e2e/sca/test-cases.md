@@ -11,7 +11,7 @@ Every row is a self-contained contract a Haiku agent can execute. See
 | Placeholder          | Meaning                                                                   | Example             |
 |----------------------|---------------------------------------------------------------------------|---------------------|
 | `{{CODEBASE_OK}}`    | A codebase that has a Dep-Track project bound to its default branch.     | `payments-api`      |
-| `{{CODEBASE_NONE}}`  | A codebase that exists but has no Dep-Track scanner binding.             | `infra-gitops`      |
+| `{{CODEBASE_UNSCANNED}}` | A codebase that exists; its default branch was never scanned.        | `infra-gitops`      |
 | `{{CODEBASE_MISSING}}` | A codebase name that does not exist in the cluster.                    | `does-not-exist`    |
 | `{{BRANCH}}`         | A branch/version known to Dep-Track for `{{CODEBASE_OK}}`.               | `main`              |
 | `{{RELEASE_BRANCH}}` | A release tag/branch of `{{CODEBASE_OK}}` with at least one finding.     | `release/1.0`       |
@@ -74,16 +74,17 @@ each verb.
 | SCA-P-09   | `krci sca components {{CODEBASE_OK}} --only-outdated -o json`          | portal | —     | `exit=0; stdout-json~/\.data\.status == "OK"/; stdout-json~/\.data\.items is array/`                                    |
 | SCA-P-10   | `krci sca findings {{CODEBASE_OK}} -o json`                            | portal | —     | `exit=0; stdout-json~/\.data\.status == "OK"/; stdout-json~/\.data\.items is array/; stdout-json~/\.data\.truncated is boolean/` |
 
-## 4. NONE state (env: `portal`)
+## 4. Branch never scanned (env: `portal`)
 
-Unbound codebases produce a `status=NONE` payload with exit `0`.
+A codebase and branch with no Dependency-Track project is not found: exit `1`.
 
-| ID         | Command                                              | Env    | Setup | Expect                                                                                       |
-|------------|------------------------------------------------------|--------|-------|----------------------------------------------------------------------------------------------|
-| SCA-N-01   | `krci sca get {{CODEBASE_NONE}}`                     | portal | —     | `exit=0; stdout~/status: NONE/; stdout~/no SCA scanner bound for {{CODEBASE_NONE}}/`         |
-| SCA-N-02   | `krci sca get {{CODEBASE_NONE}} -o json`             | portal | —     | `exit=0; stdout-json~/\.data\.status == "NONE"/`                                             |
-| SCA-N-03   | `krci sca components {{CODEBASE_NONE}} -o json`      | portal | —     | `exit=0; stdout-json~/\.data\.status == "NONE"/; stdout-json~/\.data\.items == []/`          |
-| SCA-N-04   | `krci sca findings {{CODEBASE_NONE}} -o json`        | portal | —     | `exit=0; stdout-json~/\.data\.status == "NONE"/; stdout-json~/\.data\.truncated == false/`   |
+| ID         | Command                                                     | Env    | Setup | Expect                                                                                                   |
+|------------|-------------------------------------------------------------|--------|-------|----------------------------------------------------------------------------------------------------------|
+| SCA-N-01   | `krci sca get {{CODEBASE_UNSCANNED}}`                       | portal | —     | `exit=1; stderr~/project {{CODEBASE_UNSCANNED}} not found/; stderr~/krci sca list --search={{CODEBASE_UNSCANNED}}/` |
+| SCA-N-02   | `krci sca get {{CODEBASE_UNSCANNED}} -o json`               | portal | —     | `exit=1; stdout-json~/\.error\.message contains "not found"/`                                            |
+| SCA-N-03   | `krci sca components {{CODEBASE_UNSCANNED}} -o json`        | portal | —     | `exit=1; stdout-json~/\.error\.message contains "not found"/`                                            |
+| SCA-N-04   | `krci sca findings {{CODEBASE_UNSCANNED}} -o json`          | portal | —     | `exit=1; stdout-json~/\.error\.message contains "not found"/`                                            |
+| SCA-N-05   | `krci sca get {{CODEBASE_OK}} --branch=never-scanned`       | portal | —     | `exit=1; stderr~/project {{CODEBASE_OK}} not found/`                                                     |
 
 ## 5. Severity filter (env: `portal`)
 
