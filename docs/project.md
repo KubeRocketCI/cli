@@ -59,7 +59,7 @@ Status:       created
 Available:    true
 ```
 
-JSON envelope (full output):
+JSON output, a bare object ([schema](json-schemas.md#krci-project-get-name)):
 
 ```json
 {
@@ -130,6 +130,8 @@ in the dynamic columns (table) or `null` in JSON, and `deployed: false`.
 so you see exactly where the project will land once deployed.
 
 ### JSON envelope
+
+Schema: [json-schemas.md](json-schemas.md#krci-project-deployments-project).
 
 ```bash
 krci project deployments payments-api -o json
@@ -262,6 +264,8 @@ mapping to the operator's branch resource name happens inside the command.
 did not report one.
 
 ### JSON envelope
+
+Schema: [json-schemas.md](json-schemas.md#krci-project-versions-project).
 
 ```bash
 krci project versions payments-api -o json
@@ -396,7 +400,8 @@ krci pipelinerun get "$run" --wait -o json | jq -r '.pipelineRuns[0].results.VCS
 
 ### JSON output
 
-`build` uses the same wrapped envelope as `pipelinerun start`:
+`build` uses the same wrapped envelope as `pipelinerun start`
+([schema](json-schemas.md#krci-project-build-name)):
 
 ```json
 {
@@ -442,7 +447,10 @@ builds per branch today, and this command does not claim to.
 
 ### Errors
 
-All failures exit `1` and write one line to stderr.
+All failures exit `1` and write the message to stderr after `Error: `. With
+`-o json`, a failure reported by the portal also prints the
+[error envelope](json-schemas.md#error-envelope) with the same message; a
+rejected flag or param is reported on stderr only.
 
 | Situation (portal reason)                        | Message                                                                                                                       |
 |--------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|
@@ -459,7 +467,7 @@ All failures exit `1` and write one line to stderr.
 | Build running (`build_in_progress`)              | `a build is already running for branch 'feat/x' of project 'my-app'; check: krci pipelinerun list --project my-app --status running` |
 | Portal could not evaluate state (`list_truncated`) | `portal could not safely evaluate the build state for project 'my-app' (resource list truncated); retry or contact an operator` |
 | Portal too old (route missing)                   | `portal has no endpoint for this command (Route POST:/rest/v1/pipelineruns/build not found); upgrade the portal`              |
-| Not signed in / no RBAC                          | `unauthorized: please run 'krci auth login'` / `permission denied`                                                            |
+| Not signed in / no RBAC                          | `authentication required: unauthorized: please run 'krci auth login'`, then `Run: krci auth login` / `permission denied`        |
 
 With `--branch` omitted the CLI cannot learn which branch the portal resolved,
 so every branch-specific message reads `the default branch of project 'my-app'`

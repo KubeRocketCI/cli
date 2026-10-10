@@ -79,6 +79,8 @@ Messages:
 
 ## JSON output
 
+A bare object; field rules: [json-schemas.md](json-schemas.md#krci-deployment-get-name).
+
 ```bash
 krci deployment get my-pipeline -o json
 ```
@@ -117,5 +119,5 @@ resource carries `status.detailed_message` (`"status": "failed",
 Agent workflow — list namespaces for a pipeline:
 
 ```bash
-krci deployment get my-pipeline -o json | jq -r '.stages[].namespace'
+krci deployment get my-pipeline -o json | jq -r '(.stages // [])[].namespace'
 ```

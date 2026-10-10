@@ -114,7 +114,10 @@ including `--logs` and `--reason`. The CLI polls every 10 seconds; `--timeout`
 
 The exit code is `0` only when the run succeeded. A failed, cancelled or
 timed-out run is still printed, and the command exits `1` with
-`pipeline run "<name>" finished with status <status>` on stderr.
+`pipeline run "<name>" finished with status <status>; diagnose: krci pipelinerun get <name> --reason`
+on stderr; with `--reason` the `; diagnose: ...` part is dropped. A wait that
+runs out exits `1` with
+`timed out after <timeout> waiting for pipeline run "<name>" to finish`.
 
 ```bash
 # Build a branch and read the version it produced
@@ -176,7 +179,8 @@ krci pipelinerun start foo-build -o json
 
 ### JSON output
 
-`start` uses a wrapped envelope (different from `list` / `get`):
+`start` uses a wrapped envelope (different from `list` / `get`;
+[schema](json-schemas.md#krci-pipelinerun-start)):
 
 ```json
 {
@@ -241,6 +245,8 @@ not fall back to an older run: to diagnose the last finished failure add
 ## JSON output (`list` / `get`)
 
 `start` uses a different envelope — see the [`start` section](#pipelinerun-start) above.
+Field rules: [`list`](json-schemas.md#krci-pipelinerun-list),
+[`get`](json-schemas.md#krci-pipelinerun-get-name).
 
 ```bash
 krci run list --project keycloak-operator -o json
@@ -272,7 +278,7 @@ krci run list --project keycloak-operator -o json
 }
 ```
 
-`get` returns the same `pipelineRuns` envelope with a single-element array.
+`get` returns the same `pipelineRuns` object with a single-element array.
 
 `--reason` adds `tasks`, the task tree of the first run. When there is no task
 data, `tasks` is omitted and `tasksUnavailable` gives the reason:
@@ -289,8 +295,11 @@ data, `tasks` is omitted and `tasksUnavailable` gives the reason:
     {
       "name": "build-keycloak-operator-master-x7k2p",
       "status": "Running",
+      "pipeline": "github-go-keycloak-operator-app-build-semver",
       "project": "keycloak-operator",
-      "type": "build"
+      "type": "build",
+      "startTime": "2026-04-21T09:12:03Z",
+      "duration": "1m 12s"
     }
   ],
   "tasksUnavailable": "run_not_finished"
