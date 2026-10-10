@@ -1,0 +1,26 @@
+[
+  {
+    "name": "my-app",
+    "namespace": "ns",
+    "type": "application",
+    "language": "go",
+    "buildTool": "go",
+    "framework": "gin",
+    "gitServer": "gitlab",
+    "gitUrl": "https://git.example.com/my-org/my-app",
+    "status": "created",
+    "available": true
+  },
+  {
+    "name": "my-lib",
+    "namespace": "ns",
+    "type": "library",
+    "language": "python",
+    "buildTool": "python",
+    "framework": "python-3.13",
+    "gitServer": "gitlab",
+    "gitUrl": "https://git.example.com/my-org/my-lib",
+    "status": "failed",
+    "available": false
+  }
+]

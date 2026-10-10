@@ -57,8 +57,17 @@ const (
 	cmdSCAComponents    = "sca components"
 	cmdSCAFindings      = "sca findings"
 
+	cmdProjectList        = "project list"
+	cmdProjectGet         = "project get"
+	cmdProjectVersions    = "project versions"
+	cmdProjectDeployments = "project deployments"
+	cmdDeploymentList     = "deployment list"
+	cmdDeploymentGet      = "deployment get"
+	cmdEnvList            = "env list"
+
 	nameUnauthorized  = "unauthorized"
 	nameUnknownFormat = "unknown-format"
+	nameNotFound      = "not-found"
 
 	runSucceeded = "review-my-app-main-s1a2b"
 	runFailed    = "build-my-app-main-f9x8y"
@@ -67,6 +76,7 @@ const (
 	startPipeline = "my-app-release"
 	buildProject  = "my-app"
 	scanProject   = "my-app"
+	projectName   = "my-app"
 
 	baseCluster   = "in-cluster"
 	baseNamespace = "ns"
@@ -74,6 +84,8 @@ const (
 	envDeployment = "my-pipeline"
 	envName       = "dev"
 	envNamespace  = "my-pipeline-dev"
+
+	emptyDeployment = "api-pipeline"
 
 	pathResources  = "/rest/v1/resources/"
 	pathList       = pathResources + "list"
@@ -142,7 +154,7 @@ var contractRows = []contractRow{
 	{cmd: cmdPipelineRunGet, args: []string{runFailed, "--reason"}, format: formatJSON, fixture: "failed-run",
 		name: "reason-failed"},
 	{cmd: cmdPipelineRunGet, args: []string{"ghost"}, format: formatJSON, fixture: "no-runs", wantExit: 1,
-		name: "not-found"},
+		name: nameNotFound},
 	{cmd: cmdPipelineRunGet, args: []string{runSucceeded}, format: formatJSON, fixture: "runs",
 		env: map[string]string{"KRCI_TOKEN": ""}, wantExit: 1, name: "no-token"},
 
@@ -207,19 +219,38 @@ var contractRows = []contractRow{
 	{cmd: cmdSCAFindings, args: []string{scanProject}, format: formatJSON, fixture: "sca", name: "findings"},
 	{cmd: cmdSCAFindings, args: []string{scanProject}, format: formatJSON, fixture: "sca-401", wantExit: 1,
 		name: nameUnauthorized},
-}
 
-// uncovered lists the -o verbs exempt from the success-row and error-row
-// requirement. Each entry must be an -o verb and must have no rows; remove the
-// entry when adding rows.
-var uncovered = map[string]bool{
-	"deployment get":      true,
-	"deployment list":     true,
-	"project list":        true,
-	"project get":         true,
-	"project versions":    true,
-	"project deployments": true,
-	"env list":            true,
+	{cmd: cmdProjectList, format: formatJSON, fixture: "project", name: "projects"},
+	{cmd: cmdProjectList, format: formatJSON, fixture: "codebase-401", wantExit: 1, name: nameUnauthorized},
+	{cmd: cmdProjectGet, args: []string{projectName}, format: formatJSON, fixture: "project", name: "detail"},
+	{cmd: cmdProjectGet, args: []string{projectName}, format: formatJSON, fixture: "codebase-404", wantExit: 1,
+		name: nameNotFound},
+	{cmd: cmdProjectGet, args: []string{projectName}, format: formatJSON, fixture: "codebase-401", wantExit: 1,
+		name: nameUnauthorized},
+	{cmd: cmdProjectVersions, args: []string{projectName}, format: formatJSON, fixture: "project", name: "versions"},
+	{cmd: cmdProjectVersions, args: []string{projectName}, format: formatJSON, fixture: "codebase-404",
+		wantExit: 1, name: nameNotFound},
+	{cmd: cmdProjectVersions, args: []string{projectName}, format: formatJSON, fixture: "image-streams-401",
+		wantExit: 1, name: nameUnauthorized},
+	{cmd: cmdProjectDeployments, args: []string{projectName}, format: formatJSON, fixture: "project",
+		name: "deployments"},
+	{cmd: cmdProjectDeployments, args: []string{projectName}, format: formatJSON, fixture: "cdpipelines-401",
+		wantExit: 1, name: nameUnauthorized},
+
+	{cmd: cmdDeploymentList, format: formatJSON, fixture: "project", name: "deployments"},
+	{cmd: cmdDeploymentList, format: formatJSON, fixture: "cdpipelines-401", wantExit: 1, name: nameUnauthorized},
+	{cmd: cmdDeploymentGet, args: []string{envDeployment}, format: formatJSON, fixture: "env", name: "detail"},
+	{cmd: cmdDeploymentGet, args: []string{emptyDeployment}, format: formatJSON, fixture: "project",
+		name: "no-stages"},
+	{cmd: cmdDeploymentGet, args: []string{envDeployment}, format: formatJSON, fixture: "cdpipeline-404",
+		wantExit: 1, name: nameNotFound},
+	{cmd: cmdDeploymentGet, args: []string{envDeployment}, format: formatJSON, fixture: "cdpipeline-401",
+		wantExit: 1, name: nameUnauthorized},
+	{cmd: cmdDeploymentGet, args: []string{envDeployment}, format: formatUnknown, fixture: "env", wantExit: 1,
+		name: nameUnknownFormat},
+
+	{cmd: cmdEnvList, format: formatJSON, fixture: "env", name: "stages"},
+	{cmd: cmdEnvList, format: formatJSON, fixture: "stages-401", wantExit: 1, name: nameUnauthorized},
 }
 
 // route answers one request. kind and name match resourceConfig.kind and name
@@ -276,12 +307,14 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 	}
 
 	unauthorized := file("unauthorized")
+	notFound := file("not-found")
 	fail := func(rt route, status int, body string) route {
 		rt.status, rt.body = status, body
 
 		return rt
 	}
 	deny := func(rt route) route { return fail(rt, http.StatusUnauthorized, unauthorized) }
+	missing := func(rt route) route { return fail(rt, http.StatusNotFound, notFound) }
 	denyAll := func(rts []route) []route {
 		out := make([]route, 0, len(rts))
 		for _, rt := range rts {
@@ -326,10 +359,26 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 	pipeline := at(http.MethodPost, pathGet, "env-cdpipeline")
 	pipeline.kind, pipeline.name = "CDPipeline", envDeployment
 
+	stages := list("Stage", "env-stages")
 	apps := list("Application", "env-applications")
 	pods := list("Pod", "env-pods").in(envNamespace)
 	events := list("Event", "env-events").in(envNamespace)
-	env := []route{list("Stage", "env-stages"), pipeline, apps, pods, events}
+	env := []route{stages, pipeline, apps, pods, events}
+
+	codebases := list("Codebase", "project-codebases")
+	codebase := at(http.MethodPost, pathGet, "project-codebase")
+	codebase.kind, codebase.name = "Codebase", projectName
+	byProject := []string{`"labels":{"app.edp.epam.com/codebase":"` + projectName + `"}`}
+	streams := list("CodebaseImageStream", "project-image-streams")
+	streams.bodyContains = byProject
+	branches := list("CodebaseBranch", "project-branches")
+	branches.bodyContains = byProject
+	cdpipelines := list("CDPipeline", "deployment-cdpipelines")
+	apiPipeline := at(http.MethodPost, pathGet, "deployment-api-pipeline")
+	apiPipeline.kind, apiPipeline.name = "CDPipeline", emptyDeployment
+	projectApps := list("Application", "project-applications")
+	projectApps.bodyContains = []string{`"labels":{"app.edp.epam.com/app-name":"` + projectName + `"}`}
+	project := []route{codebases, codebase, streams, branches, cdpipelines, apiPipeline, stages, projectApps}
 
 	sonar := []route{
 		getQuery(pathSonarList, url.Values{"page": {"1"}, "pageSize": {"50"}}, "sonar-projects"),
@@ -374,6 +423,14 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 		"env-applications-401": append([]route{deny(apps)}, env...),
 		"env-pods-401":         append([]route{deny(pods)}, env...),
 		"env-events-401":       append([]route{deny(events)}, env...),
+		"stages-401":           append([]route{deny(stages)}, env...),
+		"cdpipeline-404":       append([]route{missing(pipeline)}, env...),
+		"cdpipeline-401":       append([]route{deny(pipeline)}, env...),
+		"project":              project,
+		"codebase-404":         append([]route{missing(codebase)}, project...),
+		"codebase-401":         append(denyAll([]route{codebases, codebase}), project...),
+		"image-streams-401":    append([]route{deny(streams)}, project...),
+		"cdpipelines-401":      append([]route{deny(cdpipelines)}, project...),
 		"config":               {cfgRoute},
 		"none":                 {},
 		"config-401":           {deny(cfgRoute)},
@@ -594,16 +651,7 @@ func TestContract_EveryOutputVerbHasRows(t *testing.T) {
 	}
 
 	for verb := range verbs {
-		if uncovered[verb] {
-			continue
-		}
-
 		assert.Positive(t, success[verb], "%q has no success row", verb)
 		assert.Positive(t, failure[verb], "%q has no error row", verb)
-	}
-
-	for verb := range uncovered {
-		assert.True(t, verbs[verb], "uncovered %q is not an -o verb", verb)
-		assert.Zero(t, success[verb]+failure[verb], "uncovered %q has rows", verb)
 	}
 }

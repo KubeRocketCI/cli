@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1",
+  "data": {
+    "stages": [
+      {
+        "deployment": "my-pipeline",
+        "env": "dev",
+        "cluster": "in-cluster",
+        "namespace": "my-pipeline-dev",
+        "triggerType": "Manual",
+        "status": "created",
+        "order": 0
+      },
+      {
+        "deployment": "my-pipeline",
+        "env": "qa",
+        "cluster": "in-cluster",
+        "namespace": "my-pipeline-qa",
+        "triggerType": "Auto",
+        "status": "created",
+        "order": 1
+      }
+    ]
+  }
+}

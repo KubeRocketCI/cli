@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "1",
+  "error": {
+    "message": "project 'my-app' not found"
+  }
+}

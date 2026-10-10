@@ -1,0 +1,3 @@
+Error: authentication required: getting project "my-app": unauthorized: please run 'krci auth login'
+
+Run: krci auth login

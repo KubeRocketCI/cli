@@ -1,0 +1,53 @@
+{
+  "apiVersion": "argoproj.io/v1alpha1",
+  "kind": "ApplicationList",
+  "metadata": {"resourceVersion": "1005"},
+  "items": [
+    {
+      "apiVersion": "argoproj.io/v1alpha1",
+      "kind": "Application",
+      "metadata": {
+        "name": "my-pipeline-dev-my-app",
+        "namespace": "ns",
+        "creationTimestamp": "2025-12-01T08:00:30Z",
+        "labels": {
+          "app.edp.epam.com/app-name": "my-app",
+          "app.edp.epam.com/pipeline": "my-pipeline",
+          "app.edp.epam.com/stage": "dev"
+        }
+      },
+      "spec": {
+        "project": "ns",
+        "destination": {"name": "in-cluster", "namespace": "my-pipeline-dev"},
+        "source": {
+          "repoURL": "ssh://git@git.example.com:22/my-org/my-app",
+          "targetRevision": "main-20251202-090000",
+          "path": "deploy-templates",
+          "helm": {
+            "releaseName": "my-app",
+            "parameters": [
+              {"name": "image.tag", "value": "main-20251202-090000"},
+              {"name": "image.repository", "value": "registry.example.com/my-org/my-app"},
+              {"name": "image.digest", "value": "sha256:2222222222222222222222222222222222222222222222222222222222222222"}
+            ]
+          }
+        }
+      },
+      "status": {
+        "health": {"status": "Healthy"},
+        "sync": {"status": "Synced", "revision": "0a1b2c3d4e5f60718293a4b5c6d7e8f901234567"},
+        "summary": {
+          "images": [
+            "registry.example.com/my-org/my-app:main-20251202-090000@sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          ]
+        },
+        "operationState": {
+          "phase": "Succeeded",
+          "message": "successfully synced (all tasks run)",
+          "startedAt": "2026-01-02T09:00:00Z",
+          "finishedAt": "2026-01-02T09:00:30Z"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "1",
+  "data": {
+    "project": "my-app",
+    "rows": [
+      {
+        "deployment": "my-pipeline",
+        "env": "dev",
+        "deployed": true,
+        "status": "healthy",
+        "sync": "synced",
+        "version": "main-20251202-090000",
+        "imageTag": "main-20251202-090000",
+        "imageDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "cluster": "in-cluster",
+        "namespace": "my-pipeline-dev",
+        "triggerType": "Manual",
+        "deployedAt": "2026-01-02T09:00:30Z",
+        "ingressUrls": [],
+        "argocdUrl": "/applications/my-pipeline-dev-my-app",
+        "conditions": [],
+        "operation": {
+          "phase": "Succeeded",
+          "message": "successfully synced (all tasks run)",
+          "startedAt": "2026-01-02T09:00:00Z",
+          "finishedAt": "2026-01-02T09:00:30Z"
+        }
+      },
+      {
+        "deployment": "my-pipeline",
+        "env": "qa",
+        "deployed": false,
+        "status": null,
+        "sync": null,
+        "version": null,
+        "imageTag": null,
+        "imageDigest": null,
+        "cluster": "in-cluster",
+        "namespace": "my-pipeline-qa",
+        "triggerType": "Auto",
+        "deployedAt": null,
+        "ingressUrls": [],
+        "argocdUrl": null,
+        "conditions": [],
+        "operation": null
+      }
+    ]
+  }
+}

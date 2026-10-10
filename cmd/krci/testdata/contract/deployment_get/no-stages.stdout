@@ -1,0 +1,11 @@
+{
+  "name": "api-pipeline",
+  "namespace": "ns",
+  "applications": [
+    "my-api"
+  ],
+  "description": "API pipeline",
+  "status": "created",
+  "available": true,
+  "stages": null
+}

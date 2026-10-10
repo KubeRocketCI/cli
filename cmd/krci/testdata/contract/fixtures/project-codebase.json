@@ -1,0 +1,29 @@
+{
+  "apiVersion": "v2.edp.epam.com/v1",
+  "kind": "Codebase",
+  "metadata": {
+    "name": "my-app",
+    "namespace": "ns",
+    "creationTimestamp": "2025-12-01T07:30:00Z",
+    "labels": {"app.edp.epam.com/codebaseType": "application"}
+  },
+  "spec": {
+    "type": "application",
+    "lang": "go",
+    "framework": "gin",
+    "buildTool": "go",
+    "gitServer": "gitlab",
+    "gitUrlPath": "/my-org/my-app",
+    "defaultBranch": "main",
+    "ciTool": "tekton",
+    "strategy": "create",
+    "versioning": {"type": "default"}
+  },
+  "status": {
+    "status": "created",
+    "available": true,
+    "gitWebUrl": "https://git.example.com/my-org/my-app",
+    "result": "success",
+    "value": "active"
+  }
+}
