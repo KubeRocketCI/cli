@@ -207,7 +207,9 @@ var contractRows = []contractRow{
 
 	{cmd: cmdSCAList, format: formatJSON, fixture: "sca", name: "projects"},
 	{cmd: cmdSCAList, format: formatJSON, fixture: "sca-401", wantExit: 1, name: nameUnauthorized},
+	{cmd: cmdSCAList, format: formatJSON, fixture: "sca-502", wantExit: 1, name: "upstream-error"},
 	{cmd: cmdSCAList, format: formatJSON, fixture: "sca-503", wantExit: 1, name: "upstream-unavailable"},
+	{cmd: cmdSCAList, format: formatJSON, fixture: "sca-504", wantExit: 1, name: "upstream-timeout"},
 	{cmd: cmdSCAList, format: formatUnknown, fixture: "none", wantExit: 1, name: nameUnknownFormat},
 	{cmd: cmdSCAGet, args: []string{scanProject}, format: formatJSON, fixture: "sca", name: "detail"},
 	{cmd: cmdSCAGet, args: []string{scanProject}, format: formatJSON, fixture: "sca-401", wantExit: 1,
@@ -440,9 +442,9 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 		"sonar-401":            denyAll(sonar),
 		"sca":                  sca,
 		"sca-401":              denyAll(sca),
-		// sca-unavailable.json has no trailing newline: the 503 message embeds
-		// the body verbatim.
-		"sca-503": {fail(scaList, http.StatusServiceUnavailable, file("sca-unavailable"))},
+		"sca-502":              {fail(scaList, http.StatusBadGateway, file("sca-bad-gateway"))},
+		"sca-503":              {fail(scaList, http.StatusServiceUnavailable, file("sca-unavailable"))},
+		"sca-504":              {fail(scaList, http.StatusGatewayTimeout, file("sca-gateway-timeout"))},
 	}, files
 }
 

@@ -35,9 +35,9 @@ type StartResult struct {
 }
 
 // Stable machine-readable reasons the portal reports under `error.reason` for
-// `POST /rest/v1/pipelineruns/start` (see `apps/server/src/config/openapi.ts
-// handleTRPCError`). `error.message` is always the static HTTP status phrase;
-// map on the reason. trigger_template_not_found is shared with
+// `POST /rest/v1/pipelineruns/start` (see `sendRestError` in
+// `apps/server/src/config/rest-errors.ts`). `error.message` is the static HTTP
+// status phrase; map on the reason. trigger_template_not_found is shared with
 // build.
 const (
 	reasonPipelineNotFound        = "pipeline_not_found"

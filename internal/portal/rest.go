@@ -12,7 +12,10 @@ import (
 // to the user. Keeps stderr readable and avoids dumping long HTML error pages.
 const maxErrorBodyLen = 200
 
-// checkResponse maps HTTP status codes to domain errors.
+// checkResponse maps HTTP status codes to domain errors. 502, 503 and 504 map
+// to ErrUpstreamUnavailable with the Portal envelope message (status phrase when
+// the body is not an envelope). Unlisted statuses, 500 included, return the
+// generic message with the truncated body.
 func checkResponse(statusCode int, body []byte) error {
 	switch statusCode {
 	case http.StatusOK:
@@ -27,9 +30,20 @@ func checkResponse(statusCode int, body []byte) error {
 		}
 
 		return ErrNotFound
+	case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return upstreamUnavailableError(statusCode, body)
 	default:
 		return fmt.Errorf("portal returned HTTP %d: %s", statusCode, truncateBody(body))
 	}
+}
+
+// upstreamUnavailableError wraps ErrUpstreamUnavailable with the Portal's
+// static envelope message, or the status phrase when the body is not the
+// envelope (an ingress error page).
+func upstreamUnavailableError(statusCode int, body []byte) error {
+	_, message := parseErrorEnvelope(body)
+
+	return fmt.Errorf("%w: %s", ErrUpstreamUnavailable, cmp.Or(message, http.StatusText(statusCode)))
 }
 
 // truncateBody shortens a server-provided byte body to maxErrorBodyLen ASCII
@@ -63,8 +77,9 @@ type reasonTable map[string]reasonError
 // checkReasonedResponse maps a response from an endpoint whose error bodies
 // carry `error.reason`. Order: 200 → nil; a known reason → its reasonError;
 // 404 without a known reason → routeMissingError, else notFound;
-// admission-class 4xx and 5xx → platformStatusError; anything else,
-// including 401 and 403 → checkResponse. args feed every reasonError format.
+// admission-class 4xx and 500 → platformStatusError; anything else,
+// including 401, 403 and 502/503/504 → checkResponse. args feed every
+// reasonError format.
 func checkReasonedResponse(statusCode int, body []byte, reasons reasonTable, notFound reasonError, args ...any) error {
 	if statusCode == http.StatusOK {
 		return nil
@@ -116,7 +131,7 @@ func parseErrorEnvelope(body []byte) (reason, message string) {
 
 // platformStatusError maps the statuses the portal forwards from Kubernetes
 // without a stable reason tag: admission-class 4xx to ErrPlatformReject with
-// the static phrase, 5xx to ErrUpstreamUnavailable with the truncated body.
+// the static phrase, 500 to ErrUpstreamUnavailable with the truncated body.
 // nil for every other status.
 func platformStatusError(statusCode int, body []byte) error {
 	switch statusCode {
@@ -124,8 +139,7 @@ func platformStatusError(statusCode int, body []byte) error {
 		http.StatusUnprocessableEntity, http.StatusTooManyRequests:
 		_, message := parseErrorEnvelope(body)
 		return fmt.Errorf("%w: %s", ErrPlatformReject, cmp.Or(message, http.StatusText(statusCode)))
-	case http.StatusBadGateway, http.StatusServiceUnavailable,
-		http.StatusInternalServerError, http.StatusGatewayTimeout:
+	case http.StatusInternalServerError:
 		return fmt.Errorf("%w: %s", ErrUpstreamUnavailable, truncateBody(body))
 	}
 
