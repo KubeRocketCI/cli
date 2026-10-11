@@ -165,7 +165,8 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 	}
 
 	if opts.IncludeReason {
-		output.TruncateTaskLogs(result)
+		truncated := pipelinerun.TruncateTaskLogs(*result)
+		result = &truncated
 	}
 
 	// JSON consumers (jq, agents) depend on a stable envelope shape, so emit

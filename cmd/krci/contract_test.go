@@ -149,6 +149,8 @@ var contractRows = []contractRow{
 		name: "status-running"},
 	{cmd: cmdPipelineRunList, format: formatJSON, fixture: "runs-live-401", wantExit: 1, name: "live-unauthorized"},
 	{cmd: cmdPipelineRunList, format: formatUnknown, fixture: "runs", wantExit: 1, name: nameUnknownFormat},
+	{cmd: cmdPipelineRunList, args: []string{"--reason"}, format: formatJSON, fixture: "failed-run-list",
+		name: "reason-failed"},
 
 	{cmd: cmdPipelineRunGet, args: []string{runSucceeded}, format: formatJSON, fixture: "runs", name: "succeeded"},
 	{cmd: cmdPipelineRunGet, args: []string{runFailed, "--wait"}, format: formatJSON, fixture: "failed-run",
@@ -361,6 +363,8 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 	failedResults.query = runFailed
 	failedLogs := at(http.MethodGet, pathTaskRunLog, "taskrun-logs-compile")
 	failedLogs.query = "taskRunName=" + runFailed + "-compile"
+	failedLive := list("PipelineRun", "runs-live-failed")
+	failedTaskRuns := at(http.MethodGet, pathTaskRuns, "taskruns-failed")
 
 	pipeline := at(http.MethodPost, pathGet, "env-cdpipeline")
 	pipeline.kind, pipeline.name = "CDPipeline", envDeployment
@@ -414,12 +418,9 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 	return map[string][]route{
 		"runs":          {liveRuns, at(http.MethodGet, pathResults, "runs-results")},
 		"runs-live-401": {deny(liveRuns), noResults},
-		"failed-run": {
-			list("PipelineRun", "runs-live-failed"),
-			failedResults,
-			at(http.MethodGet, pathTaskRuns, "taskruns-failed"),
-			failedLogs,
-		},
+		"failed-run":    {failedLive, failedResults, failedTaskRuns, failedLogs},
+		// failedResults before noResults: the by-name lookup must not hit the empty history.
+		"failed-run-list":      {failedLive, failedResults, noResults, failedTaskRuns, failedLogs},
 		"no-runs":              {list("PipelineRun", "runs-live-empty"), noResults},
 		"start":                {startParam},
 		"start-401":            {deny(start)},

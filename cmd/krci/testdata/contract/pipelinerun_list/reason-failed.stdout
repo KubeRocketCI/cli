@@ -1,0 +1,34 @@
+{
+  "pipelineRuns": [
+    {
+      "name": "build-my-app-main-f9x8y",
+      "portalUrl": "{{PORTAL}}/c/in-cluster/cicd/pipelineruns/ns/build-my-app-main-f9x8y",
+      "status": "Failed",
+      "pipeline": "github-my-app-app-build-default",
+      "project": "my-app",
+      "branch": "main",
+      "author": "dev-user",
+      "type": "build",
+      "startTime": "2026-01-02T09:40:00Z",
+      "duration": "5m 30s",
+      "commitSha": "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432"
+    }
+  ],
+  "tasks": [
+    {
+      "name": "fetch-repository",
+      "status": "Succeeded",
+      "duration": "30s",
+      "message": "All Steps have completed executing"
+    },
+    {
+      "name": "compile",
+      "status": "Failed",
+      "duration": "4m 20s",
+      "failedStep": "compile",
+      "exitCode": 2,
+      "message": "\"step-compile\" exited with code 2",
+      "logs": "... (5 lines truncated)\ncompiling package example.com/my-app/internal/pkg06\ncompiling package example.com/my-app/internal/pkg07\ncompiling package example.com/my-app/internal/pkg08\ncompiling package example.com/my-app/internal/pkg09\ncompiling package example.com/my-app/internal/pkg10\ncompiling package example.com/my-app/internal/pkg11\ncompiling package example.com/my-app/internal/pkg12\ncompiling package example.com/my-app/internal/pkg13\ncompiling package example.com/my-app/internal/pkg14\ncompiling package example.com/my-app/internal/pkg15\ncompiling package example.com/my-app/internal/pkg16\ncompiling package example.com/my-app/internal/pkg17\ncompiling package example.com/my-app/internal/pkg18\ncompiling package example.com/my-app/internal/pkg19\ncompiling package example.com/my-app/internal/pkg20\ncompiling package example.com/my-app/internal/pkg21\ncompiling package example.com/my-app/internal/pkg22\ncompiling package example.com/my-app/internal/pkg23\ncompiling package example.com/my-app/internal/pkg24\ncompiling package example.com/my-app/internal/pkg25\ncompiling package example.com/my-app/internal/pkg26\ncompiling package example.com/my-app/internal/pkg27\n./internal/pkg27/handler.go:12:2: undefined: loginHandler\nbuild failed\nexit status 2\n"
+    }
+  ]
+}

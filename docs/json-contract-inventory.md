@@ -20,6 +20,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-pipelinerun-list)
 | status-running | `krci pipelinerun list --status running -o json` | 0 | bare | empty |
 | live-unauthorized | `krci pipelinerun list -o json` | 1 | empty | `Error: authentication required: fetching live pipeline runs: unauthorized: please run 'krci auth login'` |
 | unknown-format | `krci pipelinerun list -o xml` | 1 | empty | `Error: unknown output format: xml (use 'json' or 'table')` |
+| reason-failed | `krci pipelinerun list --reason -o json` | 0 | bare | empty |
 
 ## `krci pipelinerun get`
 
