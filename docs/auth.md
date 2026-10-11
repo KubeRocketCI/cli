@@ -35,6 +35,34 @@ Logged in as user@example.com (User Name)
 The issuer URL, cluster name, and namespace are auto-discovered from the
 Portal's public `config.get` endpoint — no extra flags required.
 
+### Portal URL
+
+Every command that calls the portal, `auth login` included, checks the portal
+URL before the first request:
+
+- Scheme `https`. `http` is accepted only when the host is `localhost` or a
+  loopback IP (`127.0.0.0/8`, `[::1]`).
+- A host is required; user info (`https://user@host`), a query and a fragment
+  are refused. A path is allowed.
+- A portal response that redirects to another host or port, or from `https`
+  to `http`, is not followed; the request fails and the redirect target is not
+  contacted. An omitted port is the scheme's default (`443` for `https`, `80`
+  for `http`), so `https://host:443` and `https://host` are the same port.
+  Redirects to the same host and port are followed; the chain stops after 10
+  requests.
+
+| Condition | Exit | Message (stderr) |
+|---|---|---|
+| URL cannot be parsed | `1` | `invalid portal URL: cannot be parsed` |
+| No host | `1` | `invalid portal URL: a host is required` |
+| URL carries a query or fragment | `1` | `invalid portal URL: query and fragment are not allowed` |
+| URL carries user info | `1` | `invalid portal URL: user info is not allowed: <url>` (password shown as `xxxxx`) |
+| Scheme is not `https`, or `http` host is not loopback | `1` | `invalid portal URL: must use https, or http on localhost or a loopback IP: <url>` |
+| Redirect to another host or port (an omitted port is the scheme's default), or from `https` to `http` | `1` | `<context>: Get "<location>": redirect refused from <url> to <target>` |
+
+`auth login` checks the URL before issuer discovery and before the browser
+opens, so a refused URL is never saved to `config.yaml`.
+
 ## `auth status`
 
 ```bash
@@ -64,8 +92,8 @@ The stored session comes from `krci auth login` and is checked locally.
 `KRCI_TOKEN`, and a stored token whose claims cannot be read, are checked with
 one call to the portal through the configured portal URL, so the check needs
 the same configuration as every portal command: portal URL, cluster name, and
-namespace. An `http://` portal URL for local development works as it does for
-the other commands.
+namespace. An `http://` portal URL on `localhost` or a loopback IP works as it
+does for the other commands; see [Portal URL](#portal-url).
 
 With `KRCI_TOKEN` set, `User`, `Groups`, and `Expires` come from its claims,
 not from the stored session. When the portal accepts a token whose claims
@@ -144,8 +172,7 @@ after upgrading. `KRCI_TOKEN` is not bound to a portal.
 
 ## Non-interactive environments
 
-For CI or local dev against an HTTP portal where discovery isn't possible,
-supply everything up front:
+For CI, or when discovery isn't possible, supply everything up front:
 
 ```bash
 KRCI_ISSUER_URL=https://idp.example.com/realms/my-realm \

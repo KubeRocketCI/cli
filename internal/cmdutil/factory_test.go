@@ -2,6 +2,7 @@ package cmdutil
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -23,6 +24,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/auth"
 	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
+	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/token"
 )
 
@@ -248,6 +250,77 @@ func TestFactoryConfig_DoesNotCacheFailure(t *testing.T) {
 	assert.Equal(t, "ns", cfg.Namespace)
 }
 
+// stubTokenProvider returns a fixed token.
+type stubTokenProvider struct{ auth.TokenProvider }
+
+func (stubTokenProvider) GetToken(context.Context) (string, error) { return "test-token", nil }
+
+func newGatedFactory(portalURL string) *Factory {
+	f := newTestFactory()
+	f.SetConfigResolver(func() (*config.Config, error) {
+		return &config.Config{PortalURL: portalURL, ClusterName: "c", Namespace: "ns"}, nil
+	})
+	f.TokenProvider = func() (auth.TokenProvider, error) { return stubTokenProvider{}, nil }
+
+	return f
+}
+
+func TestFactoryRestClient_RequiresHTTPSOrLoopback(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		portalURL string
+		wantErr   error
+	}{
+		{portalURL: "https://portal.example.com"},
+		{portalURL: "http://127.0.0.1:3001"},
+		{portalURL: "http://portal.example.com", wantErr: portal.ErrInvalidPortalURL},
+		{portalURL: "https://user@portal.example.com", wantErr: portal.ErrInvalidPortalURL},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.portalURL, func(t *testing.T) {
+			t.Parallel()
+
+			client, err := newGatedFactory(tt.portalURL).RestClient()
+
+			if tt.wantErr == nil {
+				require.NoError(t, err)
+				assert.NotNil(t, client)
+
+				return
+			}
+
+			require.ErrorIs(t, err, tt.wantErr)
+			assert.Nil(t, client)
+		})
+	}
+}
+
+func TestFactoryRestClient_RefusesCrossHostRedirect(t *testing.T) {
+	t.Parallel()
+
+	var hits atomic.Int32
+
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(target.Close)
+
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL+r.URL.Path, http.StatusFound)
+	}))
+	t.Cleanup(origin.Close)
+
+	client, err := newGatedFactory(origin.URL).RestClient()
+	require.NoError(t, err)
+
+	_, err = client.ConfigGetWithResponse(t.Context())
+	require.ErrorIs(t, err, portal.ErrRedirectRefused)
+	assert.Zero(t, hits.Load(), "redirect target was requested")
+}
+
 // TestNew_SetsEveryFuncField: every exported func field of a Factory built by
 // New is non-nil.
 func TestNew_SetsEveryFuncField(t *testing.T) {
@@ -280,11 +353,11 @@ func TestFactoryRestClient_UnboundStoredTokenNeverReachesPortal(t *testing.T) {
 
 	var hits atomic.Int32
 
-	portal := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	portalSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		hits.Add(1)
 		w.WriteHeader(http.StatusOK)
 	}))
-	t.Cleanup(portal.Close)
+	t.Cleanup(portalSrv.Close)
 
 	dir := t.TempDir()
 	tokenPath := filepath.Join(dir, "tokens.enc")
@@ -304,7 +377,7 @@ func TestFactoryRestClient_UnboundStoredTokenNeverReachesPortal(t *testing.T) {
 	f := newTestFactory()
 	f.SetConfigResolver(func() (*config.Config, error) {
 		return &config.Config{
-			PortalURL:      portal.URL,
+			PortalURL:      portalSrv.URL,
 			ClusterName:    "core",
 			Namespace:      "krci",
 			ConfigDir:      dir,

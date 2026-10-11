@@ -9,8 +9,12 @@ import (
 var (
 	ErrUnauthorized        = errors.New("unauthorized: please run 'krci auth login'")
 	ErrNotFound            = errors.New("resource not found")
-	ErrHTTPSRequired       = errors.New("portal URL must use HTTPS")
+	ErrInvalidPortalURL    = errors.New("invalid portal URL")
 	ErrUpstreamUnavailable = errors.New("upstream service unavailable")
+
+	// ErrRedirectRefused is returned when a portal response redirects to
+	// another host or port, or from https to http.
+	ErrRedirectRefused = errors.New("redirect refused")
 
 	// ErrDeploymentNotFound is returned when a CDPipeline (deployment)
 	// look-up fails. Wraps ErrNotFound so callers using errors.Is for

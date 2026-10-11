@@ -140,9 +140,9 @@ krci [--portal-url <url>]
 
 ## Configuration
 
-| Flag           | Env               | Description             |
-|----------------|-------------------|-------------------------|
-| `--portal-url` | `KRCI_PORTAL_URL` | KubeRocketCI Portal URL |
+| Flag           | Env               | Description                                                                  |
+|----------------|-------------------|------------------------------------------------------------------------------|
+| `--portal-url` | `KRCI_PORTAL_URL` | KubeRocketCI Portal URL: `https`, or `http` for `localhost` and loopback IPs |
 
 Issuer URL, cluster name, and namespace are auto-discovered from the
 Portal on `auth login`.

@@ -3,7 +3,6 @@ package login
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 
@@ -75,16 +74,17 @@ func loginRun(cmd *cobra.Command, opts *LoginOptions) error {
 		return cmdutil.ConfigNotSetError("portal URL", "", cmdutil.PortalURLOption, "")
 	}
 
+	// Runs before discovery; discovery is skipped when the issuer is configured.
+	if err := portal.ValidatePortalURL(cfg.PortalURL); err != nil {
+		return err
+	}
+
 	// Auto-discover OIDC issuer URL from portal (public endpoint, no auth needed).
 	// Mutate the factory-cached pointer so TokenProvider() (which holds the
 	// same *config.Config) sees the discovered issuer URL during construction.
 	if cfg.IssuerURL == "" {
 		issuerURL, err := portal.FetchOIDCConfig(cmd.Context(), cfg.PortalURL)
 		if err != nil {
-			if errors.Is(err, portal.ErrHTTPSRequired) {
-				return fmt.Errorf("invalid portal URL: %w", err)
-			}
-
 			return cmdutil.ConfigNotSetError("OIDC issuer URL",
 				fmt.Sprintf("could not discover OIDC issuer from portal: %v", err),
 				cmdutil.IssuerURLOption, "")

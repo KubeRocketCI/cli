@@ -3,14 +3,21 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
+	"io/fs"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
+	"github.com/KubeRocketCI/cli/internal/portal"
 )
 
 // Not parallel: the tests set HOME and KRCI_* through t.Setenv.
@@ -282,6 +289,10 @@ func TestRunWith_ConfigReachesLeaves(t *testing.T) {
 			args: []string{"project", "list", "--portal-url", "https://p.example"},
 			want: cmdutil.ConfigNotSetError("cluster name", "", cmdutil.ClusterNameOption, cmdutil.LoginHint),
 		},
+		"insecure portal URL gate": {
+			args: []string{"project", "list", "--portal-url", "http://p.example"},
+			want: portal.ValidatePortalURL("http://p.example"),
+		},
 	}
 
 	for name, tc := range cases {
@@ -297,6 +308,45 @@ func TestRunWith_ConfigReachesLeaves(t *testing.T) {
 				wantErrOut: equal("Error: " + tc.want.Error() + "\n"),
 			}.check(t, code, out.String(), errb.String())
 		})
+	}
+}
+
+// TestRunWith_LoginGatesPortalURLWithConfiguredIssuer: with the issuer
+// configured, discovery is skipped and login still refuses an insecure portal
+// URL before the OIDC flow; the issuer server sees no connection and no config
+// is written.
+func TestRunWith_LoginGatesPortalURLWithConfiguredIssuer(t *testing.T) {
+	dir := isolatedConfigDir(t)
+
+	var conns atomic.Int32
+
+	issuer := httptest.NewUnstartedServer(http.NotFoundHandler())
+	issuer.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+		if state == http.StateNew {
+			conns.Add(1)
+		}
+	}
+	issuer.StartTLS()
+	t.Cleanup(issuer.Close)
+
+	t.Setenv("KRCI_ISSUER_URL", issuer.URL)
+
+	var out, errb bytes.Buffer
+
+	code := runWith(context.Background(),
+		[]string{"auth", "login", "--portal-url", "http://example.com"}, newFactory(&out, &errb))
+	runCase{
+		wantCode:   1,
+		wantOut:    empty(),
+		wantErrOut: equal("Error: " + portal.ValidatePortalURL("http://example.com").Error() + "\n"),
+	}.check(t, code, out.String(), errb.String())
+
+	if n := conns.Load(); n != 0 {
+		t.Errorf("issuer received %d connections, want 0", n)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, "config.yaml")); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("config.yaml stat error = %v, want not exist", err)
 	}
 }
 

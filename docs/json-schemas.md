@@ -991,6 +991,10 @@ Common messages:
 
 | Condition                                    | Message                                                                                  |
 | -------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Portal URL cannot be parsed or has no host   | `invalid portal URL: cannot be parsed` or `invalid portal URL: a host is required`; the URL is not echoed, no request is sent |
+| Portal URL carries a query or fragment       | `invalid portal URL: query and fragment are not allowed`; the URL is not echoed, no request is sent |
+| Portal URL carries user info                 | `invalid portal URL: user info is not allowed: <url>`, password shown as `xxxxx`, no request is sent |
+| Portal URL is not `https` (`http` is accepted for `localhost` and loopback IPs) | `invalid portal URL: must use https, or http on localhost or a loopback IP: <url>`, no request is sent |
 | No session, or the stored session is unusable | `not authenticated: run 'krci auth login'`, after the verb's context                    |
 | Portal rejects the token (401)               | `authentication required: [<context>: ]unauthorized: please run 'krci auth login'` |
 | RBAC denied (403)                            | `permission denied`                                                                      |
@@ -999,6 +1003,7 @@ Common messages:
 | Portal upstream 502/503/504                  | `upstream service unavailable: <Portal message or HTTP status phrase>`                   |
 | Other status, 500 included                   | `portal returned HTTP <code>: <body>`; a long body is cut and ends with `...`            |
 | Network failure                              | the verb's context, then the transport error                                             |
+| Portal redirects to another host or port (an omitted port is the scheme's default), or from `https` to `http` | the verb's context, then `Get "<location>": redirect refused from <url> to <target>`; the target is not requested |
 
 Not-found messages name the resource and differ per verb; see each verb's
 section.
