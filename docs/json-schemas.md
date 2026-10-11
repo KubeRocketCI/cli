@@ -960,13 +960,13 @@ Rules:
   expired, or rejected session is an error (exit `1`) and produces the error
   envelope below with one of:
 
-  | Condition                           | Message                                              |
-  | ----------------------------------- | ---------------------------------------------------- |
-  | No stored session                   | `not authenticated: run 'krci auth login'`           |
-  | Stored session expired, no refresh  | `session expired: run 'krci auth login'`             |
-  | Expired `KRCI_TOKEN`                | `KRCI_TOKEN has expired: supply a fresh token`       |
-  | Portal rejects the token (401)      | `not authenticated: the portal rejected the token`   |
-  | Portal unreachable or other failure | `verifying the token with the portal: <cause>`       |
+  | Condition                                             | Message                                            |
+  | ----------------------------------------------------- | -------------------------------------------------- |
+  | No stored token bound to the configured portal URL    | `not authenticated: run 'krci auth login'`         |
+  | Stored session expired, no refresh                    | `session expired: run 'krci auth login'`           |
+  | Expired `KRCI_TOKEN`                                  | `KRCI_TOKEN has expired: supply a fresh token`     |
+  | Portal rejects the token (401)                        | `not authenticated: the portal rejected the token` |
+  | Portal unreachable or other failure                   | `verifying the token with the portal: <cause>`     |
 
 - `groups` is always an array (`[]` when none).
 - `expiresAt` is RFC3339 in UTC, `null` when the stored token has no expiry.

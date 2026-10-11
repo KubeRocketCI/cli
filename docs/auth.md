@@ -54,7 +54,7 @@ Groups:       admin, developers, viewers
 | State                                   | Exit | Message (stderr)                             |
 |-----------------------------------------|------|----------------------------------------------|
 | Valid session                           | `0`  | —                                            |
-| No stored session                       | `1`  | `not authenticated: run 'krci auth login'`   |
+| No stored token bound to the portal URL | `1`  | `not authenticated: run 'krci auth login'`   |
 | Session expired and refresh not possible| `1`  | `session expired: run 'krci auth login'`     |
 | `KRCI_TOKEN` is a JWT past its `exp`    | `1`  | `KRCI_TOKEN has expired: supply a fresh token` |
 | `KRCI_TOKEN` or unreadable claims, portal rejects the token | `1` | `not authenticated: the portal rejected the token` |
@@ -135,6 +135,12 @@ need `--portal-url` again.
 | `~/.config/krci/config.yaml`  | Portal URL, issuer, cluster, namespace      |
 | `~/.config/krci/tokens.enc`   | AES-encrypted access/refresh/id tokens      |
 | OS keyring (`krci`)           | Symmetric key used to decrypt `tokens.enc`  |
+
+`tokens.enc` records the portal URL the token was bound to at login or refresh.
+A stored token is used only when that URL equals the configured portal URL;
+otherwise commands fail with `not authenticated: run 'krci auth login'`. Tokens
+stored by earlier CLI versions carry no binding and require one `krci auth login`
+after upgrading. `KRCI_TOKEN` is not bound to a portal.
 
 ## Non-interactive environments
 

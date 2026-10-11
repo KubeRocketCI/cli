@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -163,6 +164,7 @@ func TestFactoryTokenProvider_WritesAuthDiagnosticsToErrOut(t *testing.T) {
 		ExpiresAt:    time.Now().Add(-time.Minute),
 		IssuerURL:    idp.URL,
 		ClientID:     "krci-cli",
+		PortalURL:    "https://portal.example.com",
 	}))
 
 	require.NoError(t, os.Chmod(dir, 0o500))
@@ -173,6 +175,7 @@ func TestFactoryTokenProvider_WritesAuthDiagnosticsToErrOut(t *testing.T) {
 	f := New(iostreams.New(nil, &out, &errOut, false))
 	f.SetConfigResolver(func() (*config.Config, error) {
 		return &config.Config{
+			PortalURL:      "https://portal.example.com",
 			IssuerURL:      idp.URL,
 			ClientID:       "krci-cli",
 			ConfigDir:      dir,
@@ -269,4 +272,51 @@ func TestNew_SetsEveryFuncField(t *testing.T) {
 	if checked == 0 {
 		t.Error("Factory has no exported func fields to check")
 	}
+}
+
+func TestFactoryRestClient_UnboundStoredTokenNeverReachesPortal(t *testing.T) {
+	t.Setenv("KRCI_KEYRING_BACKEND", "file")
+	t.Setenv("KRCI_TOKEN", "")
+
+	var hits atomic.Int32
+
+	portal := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(portal.Close)
+
+	dir := t.TempDir()
+	tokenPath := filepath.Join(dir, "tokens.enc")
+
+	keyPath := filepath.Join(dir, ".keyfile")
+	encoded := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte("k"), 32))
+	require.NoError(t, os.WriteFile(keyPath, []byte(encoded), 0o600))
+
+	const keyringService = "krci-test"
+
+	enc := token.NewAESEncryptor(keyringService, dir, io.Discard)
+	require.NoError(t, token.NewEncryptedStore(tokenPath, enc, io.Discard).Save(&token.StoredToken{
+		IDToken:   "unbound-id",
+		ExpiresAt: time.Now().Add(time.Hour),
+	}))
+
+	f := newTestFactory()
+	f.SetConfigResolver(func() (*config.Config, error) {
+		return &config.Config{
+			PortalURL:      portal.URL,
+			ClusterName:    "core",
+			Namespace:      "krci",
+			ConfigDir:      dir,
+			TokenPath:      tokenPath,
+			KeyringService: keyringService,
+		}, nil
+	})
+
+	client, err := f.RestClient()
+	require.NoError(t, err)
+
+	_, err = client.ConfigGetWithResponse(t.Context())
+	require.ErrorIs(t, err, auth.ErrNotAuthenticated)
+	assert.Zero(t, hits.Load(), "an unbound stored token must not produce a portal request")
 }
