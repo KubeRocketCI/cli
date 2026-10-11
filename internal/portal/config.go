@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
@@ -18,26 +17,23 @@ type ClusterConfig struct {
 	DefaultNamespace string `json:"defaultNamespace"`
 }
 
+// configTimeout caps each config endpoint request.
+const configTimeout = 10 * time.Second
+
 // FetchOIDCConfig calls the public /rest/v1/config/oidc endpoint (no auth)
 // and returns the OIDC issuer URL for pre-login discovery.
-// The portal URL must use HTTPS.
+// portalURL must pass ValidatePortalURL.
 func FetchOIDCConfig(ctx context.Context, portalURL string) (string, error) {
-	if err := validatePortalURL(portalURL); err != nil {
+	if err := ValidatePortalURL(portalURL); err != nil {
 		return "", err
 	}
 
-	return fetchOIDCConfig(ctx, portalURL)
-}
-
-func fetchOIDCConfig(ctx context.Context, portalURL string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, restURL(portalURL, "/v1/config/oidc"), nil)
 	if err != nil {
 		return "", fmt.Errorf("creating OIDC config request: %w", err)
 	}
 
-	client := &http.Client{Timeout: 10 * time.Second}
-
-	resp, err := client.Do(req)
+	resp, err := NewHTTPClient(configTimeout).Do(req)
 	if err != nil {
 		return "", fmt.Errorf("requesting OIDC config: %w", err)
 	}
@@ -69,16 +65,12 @@ func fetchOIDCConfig(ctx context.Context, portalURL string) (string, error) {
 
 // FetchClusterConfig calls the authenticated /rest/v1/config endpoint
 // and returns cluster name and default namespace.
-// The portal URL must use HTTPS.
+// portalURL must pass ValidatePortalURL.
 func FetchClusterConfig(ctx context.Context, portalURL, token string) (*ClusterConfig, error) {
-	if err := validatePortalURL(portalURL); err != nil {
+	if err := ValidatePortalURL(portalURL); err != nil {
 		return nil, err
 	}
 
-	return fetchClusterConfig(ctx, portalURL, token)
-}
-
-func fetchClusterConfig(ctx context.Context, portalURL, token string) (*ClusterConfig, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, restURL(portalURL, "/v1/config"), nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating cluster config request: %w", err)
@@ -86,9 +78,7 @@ func fetchClusterConfig(ctx context.Context, portalURL, token string) (*ClusterC
 
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	client := &http.Client{Timeout: 10 * time.Second}
-
-	resp, err := client.Do(req)
+	resp, err := NewHTTPClient(configTimeout).Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("requesting cluster config: %w", err)
 	}
@@ -121,15 +111,6 @@ func VerifySession(ctx context.Context, client *restapi.ClientWithResponses) err
 	}
 
 	return checkResponse(resp.StatusCode(), resp.Body)
-}
-
-func validatePortalURL(portalURL string) error {
-	u, err := url.Parse(portalURL)
-	if err != nil || u.Scheme != "https" || u.Host == "" {
-		return fmt.Errorf("%w with a valid host: %q", ErrHTTPSRequired, portalURL)
-	}
-
-	return nil
 }
 
 func restURL(portalURL, path string) string {

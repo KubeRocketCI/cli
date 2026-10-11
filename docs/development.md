@@ -33,9 +33,15 @@ make ci           # lint → test → build
 
 ## Login against the local portal
 
-The local portal runs over HTTP, so the CLI can't auto-discover the OIDC
-issuer or cluster metadata. Supply everything upfront via environment
-variables:
+The local portal runs over HTTP. The CLI accepts an `http` portal URL only for
+`localhost` and loopback IPs, and discovers the OIDC issuer and cluster
+metadata from it like from a remote portal:
+
+```bash
+./dist/krci auth login --portal-url http://localhost:3001
+```
+
+To skip discovery, supply the values via environment variables:
 
 ```bash
 KRCI_ISSUER_URL=https://idp.example.com/realms/my-realm \

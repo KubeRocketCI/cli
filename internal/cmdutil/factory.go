@@ -12,6 +12,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/auth"
 	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
+	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/internal/token"
 )
@@ -113,6 +114,11 @@ func New(ios *iostreams.IOStreams) *Factory {
 				return
 			}
 
+			if err := portal.ValidatePortalURL(cfg.PortalURL); err != nil {
+				cachedRestErr = err
+				return
+			}
+
 			if cfg.ClusterName == "" {
 				cachedRestErr = ConfigNotSetError("cluster name", "", ClusterNameOption, LoginHint)
 				return
@@ -129,8 +135,6 @@ func New(ios *iostreams.IOStreams) *Factory {
 				return
 			}
 
-			httpClient := &http.Client{Timeout: DefaultHTTPTimeout}
-
 			bearerAuth := func(ctx context.Context, req *http.Request) error {
 				tok, err := tp.GetToken(ctx)
 				if err != nil {
@@ -142,7 +146,7 @@ func New(ios *iostreams.IOStreams) *Factory {
 
 			cachedRest, cachedRestErr = restapi.NewClientWithResponses(
 				cfg.PortalURL+"/rest",
-				restapi.WithHTTPClient(httpClient),
+				restapi.WithHTTPClient(portal.NewHTTPClient(DefaultHTTPTimeout)),
 				restapi.WithRequestEditorFn(bearerAuth),
 			)
 		})

@@ -13,30 +13,6 @@ import (
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 )
 
-func TestFetchOIDCConfig_RequiresHTTPS(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name      string
-		portalURL string
-	}{
-		{name: "http scheme", portalURL: "http://portal.example.com"},
-		{name: "no scheme", portalURL: "portal.example.com"},
-		{name: "empty host", portalURL: "https://"},
-		{name: "empty string", portalURL: ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			_, err := FetchOIDCConfig(t.Context(), tt.portalURL)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "portal URL must use HTTPS")
-		})
-	}
-}
-
 func TestFetchOIDCConfig(t *testing.T) {
 	t.Parallel()
 
@@ -91,8 +67,7 @@ func TestFetchOIDCConfig(t *testing.T) {
 			srv := httptest.NewServer(tt.handler)
 			defer srv.Close()
 
-			// Use http:// for test server (validatePortalURL requires https, so bypass it)
-			issuerURL, err := fetchOIDCConfig(t.Context(), srv.URL)
+			issuerURL, err := FetchOIDCConfig(t.Context(), srv.URL)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -105,14 +80,6 @@ func TestFetchOIDCConfig(t *testing.T) {
 			assert.Equal(t, tt.wantURL, issuerURL)
 		})
 	}
-}
-
-func TestFetchClusterConfig_RequiresHTTPS(t *testing.T) {
-	t.Parallel()
-
-	_, err := FetchClusterConfig(t.Context(), "http://portal.example.com", "token")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "portal URL must use HTTPS")
 }
 
 func TestFetchClusterConfig(t *testing.T) {
@@ -162,7 +129,7 @@ func TestFetchClusterConfig(t *testing.T) {
 			srv := httptest.NewServer(tt.handler)
 			defer srv.Close()
 
-			cfg, err := fetchClusterConfig(t.Context(), srv.URL, "test-token")
+			cfg, err := FetchClusterConfig(t.Context(), srv.URL, "test-token")
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -186,7 +153,7 @@ var fetchers = map[string]struct {
 }{
 	"OIDC": {
 		fetch: func(ctx context.Context, portalURL string) error {
-			_, err := fetchOIDCConfig(ctx, portalURL)
+			_, err := FetchOIDCConfig(ctx, portalURL)
 			return err
 		},
 		errPrefix:  "requesting OIDC config: Get ",
@@ -194,12 +161,43 @@ var fetchers = map[string]struct {
 	},
 	"cluster": {
 		fetch: func(ctx context.Context, portalURL string) error {
-			_, err := fetchClusterConfig(ctx, portalURL, "test-token")
+			_, err := FetchClusterConfig(ctx, portalURL, "test-token")
 			return err
 		},
 		errPrefix:  "requesting cluster config: Get ",
 		urlPathEnd: "/rest/v1/config",
 	},
+}
+
+func TestFetchConfig_ValidatesPortalURL(t *testing.T) {
+	t.Parallel()
+
+	for name, tc := range fetchers {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tc.fetch(t.Context(), "http://portal.example.com")
+			require.ErrorIs(t, err, ErrInvalidPortalURL)
+		})
+	}
+}
+
+func TestFetchConfig_RefusesCrossHostRedirect(t *testing.T) {
+	t.Parallel()
+
+	for name, tc := range fetchers {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			target, hits := countingServer(t)
+			portalURL := redirectingServer(t, target.URL+tc.urlPathEnd).URL
+
+			err := tc.fetch(t.Context(), portalURL)
+			require.ErrorIs(t, err, ErrRedirectRefused)
+			assert.Contains(t, err.Error(), "from "+portalURL+tc.urlPathEnd+" to "+target.URL+tc.urlPathEnd)
+			assert.Zero(t, hits.Load(), "redirect target was requested")
+		})
+	}
 }
 
 func TestFetchConfig_RequestErrorText(t *testing.T) {

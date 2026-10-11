@@ -226,6 +226,8 @@ var contractRows = []contractRow{
 
 	{cmd: cmdProjectList, format: formatJSON, fixture: "project", name: "projects"},
 	{cmd: cmdProjectList, format: formatJSON, fixture: "codebase-401", wantExit: 1, name: nameUnauthorized},
+	{cmd: cmdProjectList, format: formatJSON, fixture: "none",
+		env: map[string]string{"KRCI_PORTAL_URL": "http://portal.example.com"}, wantExit: 1, name: "insecure-portal-url"},
 	{cmd: cmdProjectGet, args: []string{projectName}, format: formatJSON, fixture: "project", name: "detail"},
 	{cmd: cmdProjectGet, args: []string{projectName}, format: formatJSON, fixture: "codebase-404", wantExit: 1,
 		name: nameNotFound},
