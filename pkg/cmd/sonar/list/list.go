@@ -13,6 +13,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 	sonarinternal "github.com/KubeRocketCI/cli/pkg/cmd/sonar/internal"
 )
 
@@ -50,7 +51,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
   # Scripting — failing-gate projects
   krci sonar list -o json | jq -r '.data.projects[] | select(.qualityGateStatus=="ERROR") | .key'`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := sonarinternal.ValidateOutputFormat(opts.OutputFormat); err != nil {
+			if err := render.ValidateOutputFormat(opts.OutputFormat, output.FormatJSON, output.FormatTable); err != nil {
 				return err
 			}
 
@@ -82,7 +83,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 func listRun(ctx context.Context, opts *ListOptions) error {
 	client, err := opts.RestClient()
 	if err != nil {
-		return sonarinternal.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
 	svc := portal.NewSonarService(client)
@@ -93,10 +94,10 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		SearchTerm: opts.Search,
 	})
 	if err != nil {
-		return sonarinternal.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
-	return sonarinternal.Render(opts.IO, opts.OutputFormat, result, func(w io.Writer, isTTY bool) error {
+	return render.Render(opts.IO, opts.OutputFormat, result, func(w io.Writer, isTTY bool) error {
 		return renderTable(w, isTTY, result)
 	})
 }
@@ -119,7 +120,7 @@ func renderTable(w io.Writer, isTTY bool, result *portal.SonarProjectList) error
 		rows = append(rows, []string{p.Key, p.Name, gate})
 	}
 
-	if err := sonarinternal.PrintTable(w, isTTY, headers, rows); err != nil {
+	if err := render.PrintTable(w, isTTY, headers, rows); err != nil {
 		return err
 	}
 
@@ -137,7 +138,7 @@ func renderTable(w io.Writer, isTTY bool, result *portal.SonarProjectList) error
 // "beyond last page" rather than the misleading "page 999 of 1", and a
 // single-result page reads "1 project" (not "1 projects").
 func pageFooter(paging portal.SonarPaging) string {
-	totalPages := sonarinternal.PageCount(paging.Total, paging.PageSize)
+	totalPages := render.PageCount(paging.Total, paging.PageSize)
 
 	if paging.Total == 0 {
 		return fmt.Sprintf("no projects (page-size %d)", paging.PageSize)

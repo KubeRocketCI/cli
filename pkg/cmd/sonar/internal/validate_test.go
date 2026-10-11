@@ -94,23 +94,6 @@ func TestValidateEnumCSV(t *testing.T) {
 	})
 }
 
-func TestValidateOutputFormat(t *testing.T) {
-	t.Parallel()
-
-	for _, v := range []string{"", "table", "json"} {
-		if err := ValidateOutputFormat(v); err != nil {
-			t.Errorf("ValidateOutputFormat(%q): want nil, got %v", v, err)
-		}
-	}
-
-	for _, v := range []string{"yaml", "csv", "JSON", "Table", "xml"} {
-		err := ValidateOutputFormat(v)
-		if err == nil {
-			t.Errorf("ValidateOutputFormat(%q): want error", v)
-		}
-	}
-}
-
 func TestValidateNonEmptyFlag(t *testing.T) {
 	t.Parallel()
 

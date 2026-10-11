@@ -2,11 +2,9 @@ package discovery
 
 import (
 	"bytes"
-	"errors"
 	"strings"
 	"testing"
 
-	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
 )
@@ -173,23 +171,6 @@ func TestColorForArgoStatus_Passthrough(t *testing.T) {
 
 	if got := ColorForArgoStatus("unknown"); got != "unknown" {
 		t.Errorf("ColorForArgoStatus(unknown) = %q, want unknown", got)
-	}
-}
-
-func TestHandleError_JSONEnvelopePrinted(t *testing.T) {
-	t.Parallel()
-
-	stdout := &bytes.Buffer{}
-	ios := &iostreams.IOStreams{Out: stdout, ErrOut: &bytes.Buffer{}}
-	boom := errors.New("boom")
-
-	if got := HandleError(ios, "json", boom); got != boom {
-		t.Errorf("HandleError must return the original error; got %v", got)
-	}
-
-	want := output.JSONErrorEnvelope{SchemaVersion: SchemaVersion, Error: output.JSONErrorBody{Message: "boom"}}
-	if got := cmdtest.DecodeErrorEnvelope(t, stdout); got != want {
-		t.Errorf("envelope = %+v, want %+v", got, want)
 	}
 }
 

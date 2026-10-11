@@ -1,6 +1,5 @@
 // Package scainternal holds helpers shared by `krci sca` verbs
 // (validation, enum sets, render/format dispatch, error-envelope plumbing).
-// Structure mirrors `pkg/cmd/sonar/internal/`.
 package scainternal
 
 import (

@@ -1,7 +1,8 @@
-// Package discovery holds helpers shared by the deployment-discovery verbs:
-// output-format dispatch, JSON envelope rendering, table cells, and
-// shared error promotion. Placed under `pkg/cmd/internal/` so Go enforces
-// package visibility: only packages below `pkg/cmd/...` may import it.
+// Package discovery holds the table cells and section output shared by the
+// deployment-discovery verbs. SchemaVersion, TableRenderer, Render,
+// HandleError, PrintTable and ValidateOutputFormat delegate to
+// pkg/cmd/internal/render; new callers import render directly.
+// Importable only from packages below pkg/cmd/.
 package discovery
 
 import (
@@ -9,17 +10,15 @@ import (
 	"io"
 	"strings"
 
-	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/ptr"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
-// SchemaVersion is the shared JSON envelope version for every deployment-
-// discovery verb. Bump only when the envelope shape changes in a way scripting
-// consumers must detect.
-const SchemaVersion = "1"
+// SchemaVersion is render.SchemaVersion.
+const SchemaVersion = render.SchemaVersion
 
 // ShortDigestLen is the maximum length of an image digest as shown in table
 // mode: `sha256:` (7 chars) + first 8 hex chars = 15 visible characters.
@@ -30,48 +29,28 @@ const ShortDigestLen = 15
 // The OSC 8 hyperlink target carries the full URL regardless.
 const MaxIngressHostLen = 50
 
-// ValidateOutputFormat rejects `-o` values other than "", "table", or "json".
+// TableRenderer is render.TableRenderer.
+type TableRenderer = render.TableRenderer
+
+// ValidateOutputFormat is render.ValidateOutputFormat with "json" and "table"
+// allowed.
 func ValidateOutputFormat(format string) error {
-	switch format {
-	case "", output.FormatTable, output.FormatJSON:
-		return nil
-	default:
-		return fmt.Errorf("unknown output format: %s (use 'json' or 'table')", format)
-	}
+	return render.ValidateOutputFormat(format, output.FormatJSON, output.FormatTable)
 }
 
-// TableRenderer emits the table/text view. The callback receives the writer
-// and the TTY state so it can apply styling or truncation conditionally.
-type TableRenderer func(w io.Writer, isTTY bool) error
-
-// Render dispatches on the `-o` flag: emit `{schemaVersion, data}` envelope
-// for `-o json`, invoke the supplied TableRenderer for `-o table` (default),
-// or return a validation error.
+// Render is render.Render.
 func Render[T any](ios *iostreams.IOStreams, outputFormat string, data T, renderTable TableRenderer) error {
-	format := output.ResolveFormat(outputFormat)
-
-	switch format {
-	case output.FormatJSON:
-		return output.PrintJSONEnvelope(ios.Out, SchemaVersion, data)
-	case output.FormatTable:
-		return renderTable(ios.Out, ios.IsStdoutTTY())
-	default:
-		return fmt.Errorf("unknown output format: %s (use 'json' or 'table')", format)
-	}
+	return render.Render(ios, outputFormat, data, renderTable)
 }
 
-// HandleError is cmdutil.HandleError with the discovery envelope version.
+// HandleError is render.HandleError.
 func HandleError(ios *iostreams.IOStreams, outputFormat string, err error) error {
-	return cmdutil.HandleError(ios, outputFormat, SchemaVersion, err)
+	return render.HandleError(ios, outputFormat, err)
 }
 
-// PrintTable is the shared TTY/non-TTY dispatcher.
+// PrintTable is render.PrintTable.
 func PrintTable(w io.Writer, isTTY bool, headers []string, rows [][]string) error {
-	if isTTY {
-		return output.PrintStyledTable(w, headers, rows)
-	}
-
-	return output.PrintTable(w, headers, rows)
+	return render.PrintTable(w, isTTY, headers, rows)
 }
 
 // PrintEmptyNote writes the note of an empty result to stderr. Under -o json
@@ -125,7 +104,7 @@ func PrintSection(w io.Writer, isTTY bool, title string, lines []string) error {
 // OptCell renders an optional string field, output.EmptyCell when the pointer
 // is nil or the value is empty.
 func OptCell(s *string) string {
-	return output.OrDash(ptr.Deref(s, ""))
+	return render.OrDash(ptr.Deref(s, ""))
 }
 
 // OptTimeCell renders an optional RFC 3339 timestamp as a relative time,
@@ -146,7 +125,7 @@ func OptStatusCell(s *string, isTTY bool) string {
 		return ColorForArgoStatus(v)
 	}
 
-	return output.OrDash(v)
+	return render.OrDash(v)
 }
 
 // ShortDigestCell shortens a sha256 digest for table display: keeps the
