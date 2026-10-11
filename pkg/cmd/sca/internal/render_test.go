@@ -2,9 +2,7 @@ package scainternal
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
-	"io"
 	"strings"
 	"testing"
 
@@ -12,124 +10,19 @@ import (
 	"github.com/KubeRocketCI/cli/internal/portal"
 )
 
-type testPayload struct {
-	Message string `json:"message"`
-}
-
-func newStreams() (*iostreams.IOStreams, *bytes.Buffer) {
-	out := &bytes.Buffer{}
-	errOut := &bytes.Buffer{}
-	return &iostreams.IOStreams{Out: out, ErrOut: errOut}, out
-}
-
-func TestRender_JSONEnvelope(t *testing.T) {
-	t.Parallel()
-
-	ios, out := newStreams()
-	payload := testPayload{Message: "hello"}
-	if err := Render(ios, "json", payload, func(io.Writer, bool) error {
-		t.Fatal("table renderer must not run for -o json")
-		return nil
-	}); err != nil {
-		t.Fatalf("Render error: %v", err)
-	}
-
-	var env struct {
-		SchemaVersion string      `json:"schemaVersion"`
-		Data          testPayload `json:"data"`
-	}
-	if err := json.Unmarshal(out.Bytes(), &env); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if env.SchemaVersion != SchemaVersion {
-		t.Errorf("schemaVersion = %q; want %q", env.SchemaVersion, SchemaVersion)
-	}
-	if env.Data.Message != "hello" {
-		t.Errorf("data.message = %q; want hello", env.Data.Message)
-	}
-}
-
-func TestRender_TableInvokesCallback(t *testing.T) {
-	t.Parallel()
-
-	ios, out := newStreams()
-	called := false
-	err := Render(ios, "", testPayload{Message: "x"}, func(w io.Writer, isTTY bool) error {
-		called = true
-		_, _ = w.Write([]byte("ok"))
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-	if !called {
-		t.Fatal("table callback must run for default format")
-	}
-	if out.String() != "ok" {
-		t.Errorf("out = %q", out.String())
-	}
-}
-
-func TestRender_UnknownFormatErrors(t *testing.T) {
-	t.Parallel()
-	ios, _ := newStreams()
-	err := Render(ios, "yaml", testPayload{}, func(io.Writer, bool) error { return nil })
-	if err == nil || !strings.Contains(err.Error(), "unknown output format") {
-		t.Errorf("expected unknown format error, got %v", err)
-	}
+func newStreams() *iostreams.IOStreams {
+	return &iostreams.IOStreams{Out: &bytes.Buffer{}, ErrOut: &bytes.Buffer{}}
 }
 
 func TestHandleError_UpstreamUnavailableAnnotates(t *testing.T) {
 	t.Parallel()
-	ios, _ := newStreams()
+	ios := newStreams()
 	got := HandleError(ios, "", portal.ErrUpstreamUnavailable)
 	if got == nil || !strings.Contains(got.Error(), "dependency-track") {
 		t.Errorf("expected dep-track hint, got %v", got)
 	}
 	if !errors.Is(got, portal.ErrUpstreamUnavailable) {
 		t.Error("wrap must preserve ErrUpstreamUnavailable")
-	}
-}
-
-func TestHandleError_JSONEnvelopePrinted(t *testing.T) {
-	t.Parallel()
-	ios, out := newStreams()
-	_ = HandleError(ios, "json", errors.New("kaboom"))
-
-	var env struct {
-		SchemaVersion string `json:"schemaVersion"`
-		Error         struct {
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-	if err := json.Unmarshal(out.Bytes(), &env); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if env.SchemaVersion != SchemaVersion {
-		t.Errorf("schemaVersion = %q", env.SchemaVersion)
-	}
-	if env.Error.Message != "kaboom" {
-		t.Errorf("error.message = %q", env.Error.Message)
-	}
-}
-
-func TestPageCount(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		total, pageSize, want int
-	}{
-		{0, 25, 1},
-		{1, 25, 1},
-		{25, 25, 1},
-		{26, 25, 2},
-		{50, 25, 2},
-		{51, 25, 3},
-		{100, 0, 1}, // defensive: zero page size → 1
-	}
-	for _, c := range cases {
-		if got := PageCount(c.total, c.pageSize); got != c.want {
-			t.Errorf("PageCount(%d,%d) = %d want %d", c.total, c.pageSize, got, c.want)
-		}
 	}
 }
 

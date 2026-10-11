@@ -15,6 +15,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 	scainternal "github.com/KubeRocketCI/cli/pkg/cmd/sca/internal"
 )
 
@@ -82,7 +83,7 @@ func getRun(ctx context.Context, opts *GetOptions) error {
 		return scainternal.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
-	return scainternal.Render(opts.IO, opts.OutputFormat, detail, func(w io.Writer, isTTY bool) error {
+	return render.Render(opts.IO, opts.OutputFormat, detail, func(w io.Writer, isTTY bool) error {
 		return printDetail(w, opts.Codebase, opts.Branch, detail, isTTY)
 	})
 }

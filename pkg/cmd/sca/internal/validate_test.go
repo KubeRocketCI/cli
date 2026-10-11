@@ -1,26 +1,12 @@
 package scainternal
 
 import (
-	"errors"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
 )
-
-func TestValidateOutputFormat(t *testing.T) {
-	t.Parallel()
-
-	for _, f := range []string{"", "table", "json"} {
-		if err := ValidateOutputFormat(f); err != nil {
-			t.Errorf("%q must be valid, got %v", f, err)
-		}
-	}
-	if err := ValidateOutputFormat("yaml"); err == nil {
-		t.Error("yaml must be rejected")
-	}
-}
 
 func TestValidateCodebaseCommand_SkipsPRMutex(t *testing.T) {
 	t.Parallel()
@@ -31,6 +17,24 @@ func TestValidateCodebaseCommand_SkipsPRMutex(t *testing.T) {
 
 	if err := ValidateCodebaseCommand(cmd, "", "svc", ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateCodebaseCommand_OutputFormats(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]bool{"": true, "json": true, "table": true, "yaml": false, "xml": false}
+	for format, ok := range cases {
+		cmd := &cobra.Command{}
+		cmd.Flags().String("branch", "", "")
+
+		err := ValidateCodebaseCommand(cmd, format, "svc", "")
+		if ok && err != nil {
+			t.Errorf("format %q: unexpected error: %v", format, err)
+		}
+		if !ok && (err == nil || !strings.Contains(err.Error(), "unknown output format: "+format)) {
+			t.Errorf("format %q: want unknown-format error, got %v", format, err)
+		}
 	}
 }
 
@@ -166,19 +170,5 @@ func TestConstants(t *testing.T) {
 	}
 	if !strings.Contains(SeverityFlagUsage, "inclusive") || !strings.Contains(SeverityFlagUsage, "UNASSIGNED") {
 		t.Error("SeverityFlagUsage must describe inclusivity and INFO/UNASSIGNED merge")
-	}
-}
-
-// ensure we surface the validator error through errors.Is without wrapping.
-func TestValidateOutputFormat_ErrorType(t *testing.T) {
-	t.Parallel()
-	err := ValidateOutputFormat("csv")
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	// ValidateOutputFormat returns a fmt.Errorf; no sentinel check — just
-	// ensure it's a plain error.
-	if errors.Is(err, nil) {
-		t.Error("error should not be nil via errors.Is")
 	}
 }

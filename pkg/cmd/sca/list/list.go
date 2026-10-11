@@ -14,6 +14,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 	scainternal "github.com/KubeRocketCI/cli/pkg/cmd/sca/internal"
 )
 
@@ -57,7 +58,7 @@ By default excludes inactive projects and child versions.`,
   # Scripting — every project with at least one CRITICAL finding
   krci sca list -o json | jq -r '.data.items[] | select(.metrics.critical>0) | .name'`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := scainternal.ValidateOutputFormat(opts.OutputFormat); err != nil {
+			if err := render.ValidateOutputFormat(opts.OutputFormat, output.FormatJSON, output.FormatTable); err != nil {
 				return err
 			}
 
@@ -101,7 +102,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		return scainternal.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
-	return scainternal.Render(opts.IO, opts.OutputFormat, result, func(w io.Writer, isTTY bool) error {
+	return render.Render(opts.IO, opts.OutputFormat, result, func(w io.Writer, isTTY bool) error {
 		return renderTable(w, isTTY, opts.Page, opts.PageSize, result)
 	})
 }
@@ -122,7 +123,7 @@ func renderTable(w io.Writer, isTTY bool, page, pageSize int, result *portal.SCA
 		})
 	}
 
-	if err := scainternal.PrintTable(w, isTTY, headers, rows); err != nil {
+	if err := render.PrintTable(w, isTTY, headers, rows); err != nil {
 		return err
 	}
 
