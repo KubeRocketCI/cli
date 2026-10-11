@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -69,13 +70,21 @@ func (t *StoredToken) Valid() bool {
 type EncryptedFileStore struct {
 	path      string
 	encryptor Encryptor
+	w         io.Writer
 }
 
 // NewEncryptedStore creates a token store that encrypts data at rest.
-func NewEncryptedStore(path string, enc Encryptor) *EncryptedFileStore {
+// Token-recovery warnings are written to w, which must be non-nil.
+// Panics if w is nil.
+func NewEncryptedStore(path string, enc Encryptor, w io.Writer) *EncryptedFileStore {
+	if w == nil {
+		panic("token.NewEncryptedStore: nil writer")
+	}
+
 	return &EncryptedFileStore{
 		path:      path,
 		encryptor: enc,
+		w:         w,
 	}
 }
 
@@ -113,11 +122,11 @@ func (s *EncryptedFileStore) Load() (*StoredToken, error) {
 	plaintext, err := s.encryptor.Decrypt(ciphertext)
 	if err != nil {
 		// Remove corrupted/undecryptable token file so user can re-authenticate cleanly.
-		fmt.Fprintf(os.Stderr, "Warning: removing undecryptable token file (%s): %v\n", s.path, err)
-		fmt.Fprintf(os.Stderr, "  Run 'krci auth login' to re-authenticate.\n")
+		_, _ = fmt.Fprintf(s.w, "Warning: removing undecryptable token file (%s): %v\n", s.path, err)
+		_, _ = fmt.Fprintf(s.w, "  Run 'krci auth login' to re-authenticate.\n")
 
 		if removeErr := os.Remove(s.path); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
-			fmt.Fprintf(os.Stderr, "Warning: could not remove corrupted file: %v\n", removeErr)
+			_, _ = fmt.Fprintf(s.w, "Warning: could not remove corrupted file: %v\n", removeErr)
 		}
 
 		return nil, ErrNoToken

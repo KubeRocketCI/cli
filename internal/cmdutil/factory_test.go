@@ -1,14 +1,20 @@
 package cmdutil
 
 import (
+	"bytes"
+	"encoding/base64"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/KubeRocketCI/cli/internal/auth"
 	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 )
@@ -84,6 +90,40 @@ func TestFactoryLazyFuncs_ReadConfigAtCallTime(t *testing.T) {
 
 	_, err = restClient()
 	require.ErrorIs(t, err, cause)
+}
+
+func TestFactoryTokenProvider_WritesTokenDiagnosticsToErrOut(t *testing.T) {
+	t.Setenv("KRCI_KEYRING_BACKEND", "file")
+	t.Setenv("KRCI_TOKEN", "")
+
+	dir := t.TempDir()
+	tokenPath := filepath.Join(dir, "tokens.enc")
+	require.NoError(t, os.WriteFile(tokenPath, bytes.Repeat([]byte("x"), 64), 0o600))
+
+	keyPath := filepath.Join(dir, ".keyfile")
+	encoded := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte("k"), 32))
+	require.NoError(t, os.WriteFile(keyPath, []byte(encoded), 0o644))
+	require.NoError(t, os.Chmod(keyPath, 0o644))
+
+	var errOut bytes.Buffer
+
+	f := New(iostreams.New(nil, io.Discard, &errOut, false))
+	f.SetConfigResolver(func() (*config.Config, error) {
+		return &config.Config{ConfigDir: dir, TokenPath: tokenPath, KeyringService: "krci-test"}, nil
+	})
+
+	tp, err := f.TokenProvider()
+	require.NoError(t, err)
+
+	_, err = tp.GetToken(t.Context())
+	require.ErrorIs(t, err, auth.ErrNotAuthenticated)
+
+	assert.Contains(t, errOut.String(), "Warning: removing undecryptable token file ("+tokenPath+")")
+	assert.Contains(t, errOut.String(), "  Run 'krci auth login' to re-authenticate.\n")
+
+	if runtime.GOOS != "windows" {
+		assert.Contains(t, errOut.String(), "has permissions 0644")
+	}
 }
 
 func TestFactoryConfig_DoesNotCacheFailure(t *testing.T) {

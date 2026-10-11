@@ -1,6 +1,10 @@
 package token
 
 import (
+	"bytes"
+	"errors"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,7 +19,7 @@ func TestStoreSaveLoadRoundTrip(t *testing.T) {
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "tokens.enc")
-	store := NewEncryptedStore(path, newTestEncryptor())
+	store := NewEncryptedStore(path, newTestEncryptor(), io.Discard)
 
 	tok := &StoredToken{
 		AccessToken:  "access-123",
@@ -49,7 +53,7 @@ func TestStoreLoadNonExistent(t *testing.T) {
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "does-not-exist.enc")
-	store := NewEncryptedStore(path, newTestEncryptor())
+	store := NewEncryptedStore(path, newTestEncryptor(), io.Discard)
 
 	_, err := store.Load()
 	assert.ErrorIs(t, err, ErrNoToken)
@@ -60,7 +64,7 @@ func TestStoreLoadCorruptedAutoCleanup(t *testing.T) {
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "tokens.enc")
-	store := NewEncryptedStore(path, newTestEncryptor())
+	store := NewEncryptedStore(path, newTestEncryptor(), io.Discard)
 
 	// Write garbage data.
 	require.NoError(t, os.WriteFile(path, []byte("corrupted-garbage-data-that-is-long-enough"), 0600))
@@ -73,12 +77,89 @@ func TestStoreLoadCorruptedAutoCleanup(t *testing.T) {
 	assert.True(t, os.IsNotExist(err), "corrupted token file was not removed")
 }
 
+// stubEncryptor fails every Decrypt with decryptErr, after running onDecrypt.
+type stubEncryptor struct {
+	decryptErr error
+	onDecrypt  func()
+}
+
+func (s *stubEncryptor) Encrypt(plaintext []byte) ([]byte, error) {
+	return plaintext, nil
+}
+
+func (s *stubEncryptor) Decrypt([]byte) ([]byte, error) {
+	if s.onDecrypt != nil {
+		s.onDecrypt()
+	}
+
+	return nil, s.decryptErr
+}
+
+func TestStoreLoadUndecryptableWarning(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "tokens.enc")
+	require.NoError(t, os.WriteFile(path, []byte("ciphertext"), 0600))
+
+	var buf bytes.Buffer
+	store := NewEncryptedStore(path, &stubEncryptor{decryptErr: errors.New("decrypt failed")}, &buf)
+
+	_, err := store.Load()
+	require.ErrorIs(t, err, ErrNoToken)
+
+	want := fmt.Sprintf("Warning: removing undecryptable token file (%s): decrypt failed\n"+
+		"  Run 'krci auth login' to re-authenticate.\n", path)
+	assert.Equal(t, want, buf.String())
+
+	_, statErr := os.Stat(path)
+	assert.True(t, os.IsNotExist(statErr), "undecryptable token file was not removed")
+}
+
+func TestStoreLoadRemoveFailureWarning(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "tokens.enc")
+	require.NoError(t, os.WriteFile(path, []byte("ciphertext"), 0600))
+
+	// Replaces the file with a non-empty directory after it was read, so the removal fails.
+	enc := &stubEncryptor{
+		decryptErr: errors.New("decrypt failed"),
+		onDecrypt: func() {
+			require.NoError(t, os.Remove(path))
+			require.NoError(t, os.Mkdir(path, 0700))
+			require.NoError(t, os.WriteFile(filepath.Join(path, "child"), nil, 0600))
+		},
+	}
+
+	var buf bytes.Buffer
+	store := NewEncryptedStore(path, enc, &buf)
+
+	_, err := store.Load()
+	require.ErrorIs(t, err, ErrNoToken)
+
+	removeErr := os.Remove(path)
+	require.Error(t, removeErr)
+
+	want := fmt.Sprintf("Warning: removing undecryptable token file (%s): decrypt failed\n"+
+		"  Run 'krci auth login' to re-authenticate.\n"+
+		"Warning: could not remove corrupted file: %v\n", path, removeErr)
+	assert.Equal(t, want, buf.String())
+}
+
+func TestNewEncryptedStoreNilWriterPanics(t *testing.T) {
+	t.Parallel()
+
+	assert.PanicsWithValue(t, "token.NewEncryptedStore: nil writer", func() {
+		NewEncryptedStore(filepath.Join(t.TempDir(), "tokens.enc"), newTestEncryptor(), nil)
+	})
+}
+
 func TestStoreClear(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "tokens.enc")
-	store := NewEncryptedStore(path, newTestEncryptor())
+	store := NewEncryptedStore(path, newTestEncryptor(), io.Discard)
 
 	// Save then clear.
 	tok := &StoredToken{AccessToken: "test", ExpiresAt: time.Now().Add(time.Hour)}
@@ -94,7 +175,7 @@ func TestStoreClearNonExistent(t *testing.T) {
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "does-not-exist.enc")
-	store := NewEncryptedStore(path, newTestEncryptor())
+	store := NewEncryptedStore(path, newTestEncryptor(), io.Discard)
 
 	// Clear on non-existent file should not error.
 	require.NoError(t, store.Clear())

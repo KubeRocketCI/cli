@@ -92,16 +92,6 @@ linters:
           - forbidigo
         path-except: ^internal/(token|auth)/
         text: io\.Writer passed in by the caller
-      # Baseline: os.Stderr writes in internal/token. Delete an entry when its write
-      # moves to an injected io.Writer.
-      - linters:
-          - forbidigo
-        path: ^internal/token/store\.go$
-        source: "(removing undecryptable token file|Run 'krci auth login' to re-authenticate|could not remove corrupted file)"
-      - linters:
-          - forbidigo
-        path: ^internal/token/keyring\.go$
-        source: "(OS keyring unavailable|Ensure %s is protected|has permissions %04o|Run: chmod 600)"
       # Baseline: os.Stderr writes in internal/auth. Delete an entry when its write
       # moves to an injected io.Writer.
       - linters:
