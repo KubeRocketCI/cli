@@ -467,7 +467,7 @@ rejected flag or param is reported on stderr only.
 | Build running (`build_in_progress`)              | `a build is already running for branch 'feat/x' of project 'my-app'; check: krci pipelinerun list --project my-app --status running` |
 | Portal could not evaluate state (`list_truncated`) | `portal could not safely evaluate the build state for project 'my-app' (resource list truncated); retry or contact an operator` |
 | Portal too old (route missing)                   | `portal has no endpoint for this command (Route POST:/rest/v1/pipelineruns/build not found); upgrade the portal`              |
-| Not signed in / no RBAC                          | `authentication required: unauthorized: please run 'krci auth login'`, then `Run: krci auth login` / `permission denied`        |
+| Not signed in / no RBAC                          | `authentication required: unauthorized: please run 'krci auth login'` / `permission denied`                                    |
 
 With `--branch` omitted the CLI cannot learn which branch the portal resolved,
 so every branch-specific message reads `the default branch of project 'my-app'`

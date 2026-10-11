@@ -18,7 +18,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-pipelinerun-list)
 |---|---|---|---|---|
 | merged | `krci pipelinerun list -o json` | 0 | bare | empty |
 | status-running | `krci pipelinerun list --status running -o json` | 0 | bare | empty |
-| live-unauthorized | `krci pipelinerun list -o json` | 1 | empty | `Error: authentication required: fetching live pipeline runs: unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
+| live-unauthorized | `krci pipelinerun list -o json` | 1 | empty | `Error: authentication required: fetching live pipeline runs: unauthorized: please run 'krci auth login'` |
 | unknown-format | `krci pipelinerun list -o xml` | 1 | empty | `Error: unknown output format: xml (use 'json' or 'table')` |
 
 ## `krci pipelinerun get`
@@ -40,7 +40,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-pipelinerun-start)
 | Case | Command | Exit | stdout | stderr |
 |---|---|---|---|---|
 | created | `krci pipelinerun start my-app-release --param git-revision=main -o json` | 0 | envelope | empty |
-| unauthorized | `krci pipelinerun start my-app-release -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
+| unauthorized | `krci pipelinerun start my-app-release -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'` |
 | unknown-format | `krci pipelinerun start my-app-release -o xml` | 1 | empty | `Error: unknown output format: xml (use 'json', 'yaml', or 'table')` |
 
 ## `krci project build`
@@ -50,7 +50,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-project-build-name)
 | Case | Command | Exit | stdout | stderr |
 |---|---|---|---|---|
 | created | `krci project build my-app --branch main -o json` | 0 | envelope | empty |
-| unauthorized | `krci project build my-app -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
+| unauthorized | `krci project build my-app -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'` |
 
 ## `krci env get`
 
@@ -59,7 +59,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-env-get-deployment-env)
 | Case | Command | Exit | stdout | stderr |
 |---|---|---|---|---|
 | detail | `krci env get my-pipeline dev -o json` | 0 | envelope | empty |
-| unauthorized | `krci env get my-pipeline dev -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
+| unauthorized | `krci env get my-pipeline dev -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'` |
 | unknown-format | `krci env get my-pipeline dev -o xml` | 1 | empty | `Error: unknown output format: xml (use 'json' or 'table')` |
 
 ## `krci env pods`
@@ -69,7 +69,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-env-pods-deployment-env)
 | Case | Command | Exit | stdout | stderr |
 |---|---|---|---|---|
 | pods | `krci env pods my-pipeline dev -o json` | 0 | envelope | empty |
-| unauthorized | `krci env pods my-pipeline dev -o json` | 1 | error envelope | `Error: authentication required: listing pods in namespace "my-pipeline-dev": unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
+| unauthorized | `krci env pods my-pipeline dev -o json` | 1 | error envelope | `Error: authentication required: listing pods in namespace "my-pipeline-dev": unauthorized: please run 'krci auth login'` |
 
 ## `krci env events`
 
@@ -78,7 +78,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-env-events-deployment-env)
 | Case | Command | Exit | stdout | stderr |
 |---|---|---|---|---|
 | events | `krci env events my-pipeline dev -o json` | 0 | envelope | empty |
-| unauthorized | `krci env events my-pipeline dev -o json` | 1 | error envelope | `Error: authentication required: listing events in namespace "my-pipeline-dev": unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
+| unauthorized | `krci env events my-pipeline dev -o json` | 1 | error envelope | `Error: authentication required: listing events in namespace "my-pipeline-dev": unauthorized: please run 'krci auth login'` |
 
 ## `krci auth status`
 
@@ -97,7 +97,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-sonar-list)
 | Case | Command | Exit | stdout | stderr |
 |---|---|---|---|---|
 | projects | `krci sonar list -o json` | 0 | envelope | empty |
-| unauthorized | `krci sonar list -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
+| unauthorized | `krci sonar list -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'` |
 | unknown-format | `krci sonar list -o xml` | 1 | empty | `Error: unknown output format: xml (use 'json' or 'table')` |
 
 ## `krci sonar get`
@@ -107,7 +107,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-sonar-get-project)
 | Case | Command | Exit | stdout | stderr |
 |---|---|---|---|---|
 | detail | `krci sonar get my-app -o json` | 0 | envelope | empty |
-| unauthorized | `krci sonar get my-app -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
+| unauthorized | `krci sonar get my-app -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'` |
 | unknown-format | `krci sonar get my-app -o xml` | 1 | empty | `Error: unknown output format: xml (use 'json' or 'table')` |
 
 ## `krci sonar gate`
@@ -117,7 +117,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-sonar-gate-project)
 | Case | Command | Exit | stdout | stderr |
 |---|---|---|---|---|
 | failed-gate | `krci sonar gate my-app --branch main -o json` | 0 | envelope | empty |
-| unauthorized | `krci sonar gate my-app --branch main -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
+| unauthorized | `krci sonar gate my-app --branch main -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'` |
 
 ## `krci sonar issues`
 
@@ -126,7 +126,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-sonar-issues-project)
 | Case | Command | Exit | stdout | stderr |
 |---|---|---|---|---|
 | issues | `krci sonar issues my-app --pr 42 -o json` | 0 | envelope | empty |
-| unauthorized | `krci sonar issues my-app --pr 42 -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
+| unauthorized | `krci sonar issues my-app --pr 42 -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'` |
 
 ## `krci sca list`
 
@@ -135,7 +135,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-sca-list)
 | Case | Command | Exit | stdout | stderr |
 |---|---|---|---|---|
 | projects | `krci sca list -o json` | 0 | envelope | empty |
-| unauthorized | `krci sca list -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
+| unauthorized | `krci sca list -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'` |
 | upstream-error | `krci sca list -o json` | 1 | error envelope | `Error: upstream unavailable (dependency-track): upstream service unavailable: Bad Gateway` |
 | upstream-unavailable | `krci sca list -o json` | 1 | error envelope | `Error: upstream unavailable (dependency-track): upstream service unavailable: Dependency-Track integration is not configured` |
 | upstream-timeout | `krci sca list -o json` | 1 | error envelope | `Error: upstream unavailable (dependency-track): upstream service unavailable: Gateway Timeout` |
@@ -148,7 +148,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-sca-get-codebase)
 | Case | Command | Exit | stdout | stderr |
 |---|---|---|---|---|
 | detail | `krci sca get my-app -o json` | 0 | envelope | empty |
-| unauthorized | `krci sca get my-app -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
+| unauthorized | `krci sca get my-app -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'` |
 | unknown-format | `krci sca get my-app -o xml` | 1 | empty | `Error: unknown output format: xml (use 'json' or 'table')` |
 
 ## `krci sca components`
@@ -158,7 +158,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-sca-components-codebase)
 | Case | Command | Exit | stdout | stderr |
 |---|---|---|---|---|
 | components | `krci sca components my-app --severity high -o json` | 0 | envelope | empty |
-| unauthorized | `krci sca components my-app --severity high -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
+| unauthorized | `krci sca components my-app --severity high -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'` |
 
 ## `krci sca findings`
 
@@ -167,7 +167,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-sca-findings-codebase)
 | Case | Command | Exit | stdout | stderr |
 |---|---|---|---|---|
 | findings | `krci sca findings my-app -o json` | 0 | envelope | empty |
-| unauthorized | `krci sca findings my-app -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
+| unauthorized | `krci sca findings my-app -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'` |
 
 ## `krci project list`
 
@@ -176,7 +176,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-project-list)
 | Case | Command | Exit | stdout | stderr |
 |---|---|---|---|---|
 | projects | `krci project list -o json` | 0 | bare | empty |
-| unauthorized | `krci project list -o json` | 1 | empty | `Error: authentication required: listing projects: unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
+| unauthorized | `krci project list -o json` | 1 | empty | `Error: authentication required: listing projects: unauthorized: please run 'krci auth login'` |
 
 ## `krci project get`
 
@@ -186,7 +186,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-project-get-name)
 |---|---|---|---|---|
 | detail | `krci project get my-app -o json` | 0 | bare | empty |
 | not-found | `krci project get my-app -o json` | 1 | empty | `Error: project "my-app" not found` |
-| unauthorized | `krci project get my-app -o json` | 1 | empty | `Error: authentication required: getting project "my-app": unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
+| unauthorized | `krci project get my-app -o json` | 1 | empty | `Error: authentication required: getting project "my-app": unauthorized: please run 'krci auth login'` |
 
 ## `krci project versions`
 
@@ -196,7 +196,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-project-versions-project)
 |---|---|---|---|---|
 | versions | `krci project versions my-app -o json` | 0 | envelope | empty |
 | not-found | `krci project versions my-app -o json` | 1 | error envelope | `Error: project 'my-app' not found` |
-| unauthorized | `krci project versions my-app -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
+| unauthorized | `krci project versions my-app -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'` |
 
 ## `krci project deployments`
 
@@ -205,7 +205,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-project-deployments-project)
 | Case | Command | Exit | stdout | stderr |
 |---|---|---|---|---|
 | deployments | `krci project deployments my-app -o json` | 0 | envelope | empty |
-| unauthorized | `krci project deployments my-app -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
+| unauthorized | `krci project deployments my-app -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'` |
 
 ## `krci deployment list`
 
@@ -214,7 +214,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-deployment-list)
 | Case | Command | Exit | stdout | stderr |
 |---|---|---|---|---|
 | deployments | `krci deployment list -o json` | 0 | bare | empty |
-| unauthorized | `krci deployment list -o json` | 1 | empty | `Error: authentication required: unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
+| unauthorized | `krci deployment list -o json` | 1 | empty | `Error: authentication required: unauthorized: please run 'krci auth login'` |
 
 ## `krci deployment get`
 
@@ -225,7 +225,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-deployment-get-name)
 | detail | `krci deployment get my-pipeline -o json` | 0 | bare | empty |
 | no-stages | `krci deployment get api-pipeline -o json` | 0 | bare | empty |
 | not-found | `krci deployment get my-pipeline -o json` | 1 | empty | `Error: deployment "my-pipeline" not found` |
-| unauthorized | `krci deployment get my-pipeline -o json` | 1 | empty | `Error: authentication required: unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
+| unauthorized | `krci deployment get my-pipeline -o json` | 1 | empty | `Error: authentication required: unauthorized: please run 'krci auth login'` |
 | unknown-format | `krci deployment get my-pipeline -o xml` | 1 | empty | `Error: unknown output format: xml (use 'json' or 'table')` |
 
 ## `krci env list`
@@ -235,4 +235,4 @@ Schema: [json-schemas.md](json-schemas.md#krci-env-list)
 | Case | Command | Exit | stdout | stderr |
 |---|---|---|---|---|
 | stages | `krci env list -o json` | 0 | envelope | empty |
-| unauthorized | `krci env list -o json` | 1 | error envelope | `Error: authentication required: listing stages: unauthorized: please run 'krci auth login'\n\nRun: krci auth login` |
+| unauthorized | `krci env list -o json` | 1 | error envelope | `Error: authentication required: listing stages: unauthorized: please run 'krci auth login'` |

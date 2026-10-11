@@ -62,12 +62,6 @@ func ExactArgs(n int, usage string, hint ...string) cobra.PositionalArgs {
 	}
 }
 
-// ErrAuthRequired wraps a cause into a user-facing "authentication required" error
-// with a hint to run "krci auth login".
-func ErrAuthRequired(cause error) error {
-	return fmt.Errorf("authentication required: %w\n\nRun: krci auth login", cause)
-}
-
 // ConfigNotSetError returns a formatted error for a missing configuration field.
 // When prefix is empty, the error opens with "<fieldName> not configured".
 // When prefix is non-empty, it is used verbatim as the opening line.

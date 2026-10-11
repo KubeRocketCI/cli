@@ -71,21 +71,41 @@ func TestMapNotFound(t *testing.T) {
 	other := errors.New("portal returned HTTP 500")
 
 	cases := map[string]struct {
-		err  error
-		want string
+		err      error
+		want     string
+		wantWrap []error
 	}{
-		"deployment":         {err: portal.ErrDeploymentNotFound, want: `deployment "my-pipeline" not found`},
-		"environment":        {err: portal.ErrEnvNotFound, want: `environment "dev" not found in deployment "my-pipeline"`},
-		"wrapped deployment": {err: fmt.Errorf("resolving: %w", portal.ErrDeploymentNotFound), want: `deployment "my-pipeline" not found`},
-		"anything else":      {err: other, want: other.Error()},
+		"deployment": {
+			err:      portal.ErrDeploymentNotFound,
+			want:     `deployment "my-pipeline" not found`,
+			wantWrap: []error{portal.ErrDeploymentNotFound, portal.ErrNotFound},
+		},
+		"environment": {
+			err:      portal.ErrEnvNotFound,
+			want:     `environment "dev" not found in deployment "my-pipeline"`,
+			wantWrap: []error{portal.ErrEnvNotFound, portal.ErrNotFound},
+		},
+		"wrapped deployment": {
+			err:      fmt.Errorf("resolving: %w", portal.ErrDeploymentNotFound),
+			want:     `deployment "my-pipeline" not found`,
+			wantWrap: []error{portal.ErrDeploymentNotFound, portal.ErrNotFound},
+		},
+		"anything else": {err: other, want: other.Error(), wantWrap: []error{other}},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := MapNotFound(tc.err, "my-pipeline", "dev"); got.Error() != tc.want {
+			got := MapNotFound(tc.err, "my-pipeline", "dev")
+			if got.Error() != tc.want {
 				t.Errorf("MapNotFound = %q, want %q", got, tc.want)
+			}
+
+			for _, target := range tc.wantWrap {
+				if !errors.Is(got, target) {
+					t.Errorf("errors.Is(%q, %q) = false, want true", got, target)
+				}
 			}
 		})
 	}

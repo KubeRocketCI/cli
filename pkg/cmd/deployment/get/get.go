@@ -78,7 +78,7 @@ func getRun(ctx context.Context, opts *GetOptions) error {
 	detail, err := svc.Get(ctx, opts.Name)
 	if err != nil {
 		if errors.Is(err, portal.ErrNotFound) {
-			return fmt.Errorf("deployment %q not found", opts.Name)
+			return cmdutil.Rewritef(err, "deployment %q not found", opts.Name)
 		}
 
 		return cmdutil.HandleAuthError(err)

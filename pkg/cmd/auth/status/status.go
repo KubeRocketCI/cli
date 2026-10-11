@@ -39,16 +39,6 @@ type StatusPayload struct {
 	ExpiresAt     *string  `json:"expiresAt"`
 }
 
-// sessionError carries the user-facing message for a failed session check
-// while errors.Is still matches the sentinel that caused it.
-type sessionError struct {
-	msg   string
-	cause error
-}
-
-func (e *sessionError) Error() string { return e.msg }
-func (e *sessionError) Unwrap() error { return e.cause }
-
 // NewCmdStatus returns the "auth status" cobra.Command.
 // runF is the business logic function; pass nil to use the default statusRun.
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
@@ -147,7 +137,7 @@ func (opts *StatusOptions) verifySession(ctx context.Context) error {
 
 	if err := portal.VerifySession(ctx, client); err != nil {
 		if errors.Is(err, portal.ErrUnauthorized) {
-			return &sessionError{msg: "not authenticated: the portal rejected the token", cause: err}
+			return cmdutil.Rewritef(err, "not authenticated: the portal rejected the token")
 		}
 
 		return fmt.Errorf("verifying the token with the portal: %w", err)
@@ -161,7 +151,7 @@ func (opts *StatusOptions) verifySession(ctx context.Context) error {
 // expired or unrefreshable session gets a message of its own.
 func classifyTokenError(err error) error {
 	if errors.Is(err, auth.ErrTokenExpired) || errors.Is(err, auth.ErrRefreshFailed) {
-		return &sessionError{msg: "session expired: run 'krci auth login'", cause: err}
+		return cmdutil.Rewritef(err, "session expired: run 'krci auth login'")
 	}
 
 	return err
