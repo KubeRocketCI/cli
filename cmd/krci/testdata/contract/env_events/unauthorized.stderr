@@ -1,3 +1,1 @@
 Error: authentication required: listing events in namespace "my-pipeline-dev": unauthorized: please run 'krci auth login'
-
-Run: krci auth login

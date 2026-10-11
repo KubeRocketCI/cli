@@ -40,14 +40,14 @@ func ValidateTarget(outputFormat, deployment, env string) error {
 }
 
 // MapNotFound rewrites the not-found sentinels of portal.EnvService into the
-// message that names the deployment and the environment. Other errors pass
-// through unchanged.
+// message that names the deployment and the environment. The result still
+// unwraps to err. Other errors pass through unchanged.
 func MapNotFound(err error, deployment, env string) error {
 	switch {
 	case errors.Is(err, portal.ErrEnvNotFound):
-		return fmt.Errorf("environment %q not found in deployment %q", env, deployment)
+		return cmdutil.Rewritef(err, "environment %q not found in deployment %q", env, deployment)
 	case errors.Is(err, portal.ErrDeploymentNotFound):
-		return fmt.Errorf("deployment %q not found", deployment)
+		return cmdutil.Rewritef(err, "deployment %q not found", deployment)
 	default:
 		return err
 	}

@@ -992,7 +992,7 @@ Common messages:
 | Condition                                    | Message                                                                                  |
 | -------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | No session, or the stored session is unusable | `not authenticated: run 'krci auth login'`, after the verb's context                    |
-| Portal rejects the token (401)               | `authentication required: [<context>: ]unauthorized: please run 'krci auth login'`, then a blank line and `Run: krci auth login` |
+| Portal rejects the token (401)               | `authentication required: [<context>: ]unauthorized: please run 'krci auth login'` |
 | RBAC denied (403)                            | `permission denied`                                                                      |
 | Resource missing (404), no verb-specific text | `resource not found`                                                                    |
 | Portal too old for the command               | `portal has no endpoint for this command (<route>); upgrade the portal`                  |

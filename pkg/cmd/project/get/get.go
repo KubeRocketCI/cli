@@ -4,7 +4,6 @@ package get
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"strconv"
 
@@ -77,7 +76,7 @@ func getRun(ctx context.Context, opts *GetOptions) error {
 	project, err := svc.Get(ctx, opts.Name)
 	if err != nil {
 		if errors.Is(err, portal.ErrNotFound) {
-			return fmt.Errorf("project %q not found", opts.Name)
+			return cmdutil.Rewritef(err, "project %q not found", opts.Name)
 		}
 
 		return cmdutil.HandleAuthError(err)

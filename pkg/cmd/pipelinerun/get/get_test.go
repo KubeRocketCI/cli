@@ -3,6 +3,7 @@ package get
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
@@ -188,5 +189,24 @@ func TestGet_ReasonOnARunningRun(t *testing.T) {
 				t.Errorf("want %q and no %q, got:\n%s", tc.want, tc.absent, out.String())
 			}
 		})
+	}
+}
+
+func TestGet_NotFoundKeepsTheSentinel(t *testing.T) {
+	t.Parallel()
+
+	f, _ := cmdtest.NewPortalFactory(t, cmdtest.PortalReply(http.StatusNotFound, `{"error":{"code":"NOT_FOUND","message":"Not Found"}}`))
+
+	err := execute(f, "run-x")
+	if err == nil {
+		t.Fatal("expected an error for a missing pipeline run")
+	}
+
+	if want := `pipeline run "run-x" not found`; err.Error() != want {
+		t.Errorf("error = %q, want %q", err, want)
+	}
+
+	if !errors.Is(err, portal.ErrNotFound) {
+		t.Errorf("errors.Is(%q, portal.ErrNotFound) = false, want true", err)
 	}
 }

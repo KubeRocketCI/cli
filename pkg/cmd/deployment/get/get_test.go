@@ -2,10 +2,13 @@ package get
 
 import (
 	"bytes"
+	"errors"
+	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/KubeRocketCI/cli/internal/portal"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
 )
 
 func TestPrintPlainDeploymentDetail_Messages(t *testing.T) {
@@ -61,5 +64,24 @@ func TestPrintPlainDeploymentDetail_NoMessages(t *testing.T) {
 
 	if strings.Contains(buf.String(), "Message") {
 		t.Errorf("output should not mention messages without diagnostics:\n%s", buf.String())
+	}
+}
+
+func TestGet_NotFoundKeepsTheSentinel(t *testing.T) {
+	t.Parallel()
+
+	f, _ := cmdtest.NewPortalFactory(t, cmdtest.PortalReply(http.StatusNotFound, `{"error":{"code":"NOT_FOUND","message":"Not Found"}}`))
+
+	err := cmdtest.Execute(NewCmdGet, f, []string{"my-deployment"})
+	if err == nil {
+		t.Fatal("expected an error for a missing deployment")
+	}
+
+	if want := `deployment "my-deployment" not found`; err.Error() != want {
+		t.Errorf("error = %q, want %q", err, want)
+	}
+
+	if !errors.Is(err, portal.ErrNotFound) {
+		t.Errorf("errors.Is(%q, portal.ErrNotFound) = false, want true", err)
 	}
 }

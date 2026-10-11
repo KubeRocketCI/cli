@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,11 +23,23 @@ func TestHandleAuthError(t *testing.T) {
 
 	got := HandleAuthError(unauthorized)
 	require.ErrorIs(t, got, portal.ErrUnauthorized)
-	assert.EqualError(t, got, ErrAuthRequired(unauthorized).Error())
+	assert.EqualError(t, got, "authentication required: list: unauthorized: please run 'krci auth login'")
+	assert.Equal(t, 1, strings.Count(got.Error(), "krci auth login"))
 
 	for _, err := range []error{portal.ErrNotFound, portal.ErrUpstreamUnavailable, errors.New("boom")} {
 		assert.Equal(t, err, HandleAuthError(err))
 	}
+}
+
+func TestRewritef(t *testing.T) {
+	t.Parallel()
+
+	got := Rewritef(portal.ErrEnvNotFound, "environment %q not found", "dev")
+
+	assert.EqualError(t, got, `environment "dev" not found`)
+	require.ErrorIs(t, got, portal.ErrEnvNotFound)
+	require.ErrorIs(t, got, portal.ErrNotFound)
+	assert.NotContains(t, got.Error(), portal.ErrEnvNotFound.Error())
 }
 
 func TestPrintError(t *testing.T) {
@@ -91,7 +104,7 @@ func TestHandleError_EnvelopeCarriesTheLoginHint(t *testing.T) {
 
 	want, err := json.Marshal(map[string]any{
 		"schemaVersion": "7",
-		"error":         map[string]string{"message": ErrAuthRequired(portal.ErrUnauthorized).Error()},
+		"error":         map[string]string{"message": "authentication required: unauthorized: please run 'krci auth login'"},
 	})
 	require.NoError(t, err)
 	assert.JSONEq(t, string(want), stdout.String())
