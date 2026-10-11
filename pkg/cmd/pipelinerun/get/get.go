@@ -191,7 +191,8 @@ func finishedError(opts *GetOptions, status string) error {
 
 func renderRun(opts *GetOptions, result *portal.PipelineRunListResult) error {
 	if opts.IncludeReason {
-		output.TruncateTaskLogs(result)
+		truncated := pipelinerun.TruncateTaskLogs(*result)
+		result = &truncated
 	}
 
 	if output.ResolveFormat(opts.OutputFormat) == output.FormatJSON {

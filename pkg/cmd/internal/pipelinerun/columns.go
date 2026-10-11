@@ -1,6 +1,6 @@
 // Package pipelinerun holds helpers shared by the `krci pipelinerun` verbs and
 // `krci project build` (validation, shared column headers, key=value parsing,
-// row and dry-run rendering).
+// row and dry-run rendering, --reason log truncation).
 package pipelinerun
 
 // SchemaVersion is the JSON envelope schema tag for pipelinerun command output.
