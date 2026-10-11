@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -67,7 +68,9 @@ func (t *StoredToken) Valid() bool {
 }
 
 // EncryptedFileStore persists tokens as AES-256-GCM encrypted JSON files.
+// Save, Load, and Clear are safe for concurrent use; each holds mu for its whole duration.
 type EncryptedFileStore struct {
+	mu        sync.Mutex
 	path      string
 	encryptor Encryptor
 	w         io.Writer
@@ -90,6 +93,9 @@ func NewEncryptedStore(path string, enc Encryptor, w io.Writer) *EncryptedFileSt
 
 // Save encrypts and writes the token to disk atomically (temp file + fsync + rename).
 func (s *EncryptedFileStore) Save(tok *StoredToken) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	plaintext, err := json.Marshal(tok)
 	if err != nil {
 		return fmt.Errorf("marshaling token: %w", err)
@@ -109,7 +115,11 @@ func (s *EncryptedFileStore) Save(tok *StoredToken) error {
 }
 
 // Load reads and decrypts the token from disk.
+// An undecryptable file is reported on the store's writer and removed; once removed, Load returns ErrNoToken silently.
 func (s *EncryptedFileStore) Load() (*StoredToken, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	ciphertext, err := os.ReadFile(s.path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -142,6 +152,9 @@ func (s *EncryptedFileStore) Load() (*StoredToken, error) {
 
 // Clear removes the stored token file.
 func (s *EncryptedFileStore) Clear() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	err := os.Remove(s.path)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("removing token file: %w", err)
