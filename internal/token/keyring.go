@@ -49,26 +49,27 @@ func ensureConfigDir(configDir string) (string, error) {
 
 // getOrCreateKey retrieves the 256-bit AES key using the configured backend.
 // Respects KRCI_KEYRING_BACKEND env var: "keyring" (default) or "file".
-func getOrCreateKey(service, user, configDir string) ([]byte, error) {
+// Warnings are written to w.
+func getOrCreateKey(service, user, configDir string, w io.Writer) ([]byte, error) {
 	backend := os.Getenv("KRCI_KEYRING_BACKEND")
 	if backend == "file" {
-		return getOrCreateFileKey(configDir)
+		return getOrCreateFileKey(configDir, w)
 	}
 
-	return getOrCreateKeyringKey(service, user, configDir)
+	return getOrCreateKeyringKey(service, user, configDir, w)
 }
 
 // getOrCreateKeyringKey tries the OS keyring, falling back to file if unavailable.
-func getOrCreateKeyringKey(service, user, configDir string) ([]byte, error) {
+func getOrCreateKeyringKey(service, user, configDir string, w io.Writer) ([]byte, error) {
 	encoded, err := keyring.Get(service, user)
 	if err == nil {
 		return decodeKey(encoded)
 	}
 
 	if !errors.Is(err, keyring.ErrNotFound) {
-		warnKeyringFallback(configDir)
+		warnKeyringFallback(configDir, w)
 
-		return getOrCreateFileKey(configDir)
+		return getOrCreateFileKey(configDir, w)
 	}
 
 	key, err := generateKey()
@@ -77,7 +78,7 @@ func getOrCreateKeyringKey(service, user, configDir string) ([]byte, error) {
 	}
 
 	if err := keyring.Set(service, user, encodeKey(key)); err != nil {
-		warnKeyringFallback(configDir)
+		warnKeyringFallback(configDir, w)
 
 		return key, saveKeyToFile(key, configDir)
 	}
@@ -85,15 +86,15 @@ func getOrCreateKeyringKey(service, user, configDir string) ([]byte, error) {
 	return key, nil
 }
 
-// warnKeyringFallback prints a warning when falling back to file-based key storage.
-func warnKeyringFallback(configDir string) {
+// warnKeyringFallback writes a warning to w when falling back to file-based key storage.
+func warnKeyringFallback(configDir string, w io.Writer) {
 	keyPath, err := configPath(configDir, ".keyfile")
 	if err != nil {
 		return
 	}
 
-	fmt.Fprintf(os.Stderr, "Warning: OS keyring unavailable, using file-based key storage.\n")
-	fmt.Fprintf(os.Stderr, "  Ensure %s is protected.\n", keyPath)
+	_, _ = fmt.Fprintf(w, "Warning: OS keyring unavailable, using file-based key storage.\n")
+	_, _ = fmt.Fprintf(w, "  Ensure %s is protected.\n", keyPath)
 }
 
 // generateKey creates a cryptographically secure 256-bit key.
@@ -107,7 +108,7 @@ func generateKey() ([]byte, error) {
 }
 
 // getOrCreateFileKey loads the key from file, or generates and saves one.
-func getOrCreateFileKey(configDir string) ([]byte, error) {
+func getOrCreateFileKey(configDir string, w io.Writer) ([]byte, error) {
 	keyPath, err := configPath(configDir, ".keyfile")
 	if err != nil {
 		return nil, err
@@ -115,7 +116,7 @@ func getOrCreateFileKey(configDir string) ([]byte, error) {
 
 	data, err := os.ReadFile(keyPath)
 	if err == nil {
-		validateFilePermissions(keyPath)
+		validateFilePermissions(keyPath, w)
 
 		return decodeKey(string(data))
 	}
@@ -195,8 +196,8 @@ func readWinnersKey(keyPath string, dst []byte) error {
 	return nil
 }
 
-// validateFilePermissions warns if the key file is readable by others (Unix only).
-func validateFilePermissions(path string) {
+// validateFilePermissions warns on w if the key file is readable by others (Unix only).
+func validateFilePermissions(path string, w io.Writer) {
 	if runtime.GOOS == "windows" {
 		return
 	}
@@ -208,7 +209,7 @@ func validateFilePermissions(path string) {
 
 	mode := info.Mode().Perm()
 	if mode&0o077 != 0 {
-		fmt.Fprintf(os.Stderr, "Warning: %s has permissions %04o, expected 0600.\n", path, mode)
-		fmt.Fprintf(os.Stderr, "  Run: chmod 600 %s\n", path)
+		_, _ = fmt.Fprintf(w, "Warning: %s has permissions %04o, expected 0600.\n", path, mode)
+		_, _ = fmt.Fprintf(w, "  Run: chmod 600 %s\n", path)
 	}
 }

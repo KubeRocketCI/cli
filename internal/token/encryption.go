@@ -22,17 +22,25 @@ type aesEncryptor struct {
 	keyringService string
 	keyringUser    string
 	configDir      string
+	w              io.Writer
 	mu             sync.Mutex
 	key            []byte
 }
 
 // NewAESEncryptor creates an AES-256-GCM encryptor.
 // The encryption key is stored in the OS keyring with file fallback.
-func NewAESEncryptor(keyringService, configDir string) Encryptor {
+// Key-storage warnings are written to w, which must be non-nil.
+// Panics if w is nil.
+func NewAESEncryptor(keyringService, configDir string, w io.Writer) Encryptor {
+	if w == nil {
+		panic("token.NewAESEncryptor: nil writer")
+	}
+
 	return &aesEncryptor{
 		keyringService: keyringService,
 		keyringUser:    "encryption-key",
 		configDir:      configDir,
+		w:              w,
 	}
 }
 
@@ -43,7 +51,7 @@ func (e *aesEncryptor) gcm() (cipher.AEAD, error) {
 	defer e.mu.Unlock()
 
 	if e.key == nil {
-		key, err := getOrCreateKey(e.keyringService, e.keyringUser, e.configDir)
+		key, err := getOrCreateKey(e.keyringService, e.keyringUser, e.configDir, e.w)
 		if err != nil {
 			return nil, fmt.Errorf("getting encryption key: %w", err)
 		}
