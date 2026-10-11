@@ -538,7 +538,7 @@ type TaskRunStep struct {
 	} `json:"waiting,omitempty"`
 }
 
-// ErrorBADREQUEST REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
+// ErrorBADREQUEST REST error envelope emitted by sendRestError. `message` is static per status (per status and integration for 503 not configured); `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
 type ErrorBADREQUEST struct {
 	Error struct {
 		// Code tRPC error code (string literal)
@@ -552,7 +552,7 @@ type ErrorBADREQUEST struct {
 	} `json:"error"`
 }
 
-// ErrorCONFLICT REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
+// ErrorCONFLICT REST error envelope emitted by sendRestError. `message` is static per status (per status and integration for 503 not configured); `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
 type ErrorCONFLICT struct {
 	Error struct {
 		// Code tRPC error code (string literal)
@@ -566,7 +566,7 @@ type ErrorCONFLICT struct {
 	} `json:"error"`
 }
 
-// ErrorFORBIDDEN REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
+// ErrorFORBIDDEN REST error envelope emitted by sendRestError. `message` is static per status (per status and integration for 503 not configured); `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
 type ErrorFORBIDDEN struct {
 	Error struct {
 		// Code tRPC error code (string literal)
@@ -580,7 +580,7 @@ type ErrorFORBIDDEN struct {
 	} `json:"error"`
 }
 
-// ErrorINTERNALSERVERERROR REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
+// ErrorINTERNALSERVERERROR REST error envelope emitted by sendRestError. `message` is static per status (per status and integration for 503 not configured); `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
 type ErrorINTERNALSERVERERROR struct {
 	Error struct {
 		// Code tRPC error code (string literal)
@@ -594,7 +594,7 @@ type ErrorINTERNALSERVERERROR struct {
 	} `json:"error"`
 }
 
-// ErrorNOTFOUND REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
+// ErrorNOTFOUND REST error envelope emitted by sendRestError. `message` is static per status (per status and integration for 503 not configured); `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
 type ErrorNOTFOUND struct {
 	Error struct {
 		// Code tRPC error code (string literal)
@@ -608,7 +608,7 @@ type ErrorNOTFOUND struct {
 	} `json:"error"`
 }
 
-// ErrorTIMEOUT REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
+// ErrorTIMEOUT REST error envelope emitted by sendRestError. `message` is static per status (per status and integration for 503 not configured); `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
 type ErrorTIMEOUT struct {
 	Error struct {
 		// Code tRPC error code (string literal)
@@ -622,7 +622,7 @@ type ErrorTIMEOUT struct {
 	} `json:"error"`
 }
 
-// ErrorTOOMANYREQUESTS REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
+// ErrorTOOMANYREQUESTS REST error envelope emitted by sendRestError. `message` is static per status (per status and integration for 503 not configured); `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
 type ErrorTOOMANYREQUESTS struct {
 	Error struct {
 		// Code tRPC error code (string literal)
@@ -636,7 +636,7 @@ type ErrorTOOMANYREQUESTS struct {
 	} `json:"error"`
 }
 
-// ErrorUNAUTHORIZED REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
+// ErrorUNAUTHORIZED REST error envelope emitted by sendRestError. `message` is static per status (per status and integration for 503 not configured); `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
 type ErrorUNAUTHORIZED struct {
 	Error struct {
 		// Code tRPC error code (string literal)
@@ -650,7 +650,7 @@ type ErrorUNAUTHORIZED struct {
 	} `json:"error"`
 }
 
-// ErrorUNPROCESSABLECONTENT REST error envelope emitted by handleTRPCError. `message` is the static HTTP status phrase; `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
+// ErrorUNPROCESSABLECONTENT REST error envelope emitted by sendRestError. `message` is static per status (per status and integration for 503 not configured); `reason` (when present) is a stable machine-readable disambiguator that consumers should key off rather than parsing the human message.
 type ErrorUNPROCESSABLECONTENT struct {
 	Error struct {
 		// Code tRPC error code (string literal)
@@ -3061,6 +3061,7 @@ type ScaComponentsResponse struct {
 	JSON500      *ErrorINTERNALSERVERERROR
 	JSON502      *ErrorINTERNALSERVERERROR
 	JSON503      *ErrorINTERNALSERVERERROR
+	JSON504      *ErrorINTERNALSERVERERROR
 }
 
 // Status returns HTTPResponse.Status
@@ -3089,6 +3090,7 @@ type ScaFindingsResponse struct {
 	JSON500      *ErrorINTERNALSERVERERROR
 	JSON502      *ErrorINTERNALSERVERERROR
 	JSON503      *ErrorINTERNALSERVERERROR
+	JSON504      *ErrorINTERNALSERVERERROR
 }
 
 // Status returns HTTPResponse.Status
@@ -3117,6 +3119,7 @@ type ScaGetResponse struct {
 	JSON500      *ErrorINTERNALSERVERERROR
 	JSON502      *ErrorINTERNALSERVERERROR
 	JSON503      *ErrorINTERNALSERVERERROR
+	JSON504      *ErrorINTERNALSERVERERROR
 }
 
 // Status returns HTTPResponse.Status
@@ -3144,6 +3147,7 @@ type ScaListResponse struct {
 	JSON500      *ErrorINTERNALSERVERERROR
 	JSON502      *ErrorINTERNALSERVERERROR
 	JSON503      *ErrorINTERNALSERVERERROR
+	JSON504      *ErrorINTERNALSERVERERROR
 }
 
 // Status returns HTTPResponse.Status
@@ -3171,6 +3175,9 @@ type SonarGateResponse struct {
 	JSON403      *ErrorFORBIDDEN
 	JSON404      *ErrorNOTFOUND
 	JSON500      *ErrorINTERNALSERVERERROR
+	JSON502      *ErrorINTERNALSERVERERROR
+	JSON503      *ErrorINTERNALSERVERERROR
+	JSON504      *ErrorINTERNALSERVERERROR
 }
 
 // Status returns HTTPResponse.Status
@@ -3198,6 +3205,9 @@ type SonarGetResponse struct {
 	JSON403      *ErrorFORBIDDEN
 	JSON404      *ErrorNOTFOUND
 	JSON500      *ErrorINTERNALSERVERERROR
+	JSON502      *ErrorINTERNALSERVERERROR
+	JSON503      *ErrorINTERNALSERVERERROR
+	JSON504      *ErrorINTERNALSERVERERROR
 }
 
 // Status returns HTTPResponse.Status
@@ -3225,6 +3235,9 @@ type SonarIssuesResponse struct {
 	JSON403      *ErrorFORBIDDEN
 	JSON404      *ErrorNOTFOUND
 	JSON500      *ErrorINTERNALSERVERERROR
+	JSON502      *ErrorINTERNALSERVERERROR
+	JSON503      *ErrorINTERNALSERVERERROR
+	JSON504      *ErrorINTERNALSERVERERROR
 }
 
 // Status returns HTTPResponse.Status
@@ -3252,6 +3265,9 @@ type SonarListResponse struct {
 	JSON403      *ErrorFORBIDDEN
 	JSON404      *ErrorNOTFOUND
 	JSON500      *ErrorINTERNALSERVERERROR
+	JSON502      *ErrorINTERNALSERVERERROR
+	JSON503      *ErrorINTERNALSERVERERROR
+	JSON504      *ErrorINTERNALSERVERERROR
 }
 
 // Status returns HTTPResponse.Status
@@ -4124,6 +4140,13 @@ func ParseScaComponentsResponse(rsp *http.Response) (*ScaComponentsResponse, err
 		}
 		response.JSON503 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 504:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON504 = &dest
+
 	}
 
 	return response, nil
@@ -4191,6 +4214,13 @@ func ParseScaFindingsResponse(rsp *http.Response) (*ScaFindingsResponse, error) 
 			return nil, err
 		}
 		response.JSON503 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 504:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON504 = &dest
 
 	}
 
@@ -4260,6 +4290,13 @@ func ParseScaGetResponse(rsp *http.Response) (*ScaGetResponse, error) {
 		}
 		response.JSON503 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 504:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON504 = &dest
+
 	}
 
 	return response, nil
@@ -4320,6 +4357,13 @@ func ParseScaListResponse(rsp *http.Response) (*ScaListResponse, error) {
 			return nil, err
 		}
 		response.JSON503 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 504:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON504 = &dest
 
 	}
 
@@ -4382,6 +4426,27 @@ func ParseSonarGateResponse(rsp *http.Response) (*SonarGateResponse, error) {
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON502 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 504:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON504 = &dest
+
 	}
 
 	return response, nil
@@ -4442,6 +4507,27 @@ func ParseSonarGetResponse(rsp *http.Response) (*SonarGetResponse, error) {
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON502 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 504:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON504 = &dest
 
 	}
 
@@ -4504,6 +4590,27 @@ func ParseSonarIssuesResponse(rsp *http.Response) (*SonarIssuesResponse, error) 
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON502 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 504:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON504 = &dest
+
 	}
 
 	return response, nil
@@ -4564,6 +4671,27 @@ func ParseSonarListResponse(rsp *http.Response) (*SonarListResponse, error) {
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON502 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 504:
+		var dest ErrorINTERNALSERVERERROR
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON504 = &dest
 
 	}
 
