@@ -544,7 +544,7 @@ type ErrorBADREQUEST struct {
 		// Code tRPC error code (string literal)
 		Code string `json:"code"`
 
-		// Message Static HTTP status phrase
+		// Message Static per status; per status and integration for 503 not configured
 		Message string `json:"message"`
 
 		// Reason Stable machine-readable disambiguator (omitted when none applies)
@@ -558,7 +558,7 @@ type ErrorCONFLICT struct {
 		// Code tRPC error code (string literal)
 		Code string `json:"code"`
 
-		// Message Static HTTP status phrase
+		// Message Static per status; per status and integration for 503 not configured
 		Message string `json:"message"`
 
 		// Reason Stable machine-readable disambiguator (omitted when none applies)
@@ -572,7 +572,7 @@ type ErrorFORBIDDEN struct {
 		// Code tRPC error code (string literal)
 		Code string `json:"code"`
 
-		// Message Static HTTP status phrase
+		// Message Static per status; per status and integration for 503 not configured
 		Message string `json:"message"`
 
 		// Reason Stable machine-readable disambiguator (omitted when none applies)
@@ -586,7 +586,7 @@ type ErrorINTERNALSERVERERROR struct {
 		// Code tRPC error code (string literal)
 		Code string `json:"code"`
 
-		// Message Static HTTP status phrase
+		// Message Static per status; per status and integration for 503 not configured
 		Message string `json:"message"`
 
 		// Reason Stable machine-readable disambiguator (omitted when none applies)
@@ -600,7 +600,7 @@ type ErrorNOTFOUND struct {
 		// Code tRPC error code (string literal)
 		Code string `json:"code"`
 
-		// Message Static HTTP status phrase
+		// Message Static per status; per status and integration for 503 not configured
 		Message string `json:"message"`
 
 		// Reason Stable machine-readable disambiguator (omitted when none applies)
@@ -614,7 +614,7 @@ type ErrorTIMEOUT struct {
 		// Code tRPC error code (string literal)
 		Code string `json:"code"`
 
-		// Message Static HTTP status phrase
+		// Message Static per status; per status and integration for 503 not configured
 		Message string `json:"message"`
 
 		// Reason Stable machine-readable disambiguator (omitted when none applies)
@@ -628,7 +628,7 @@ type ErrorTOOMANYREQUESTS struct {
 		// Code tRPC error code (string literal)
 		Code string `json:"code"`
 
-		// Message Static HTTP status phrase
+		// Message Static per status; per status and integration for 503 not configured
 		Message string `json:"message"`
 
 		// Reason Stable machine-readable disambiguator (omitted when none applies)
@@ -642,7 +642,7 @@ type ErrorUNAUTHORIZED struct {
 		// Code tRPC error code (string literal)
 		Code string `json:"code"`
 
-		// Message Static HTTP status phrase
+		// Message Static per status; per status and integration for 503 not configured
 		Message string `json:"message"`
 
 		// Reason Stable machine-readable disambiguator (omitted when none applies)
@@ -656,7 +656,7 @@ type ErrorUNPROCESSABLECONTENT struct {
 		// Code tRPC error code (string literal)
 		Code string `json:"code"`
 
-		// Message Static HTTP status phrase
+		// Message Static per status; per status and integration for 503 not configured
 		Message string `json:"message"`
 
 		// Reason Stable machine-readable disambiguator (omitted when none applies)

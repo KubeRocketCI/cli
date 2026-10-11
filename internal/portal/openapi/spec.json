@@ -2599,7 +2599,7 @@
               },
               "message": {
                 "type": "string",
-                "description": "Static HTTP status phrase",
+                "description": "Static per status; per status and integration for 503 not configured",
                 "example": "Internal Server Error"
               }
             }
@@ -2638,7 +2638,7 @@
               },
               "message": {
                 "type": "string",
-                "description": "Static HTTP status phrase",
+                "description": "Static per status; per status and integration for 503 not configured",
                 "example": "Unauthorized"
               }
             }
@@ -2677,7 +2677,7 @@
               },
               "message": {
                 "type": "string",
-                "description": "Static HTTP status phrase",
+                "description": "Static per status; per status and integration for 503 not configured",
                 "example": "Forbidden"
               }
             }
@@ -2716,7 +2716,7 @@
               },
               "message": {
                 "type": "string",
-                "description": "Static HTTP status phrase",
+                "description": "Static per status; per status and integration for 503 not configured",
                 "example": "Bad Request"
               }
             }
@@ -2755,7 +2755,7 @@
               },
               "message": {
                 "type": "string",
-                "description": "Static HTTP status phrase",
+                "description": "Static per status; per status and integration for 503 not configured",
                 "example": "Not Found"
               }
             }
@@ -2794,7 +2794,7 @@
               },
               "message": {
                 "type": "string",
-                "description": "Static HTTP status phrase",
+                "description": "Static per status; per status and integration for 503 not configured",
                 "example": "Request Timeout"
               }
             }
@@ -2833,7 +2833,7 @@
               },
               "message": {
                 "type": "string",
-                "description": "Static HTTP status phrase",
+                "description": "Static per status; per status and integration for 503 not configured",
                 "example": "Conflict"
               }
             }
@@ -2872,7 +2872,7 @@
               },
               "message": {
                 "type": "string",
-                "description": "Static HTTP status phrase",
+                "description": "Static per status; per status and integration for 503 not configured",
                 "example": "Unprocessable Content"
               }
             }
@@ -2911,7 +2911,7 @@
               },
               "message": {
                 "type": "string",
-                "description": "Static HTTP status phrase",
+                "description": "Static per status; per status and integration for 503 not configured",
                 "example": "Too Many Requests"
               }
             }
