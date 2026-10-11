@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -37,13 +38,22 @@ const envTokenVar = "KRCI_TOKEN"
 type tokenProvider struct {
 	store token.Store
 	cfg   *config.Config
+	w     io.Writer
 }
 
 // NewTokenProvider creates a TokenProvider with the given store and config.
-func NewTokenProvider(store token.Store, cfg *config.Config) *tokenProvider {
+// Login progress, the login summary, and refresh-persistence warnings are
+// written to w, which must be non-nil.
+// Panics if w is nil.
+func NewTokenProvider(store token.Store, cfg *config.Config, w io.Writer) *tokenProvider {
+	if w == nil {
+		panic("auth.NewTokenProvider: nil writer")
+	}
+
 	return &tokenProvider{
 		store: store,
 		cfg:   cfg,
+		w:     w,
 	}
 }
 
@@ -100,12 +110,16 @@ func (p *tokenProvider) Login(ctx context.Context) error {
 		return err
 	}
 
-	fmt.Fprintf(os.Stderr, "Logged in as %s (%s)\n", claims.Email, claims.Name)
-	if len(claims.Groups) > 0 {
-		fmt.Fprintf(os.Stderr, "Groups: %s\n", strings.Join(claims.Groups, ", "))
-	}
+	writeLoginSummary(p.w, claims)
 
 	return nil
+}
+
+func writeLoginSummary(w io.Writer, claims *UserInfo) {
+	_, _ = fmt.Fprintf(w, "Logged in as %s (%s)\n", claims.Email, claims.Name)
+	if len(claims.Groups) > 0 {
+		_, _ = fmt.Fprintf(w, "Groups: %s\n", strings.Join(claims.Groups, ", "))
+	}
 }
 
 // Logout clears stored credentials.
@@ -176,8 +190,8 @@ func (p *tokenProvider) refresh(ctx context.Context, stored *token.StoredToken) 
 	}
 
 	if err := p.store.Save(refreshed); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to persist refreshed credentials: %v\n", err)
-		fmt.Fprintf(os.Stderr, "You may need to re-authenticate on next use.\n")
+		_, _ = fmt.Fprintf(p.w, "Warning: failed to persist refreshed credentials: %v\n", err)
+		_, _ = fmt.Fprintf(p.w, "You may need to re-authenticate on next use.\n")
 	}
 
 	return refreshed, nil

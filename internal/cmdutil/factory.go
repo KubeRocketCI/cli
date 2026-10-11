@@ -88,7 +88,7 @@ func New(ios *iostreams.IOStreams) *Factory {
 
 			enc := token.NewAESEncryptor(cfg.KeyringService, cfg.ConfigDir, f.IOStreams.ErrOut)
 			store := token.NewEncryptedStore(cfg.TokenPath, enc, f.IOStreams.ErrOut)
-			cachedTP = auth.NewTokenProvider(store, cfg)
+			cachedTP = auth.NewTokenProvider(store, cfg, f.IOStreams.ErrOut)
 		})
 
 		return cachedTP, cachedTPErr

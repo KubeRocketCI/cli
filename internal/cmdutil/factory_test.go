@@ -3,20 +3,26 @@ package cmdutil
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
 	"testing"
+	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/KubeRocketCI/cli/internal/auth"
 	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
+	"github.com/KubeRocketCI/cli/internal/token"
 )
 
 func newTestFactory() *Factory {
@@ -124,6 +130,100 @@ func TestFactoryTokenProvider_WritesTokenDiagnosticsToErrOut(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		assert.Contains(t, errOut.String(), "has permissions 0644")
 	}
+}
+
+func TestFactoryTokenProvider_WritesAuthDiagnosticsToErrOut(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("read-only directories do not block writes")
+	}
+
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses directory permissions")
+	}
+
+	t.Setenv("KRCI_KEYRING_BACKEND", "file")
+	t.Setenv("KRCI_TOKEN", "")
+
+	idp := newRefreshIDP(t)
+
+	dir := t.TempDir()
+	tokenPath := filepath.Join(dir, "tokens.enc")
+
+	keyPath := filepath.Join(dir, ".keyfile")
+	encoded := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte("k"), 32))
+	require.NoError(t, os.WriteFile(keyPath, []byte(encoded), 0o600))
+
+	const keyringService = "krci-test"
+
+	enc := token.NewAESEncryptor(keyringService, dir, io.Discard)
+	require.NoError(t, token.NewEncryptedStore(tokenPath, enc, io.Discard).Save(&token.StoredToken{
+		AccessToken:  "expired",
+		RefreshToken: "old-refresh",
+		IDToken:      "old-id",
+		ExpiresAt:    time.Now().Add(-time.Minute),
+		IssuerURL:    idp.URL,
+		ClientID:     "krci-cli",
+	}))
+
+	require.NoError(t, os.Chmod(dir, 0o500))
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+
+	var out, errOut bytes.Buffer
+
+	f := New(iostreams.New(nil, &out, &errOut, false))
+	f.SetConfigResolver(func() (*config.Config, error) {
+		return &config.Config{
+			IssuerURL:      idp.URL,
+			ClientID:       "krci-cli",
+			ConfigDir:      dir,
+			TokenPath:      tokenPath,
+			KeyringService: keyringService,
+		}, nil
+	})
+
+	tp, err := f.TokenProvider()
+	require.NoError(t, err)
+
+	tok, err := tp.GetToken(oidc.ClientContext(t.Context(), idp.Client()))
+	require.NoError(t, err)
+	require.Equal(t, "new-id", tok)
+
+	assert.Contains(t, errOut.String(), "Warning: failed to persist refreshed credentials: ")
+	assert.Contains(t, errOut.String(), "You may need to re-authenticate on next use.\n")
+	assert.Empty(t, out.String())
+}
+
+// newRefreshIDP serves OIDC discovery and a refresh_token grant over TLS.
+func newRefreshIDP(t *testing.T) *httptest.Server {
+	t.Helper()
+
+	var idp *httptest.Server
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"issuer":                 idp.URL,
+			"authorization_endpoint": idp.URL + "/auth",
+			"token_endpoint":         idp.URL + "/token",
+			"jwks_uri":               idp.URL + "/keys",
+		})
+	})
+	mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token":  "new-access",
+			"token_type":    "Bearer",
+			"refresh_token": "new-refresh",
+			"expires_in":    3600,
+			"id_token":      "new-id",
+		})
+	})
+
+	idp = httptest.NewTLSServer(mux)
+	t.Cleanup(idp.Close)
+
+	return idp
 }
 
 func TestFactoryConfig_DoesNotCacheFailure(t *testing.T) {

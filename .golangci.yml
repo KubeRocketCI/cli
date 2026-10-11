@@ -92,16 +92,6 @@ linters:
           - forbidigo
         path-except: ^internal/(token|auth)/
         text: io\.Writer passed in by the caller
-      # Baseline: os.Stderr writes in internal/auth. Delete an entry when its write
-      # moves to an injected io.Writer.
-      - linters:
-          - forbidigo
-        path: ^internal/auth/provider\.go$
-        source: "(Logged in as|Groups: %s|failed to persist refreshed credentials|You may need to re-authenticate)"
-      - linters:
-          - forbidigo
-        path: ^internal/auth/oidc\.go$
-        source: "(Opening browser for authentication|If browser doesn't open|could not open browser)"
       # Baseline: internal/output imports internal/portal. Delete when the
       # pipeline-run renderers and the status colors move out of internal/output.
       - linters:
