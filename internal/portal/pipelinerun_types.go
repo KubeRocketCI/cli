@@ -70,8 +70,12 @@ var statusDisplay = map[string]string{
 	resultStatusUnknown:   StatusRunning,
 }
 
+// celRunEnded matches a Tekton Results record whose run has ended. Results CEL
+// matches no record with `!= null` or has() on summary.end_time.
+const celRunEnded = `summary.end_time > timestamp("1970-01-01T00:00:00Z")`
+
 // statusFilter pairs a user-facing status filter keyword with the display
-// label and the Tekton Results CEL numeric value it selects.
+// label and the Tekton Results CEL predicate that selects it.
 type statusFilter struct {
 	keyword string
 	display string
@@ -79,12 +83,17 @@ type statusFilter struct {
 }
 
 // statusFilters is in the order help and error messages list the keywords.
+// Status numbers: 0 UNKNOWN, 1 SUCCESS, 2 FAILURE, 3 TIMEOUT, 4 CANCELLED.
+// failed includes UNKNOWN with an end time, as summaryStatus displays it.
 var statusFilters = []statusFilter{
-	{keyword: "succeeded", display: StatusSucceeded, cel: "1"},
-	{keyword: "failed", display: StatusFailed, cel: "2"},
-	{keyword: "running", display: StatusRunning, cel: "0"},
-	{keyword: "timeout", display: StatusTimeout, cel: "3"},
-	{keyword: "cancelled", display: StatusCancelled, cel: "4"},
+	{keyword: "succeeded", display: StatusSucceeded, cel: "summary.status == 1"},
+	{
+		keyword: "failed", display: StatusFailed,
+		cel: "(summary.status == 2 || (summary.status == 0 && " + celRunEnded + "))",
+	},
+	{keyword: "running", display: StatusRunning, cel: "summary.status == 0"},
+	{keyword: "timeout", display: StatusTimeout, cel: "summary.status == 3"},
+	{keyword: "cancelled", display: StatusCancelled, cel: "summary.status == 4"},
 }
 
 // findStatusFilter looks a status filter keyword up, ignoring case.
@@ -162,7 +171,8 @@ func (sum *tektonResultSummary) finished() bool {
 }
 
 // summaryStatus is the display status of a Tekton Results summary. UNKNOWN
-// with an EndTime is Failed: the run ended with Succeeded=False.
+// with an EndTime is Failed: the run ended with Succeeded=False. The failed
+// predicate in statusFilters selects the same records.
 func summaryStatus(sum *tektonResultSummary) string {
 	if sum.Status == resultStatusUnknown && sum.finished() {
 		return StatusFailed
