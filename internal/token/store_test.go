@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -144,6 +146,127 @@ func TestStoreLoadRemoveFailureWarning(t *testing.T) {
 		"  Run 'krci auth login' to re-authenticate.\n"+
 		"Warning: could not remove corrupted file: %v\n", path, removeErr)
 	assert.Equal(t, want, buf.String())
+}
+
+// syncBuffer is a bytes.Buffer safe for concurrent writers.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.String()
+}
+
+func TestStoreLoadConcurrentCorruptFileWarnsOnce(t *testing.T) {
+	t.Parallel()
+
+	const callers = 8
+
+	path := filepath.Join(t.TempDir(), "tokens.enc")
+	require.NoError(t, os.WriteFile(path, []byte("ciphertext"), 0600))
+
+	// The delay keeps every unserialised caller inside Decrypt until all of them have read the file.
+	enc := &stubEncryptor{
+		decryptErr: errors.New("decrypt failed"),
+		onDecrypt:  func() { time.Sleep(20 * time.Millisecond) },
+	}
+
+	var out syncBuffer
+	store := NewEncryptedStore(path, enc, &out)
+
+	var (
+		wg    sync.WaitGroup
+		start = make(chan struct{})
+		errs  = make([]error, callers)
+	)
+
+	for i := range callers {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			<-start
+
+			_, errs[i] = store.Load()
+		}()
+	}
+
+	close(start)
+	wg.Wait()
+
+	for i, err := range errs {
+		assert.ErrorIs(t, err, ErrNoToken, "caller %d", i)
+	}
+
+	assert.Equal(t, 1, strings.Count(out.String(), "removing undecryptable token file"), out.String())
+	assert.Equal(t, 1, strings.Count(out.String(), "Run 'krci auth login'"), out.String())
+
+	_, statErr := os.Stat(path)
+	assert.True(t, os.IsNotExist(statErr), "undecryptable token file was not removed")
+}
+
+func TestStoreSaveWaitsForInFlightLoad(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "tokens.enc")
+	require.NoError(t, os.WriteFile(path, []byte("ciphertext"), 0600))
+
+	var (
+		entered = make(chan struct{})
+		release = make(chan struct{})
+	)
+
+	enc := &stubEncryptor{
+		decryptErr: errors.New("decrypt failed"),
+		onDecrypt: func() {
+			close(entered)
+			<-release
+		},
+	}
+	store := NewEncryptedStore(path, enc, io.Discard)
+
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+
+		_, _ = store.Load()
+	}()
+
+	<-entered
+
+	saveErr := make(chan error, 1)
+
+	go func() {
+		defer wg.Done()
+
+		saveErr <- store.Save(&StoredToken{AccessToken: "fresh"})
+	}()
+
+	// A Save that is not serialised completes here and is then removed by the Load.
+	time.Sleep(50 * time.Millisecond)
+	close(release)
+	wg.Wait()
+
+	require.NoError(t, <-saveErr)
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err, "Save result was removed by the in-flight Load")
+	assert.Contains(t, string(data), "fresh")
 }
 
 func TestNewEncryptedStoreNilWriterPanics(t *testing.T) {
