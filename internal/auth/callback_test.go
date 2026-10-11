@@ -69,15 +69,23 @@ func TestCallbackStateMismatchKeepsListening(t *testing.T) {
 		resultCh <- r
 	}()
 
-	// Send request with wrong state -- should be rejected but server continues.
-	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/callback?code=bad&state=wrong-state", port))
-	require.NoError(t, err)
-	resp.Body.Close()
+	// Requests without the expected state get 400 and leave the wait open.
+	for _, query := range []string{
+		"code=bad&state=wrong-state",
+		"code=forged",
+		"error=access_denied&error_description=spoofed",
+		"error=access_denied&error_description=spoofed&state=wrong-state",
+	} {
+		t.Run(query, func(t *testing.T) {
+			resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/callback?%s", port, query))
+			require.NoError(t, err)
+			resp.Body.Close()
 
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		})
+	}
 
-	// Now send correct callback -- server should still be running.
-	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%d/callback?code=good-code&state=%s", port, state))
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/callback?code=good-code&state=%s", port, state))
 	require.NoError(t, err)
 	resp.Body.Close()
 
@@ -106,16 +114,34 @@ func TestCallbackOAuthError(t *testing.T) {
 		errCh <- e
 	}()
 
-	// Simulate IdP error response.
-	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/callback?error=access_denied&error_description=user+cancelled", port))
+	// Simulate IdP error response carrying the expected state.
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/callback?error=access_denied&error_description=user+cancelled&state=state", port))
 	require.NoError(t, err)
 	resp.Body.Close()
 
 	select {
 	case err := <-errCh:
-		require.Error(t, err, "expected error for OAuth error response")
+		require.EqualError(t, err, "auth callback: access_denied: user cancelled")
 	case <-time.After(3 * time.Second):
 		t.Fatal("timeout waiting for error")
+	}
+}
+
+func TestCallbackEmptyExpectedState(t *testing.T) {
+	t.Parallel()
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	addr := listener.Addr().String()
+
+	_, err = waitForCallback(t.Context(), listener, "", time.Second)
+	require.EqualError(t, err, "auth callback: empty expected state")
+
+	conn, err := net.DialTimeout("tcp", addr, time.Second)
+	if err == nil {
+		conn.Close()
+		t.Fatal("listener still accepts connections after the empty-state error")
 	}
 }
 

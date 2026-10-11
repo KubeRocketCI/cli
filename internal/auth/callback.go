@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -32,13 +33,18 @@ const errorHTML = `<!DOCTYPE html>
 
 // waitForCallback starts a single-use HTTP server that receives the OAuth2 callback.
 // It validates the state parameter and returns the authorization code.
-// Invalid requests (wrong state, missing code) are rejected with HTTP errors but
-// do NOT terminate the server — only a valid success or an IdP error response is terminal.
+// Terminal: a state-matched request carrying a code or an IdP error.
+// Rejected with 400, wait continues: wrong or missing state (error callbacks included), missing code.
 // The wait ends after timeout or when ctx is cancelled; cancellation returns an
-// error wrapping ctx.Err().
+// error wrapping ctx.Err(). An empty expectedState is an error; the listener is closed.
 func waitForCallback(
 	ctx context.Context, listener net.Listener, expectedState string, timeout time.Duration,
 ) (*callbackResult, error) {
+	if expectedState == "" {
+		_ = listener.Close()
+		return nil, errors.New("auth callback: empty expected state")
+	}
+
 	resultCh := make(chan *callbackResult, 1)
 	errCh := make(chan error, 1)
 
@@ -52,9 +58,17 @@ func waitForCallback(
 				return
 			}
 
-			// Check for OAuth error response from the IdP (terminal).
-			if errParam := r.URL.Query().Get("error"); errParam != "" {
-				desc := r.URL.Query().Get("error_description")
+			q := r.URL.Query()
+
+			// State is compared before any other parameter; a forged code or error callback never ends the wait.
+			if subtle.ConstantTimeCompare([]byte(q.Get("state")), []byte(expectedState)) != 1 {
+				http.Error(w, "invalid request", http.StatusBadRequest)
+				return
+			}
+
+			// OAuth error response from the IdP (terminal).
+			if errParam := q.Get("error"); errParam != "" {
+				desc := q.Get("error_description")
 				w.Header().Set("Content-Type", "text/html")
 
 				if _, writeErr := fmt.Fprintf(w, errorHTML,
@@ -67,15 +81,7 @@ func waitForCallback(
 				return
 			}
 
-			// Validate state parameter to prevent CSRF (constant-time comparison).
-			// Invalid state is NOT terminal — keep listening for the legitimate callback.
-			stateParam := r.URL.Query().Get("state")
-			if subtle.ConstantTimeCompare([]byte(stateParam), []byte(expectedState)) != 1 {
-				http.Error(w, "invalid request", http.StatusBadRequest)
-				return
-			}
-
-			code := r.URL.Query().Get("code")
+			code := q.Get("code")
 			if code == "" {
 				http.Error(w, "missing authorization code", http.StatusBadRequest)
 				return
