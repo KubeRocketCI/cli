@@ -14,6 +14,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 	sonarinternal "github.com/KubeRocketCI/cli/pkg/cmd/sonar/internal"
 )
 
@@ -164,17 +165,17 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*IssuesOptions) error) *cobra.Co
 func issuesRun(ctx context.Context, opts *IssuesOptions) error {
 	client, err := opts.RestClient()
 	if err != nil {
-		return sonarinternal.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
 	svc := portal.NewSonarService(client)
 
 	result, err := svc.Issues(ctx, opts.normalized)
 	if err != nil {
-		return sonarinternal.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
-	return sonarinternal.Render(opts.IO, opts.OutputFormat, result, func(w io.Writer, isTTY bool) error {
+	return render.Render(opts.IO, opts.OutputFormat, result, func(w io.Writer, isTTY bool) error {
 		return renderTable(w, isTTY, opts.Project, opts.PullRequest, opts.Branch, result)
 	})
 }
@@ -185,7 +186,7 @@ func renderTable(w io.Writer, isTTY bool, project, pullRequest, branch string, r
 		"Issues for %s  (page %d/%d, %d total)\n\n",
 		project,
 		result.Paging.PageIndex,
-		sonarinternal.PageCount(result.Paging.Total, result.Paging.PageSize),
+		render.PageCount(result.Paging.Total, result.Paging.PageSize),
 		result.Paging.Total,
 	); err != nil {
 		return err
@@ -241,5 +242,5 @@ func renderTable(w io.Writer, isTTY bool, project, pullRequest, branch string, r
 		})
 	}
 
-	return sonarinternal.PrintTable(w, isTTY, headers, rows)
+	return render.PrintTable(w, isTTY, headers, rows)
 }

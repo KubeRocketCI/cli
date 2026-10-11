@@ -13,6 +13,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 	sonarinternal "github.com/KubeRocketCI/cli/pkg/cmd/sonar/internal"
 )
 
@@ -81,7 +82,7 @@ func NewCmdGate(f *cmdutil.Factory, runF func(*GateOptions) error) *cobra.Comman
 func gateRun(ctx context.Context, opts *GateOptions) error {
 	client, err := opts.RestClient()
 	if err != nil {
-		return sonarinternal.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
 	svc := portal.NewSonarService(client)
@@ -91,10 +92,10 @@ func gateRun(ctx context.Context, opts *GateOptions) error {
 		Branch:      opts.Branch,
 	})
 	if err != nil {
-		return sonarinternal.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
-	return sonarinternal.Render(opts.IO, opts.OutputFormat, g, func(w io.Writer, isTTY bool) error {
+	return render.Render(opts.IO, opts.OutputFormat, g, func(w io.Writer, isTTY bool) error {
 		return renderTable(w, isTTY, opts.Project, g)
 	})
 }
@@ -137,5 +138,5 @@ func renderTable(w io.Writer, isTTY bool, project string, g *portal.SonarGate) e
 		rows = append(rows, []string{c.MetricKey, c.Comparator, c.ErrorThreshold, c.ActualValue, s})
 	}
 
-	return sonarinternal.PrintTable(w, isTTY, headers, rows)
+	return render.PrintTable(w, isTTY, headers, rows)
 }

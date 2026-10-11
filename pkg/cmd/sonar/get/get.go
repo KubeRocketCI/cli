@@ -16,6 +16,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 	sonarinternal "github.com/KubeRocketCI/cli/pkg/cmd/sonar/internal"
 )
 
@@ -82,7 +83,7 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 func getRun(ctx context.Context, opts *GetOptions) error {
 	client, err := opts.RestClient()
 	if err != nil {
-		return sonarinternal.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
 	svc := portal.NewSonarService(client)
@@ -92,10 +93,10 @@ func getRun(ctx context.Context, opts *GetOptions) error {
 		Branch:      opts.Branch,
 	})
 	if err != nil {
-		return sonarinternal.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
-	return sonarinternal.Render(opts.IO, opts.OutputFormat, detail, func(w io.Writer, isTTY bool) error {
+	return render.Render(opts.IO, opts.OutputFormat, detail, func(w io.Writer, isTTY bool) error {
 		return printDetail(w, detail, isTTY)
 	})
 }
@@ -189,15 +190,12 @@ var measureSections = []measureSection{
 	},
 }
 
-// printAligned prints "<indent><label padded to column-width>   <value>" for
-// each pair. The column width is the max label length in the block so every
-// value aligns regardless of label length. Reuses `output.LabelStyle` via
-// `UnsetWidth()` to match the sibling `project` / `deployment` get views
-// while letting this renderer own the column-width decision.
-// sonarLabelStyle reuses the shared LabelStyle but lets printAligned control
-// the column width dynamically via its own padding logic.
+// sonarLabelStyle is output.LabelStyle without a fixed width; printAligned
+// pads labels itself.
 var sonarLabelStyle = output.LabelStyle.UnsetWidth()
 
+// printAligned prints "<indent><label padded to column width>   <value>" for
+// each pair. Column width is the longest label in pairs.
 func printAligned(w io.Writer, pairs []kvPair, indent string, styled bool) error {
 	maxLabel := 0
 	for _, p := range pairs {
