@@ -147,6 +147,8 @@ var contractRows = []contractRow{
 	{cmd: cmdPipelineRunList, format: formatJSON, fixture: "runs", name: "merged"},
 	{cmd: cmdPipelineRunList, args: []string{"--status", "running"}, format: formatJSON, fixture: "runs",
 		name: "status-running"},
+	{cmd: cmdPipelineRunList, args: []string{"--status", "failed"}, format: formatJSON, fixture: "runs-failed",
+		name: "status-failed"},
 	{cmd: cmdPipelineRunList, format: formatJSON, fixture: "runs-live-401", wantExit: 1, name: "live-unauthorized"},
 	{cmd: cmdPipelineRunList, format: formatUnknown, fixture: "runs", wantExit: 1, name: nameUnknownFormat},
 	{cmd: cmdPipelineRunList, args: []string{"--reason"}, format: formatJSON, fixture: "failed-run-list",
@@ -363,6 +365,14 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 	failedResults.query = runFailed
 	failedLogs := at(http.MethodGet, pathTaskRunLog, "taskrun-logs-compile")
 	failedLogs.query = "taskRunName=" + runFailed + "-compile"
+	// The filter is the --status failed predicate: FAILURE, or UNKNOWN with an end time.
+	statusFailedResults := at(http.MethodGet, pathResults, "runs-results-status-failed")
+	statusFailedResults.params = url.Values{
+		"namespace": {baseNamespace},
+		"pageSize":  {"10"},
+		"filter": {`(summary.status == 2 || (summary.status == 0 && ` +
+			`summary.end_time > timestamp("1970-01-01T00:00:00Z")))`},
+	}
 	failedLive := list("PipelineRun", "runs-live-failed")
 	failedTaskRuns := at(http.MethodGet, pathTaskRuns, "taskruns-failed")
 
@@ -418,6 +428,7 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 	return map[string][]route{
 		"runs":          {liveRuns, at(http.MethodGet, pathResults, "runs-results")},
 		"runs-live-401": {deny(liveRuns), noResults},
+		"runs-failed":   {list("PipelineRun", "runs-live-empty"), statusFailedResults},
 		"failed-run":    {failedLive, failedResults, failedTaskRuns, failedLogs},
 		// failedResults before noResults: the by-name lookup must not hit the empty history.
 		"failed-run-list":      {failedLive, failedResults, noResults, failedTaskRuns, failedLogs},

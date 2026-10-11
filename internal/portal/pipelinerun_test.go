@@ -225,19 +225,28 @@ func TestValidatePipelineRunStatus(t *testing.T) {
 	}
 }
 
-// TestBuildCELFilter_Status pins the Tekton Results status number of every
-// keyword; case is ignored.
+// TestBuildCELFilter_Status pins the Tekton Results predicate of every keyword;
+// case is ignored. failed also selects UNKNOWN records with an end time.
 func TestBuildCELFilter_Status(t *testing.T) {
 	t.Parallel()
 
-	want := map[string]string{"succeeded": "1", "failed": "2", "running": "0", "timeout": "3", "cancelled": "4"}
+	failed := `(summary.status == 2 || (summary.status == 0 && summary.end_time > timestamp("1970-01-01T00:00:00Z")))`
+	want := map[string]string{
+		"succeeded": "summary.status == 1",
+		"failed":    failed,
+		"running":   "summary.status == 0",
+		"timeout":   "summary.status == 3",
+		"cancelled": "summary.status == 4",
+	}
 
 	for _, keyword := range PipelineRunStatusKeywords() {
 		require.Contains(t, want, keyword)
-		assert.Equal(t, "summary.status == "+want[keyword], buildCELFilter(PipelineRunFilter{Status: keyword}))
+		assert.Equal(t, want[keyword], buildCELFilter(PipelineRunFilter{Status: keyword}))
 	}
 
-	assert.Equal(t, "summary.status == 2", buildCELFilter(PipelineRunFilter{Status: "Failed"}))
+	assert.Equal(t, failed, buildCELFilter(PipelineRunFilter{Status: "Failed"}))
+	assert.Equal(t, `annotations["app.edp.epam.com/codebase"] == "my-app" && `+failed,
+		buildCELFilter(PipelineRunFilter{Project: "my-app", Status: "failed"}))
 	assert.Empty(t, buildCELFilter(PipelineRunFilter{}))
 }
 

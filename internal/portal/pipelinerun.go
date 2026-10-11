@@ -1059,7 +1059,7 @@ func buildCELFilter(f PipelineRunFilter) string {
 	}
 
 	if status, ok := findStatusFilter(f.Status); ok {
-		parts = append(parts, fmt.Sprintf("summary.status == %s", status.cel))
+		parts = append(parts, status.cel)
 	}
 
 	return strings.Join(parts, " && ")

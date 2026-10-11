@@ -103,8 +103,8 @@ from Tekton Results history show none.
 A run still in the cluster is reported with its cluster status even when its
 task tree is read from history. A run read back from history that ended with
 a reason Tekton Results does not classify (`CouldntGetPipeline`,
-`PipelineValidationFailed`, ...) is reported as `Failed`. `--status failed`
-does not select it; the history filter matches the stored status.
+`PipelineValidationFailed`, `CouldntGetPipelineResult`, ...) is reported as
+`Failed`, and `--status failed` selects it.
 
 ### Waiting for a run (`--wait`)
 
