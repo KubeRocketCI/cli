@@ -1,5 +1,5 @@
 // Package scainternal holds helpers shared by `krci sca` verbs
-// (validation, enum sets, render/format dispatch, error-envelope plumbing).
+// (validation, enum sets, Dependency-Track error hint, table cells, paging footer).
 package scainternal
 
 import (
@@ -11,6 +11,7 @@ import (
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/output"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 // MaxPageSize is the upper bound on `--page-size` for every paginated sca
@@ -61,23 +62,11 @@ func ValidatePageBounds(page, pageSize int) error {
 	return nil
 }
 
-// ValidateOutputFormat rejects `-o` values other than "", "table", or "json".
-// An empty string means "use default" (table) and is always valid.
-func ValidateOutputFormat(format string) error {
-	switch format {
-	case "", output.FormatTable, output.FormatJSON:
-		return nil
-	default:
-		return fmt.Errorf("unknown output format: %s (use 'json' or 'table')", format)
-	}
-}
-
-// ValidateCodebaseCommand runs the validator chain used by every per-codebase
-// sca verb (get, components, findings): output format → Kubernetes-name codebase
-// → non-empty --branch (when explicitly supplied). Unlike sonar, sca never
-// takes --pr, so there is no scope-mutex step.
+// ValidateCodebaseCommand validates a per-codebase sca verb's inputs in order:
+// output format, Kubernetes-name codebase, non-empty --branch when supplied.
+// sca verbs take no --pr, so there is no scope-mutex step.
 func ValidateCodebaseCommand(cmd *cobra.Command, outputFormat, codebase, branch string) error {
-	if err := ValidateOutputFormat(outputFormat); err != nil {
+	if err := render.ValidateOutputFormat(outputFormat, output.FormatJSON, output.FormatTable); err != nil {
 		return err
 	}
 

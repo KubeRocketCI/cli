@@ -12,6 +12,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 	scainternal "github.com/KubeRocketCI/cli/pkg/cmd/sca/internal"
 )
 
@@ -113,7 +114,7 @@ func componentsRun(ctx context.Context, opts *ComponentsOptions) error {
 		return scainternal.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
-	return scainternal.Render(opts.IO, opts.OutputFormat, result, func(w io.Writer, isTTY bool) error {
+	return render.Render(opts.IO, opts.OutputFormat, result, func(w io.Writer, isTTY bool) error {
 		return renderTable(w, isTTY, opts.Codebase, opts.Page, opts.PageSize, result)
 	})
 }
@@ -141,7 +142,7 @@ func renderTable(
 		})
 	}
 
-	if err := scainternal.PrintTable(w, isTTY, headers, rows); err != nil {
+	if err := render.PrintTable(w, isTTY, headers, rows); err != nil {
 		return err
 	}
 
