@@ -3,9 +3,9 @@ package auth
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -60,8 +60,8 @@ func (p *tokenProvider) login(ctx context.Context) (*UserInfo, error) {
 		return nil, err
 	}
 
-	// Listen on "localhost" to cover both IPv4 and IPv6 loopback.
-	// OIDC providers support any port for localhost redirect URIs (RFC 8252 §7.3).
+	// Binds the first address localhost resolves to, IPv4 preferred.
+	// RFC 8252 §7.3 allows any port for loopback redirect URIs.
 	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		return nil, fmt.Errorf("starting callback server: %w", err)
@@ -84,12 +84,7 @@ func (p *tokenProvider) login(ctx context.Context) (*UserInfo, error) {
 		oauth2.SetAuthURLParam("prompt", "consent"),
 	)
 
-	fmt.Fprintf(os.Stderr, "Opening browser for authentication...\n")
-	fmt.Fprintf(os.Stderr, "If browser doesn't open, visit:\n  %s\n\n", authURL)
-
-	if err := browser.OpenURL(authURL); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: could not open browser: %v\n", err)
-	}
+	openAuthURL(p.w, authURL, browser.OpenURL)
 
 	result, err := waitForCallback(ctx, listener, state, 5*time.Minute)
 	if err != nil {
@@ -123,4 +118,19 @@ func (p *tokenProvider) login(ctx context.Context) (*UserInfo, error) {
 	}
 
 	return &claims, nil
+}
+
+// openAuthURL writes the manual-visit instructions to w, then calls open.
+// An open failure is written to w and not returned.
+// Sets browser.Stdout and browser.Stderr to w.
+func openAuthURL(w io.Writer, authURL string, open func(string) error) {
+	_, _ = fmt.Fprintf(w, "Opening browser for authentication...\n")
+	_, _ = fmt.Fprintf(w, "If browser doesn't open, visit:\n  %s\n\n", authURL)
+
+	browser.Stdout = w
+	browser.Stderr = w
+
+	if err := open(authURL); err != nil {
+		_, _ = fmt.Fprintf(w, "Warning: could not open browser: %v\n", err)
+	}
 }

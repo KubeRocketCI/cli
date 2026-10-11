@@ -1,13 +1,19 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -64,7 +70,7 @@ func TestGetTokenEnvVarTakesPrecedence(t *testing.T) {
 		tok: &token.StoredToken{IDToken: "cached-id-token", ExpiresAt: time.Now().Add(time.Hour)},
 	}
 
-	tp := NewTokenProvider(store, &config.Config{})
+	tp := NewTokenProvider(store, &config.Config{}, io.Discard)
 	tok, err := tp.GetToken(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, "env-token-value", tok)
@@ -78,7 +84,7 @@ func TestGetTokenEnvVarExpired(t *testing.T) {
 		tok: &token.StoredToken{IDToken: "cached-id-token", ExpiresAt: time.Now().Add(time.Hour)},
 	}
 
-	tp := NewTokenProvider(store, &config.Config{})
+	tp := NewTokenProvider(store, &config.Config{}, io.Discard)
 	_, err := tp.GetToken(context.Background())
 	require.ErrorIs(t, err, ErrEnvTokenExpired)
 }
@@ -88,7 +94,7 @@ func TestGetTokenEnvVarUnexpiredJWT(t *testing.T) {
 	envTok := fakeJWT(fmt.Sprintf(`{"sub":"ci","exp":%d}`, valid))
 	t.Setenv("KRCI_TOKEN", envTok)
 
-	tp := NewTokenProvider(&mockStore{}, &config.Config{})
+	tp := NewTokenProvider(&mockStore{}, &config.Config{}, io.Discard)
 	tok, err := tp.GetToken(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, envTok, tok)
@@ -105,7 +111,7 @@ func TestUserInfoFromEnvToken(t *testing.T) {
 		},
 	}
 
-	tp := NewTokenProvider(store, &config.Config{})
+	tp := NewTokenProvider(store, &config.Config{}, io.Discard)
 	info, err := tp.UserInfo()
 	require.NoError(t, err)
 
@@ -118,7 +124,7 @@ func TestUserInfoFromEnvToken(t *testing.T) {
 func TestUserInfoFromOpaqueEnvToken(t *testing.T) {
 	t.Setenv("KRCI_TOKEN", "opaque-token")
 
-	tp := NewTokenProvider(&mockStore{}, &config.Config{})
+	tp := NewTokenProvider(&mockStore{}, &config.Config{}, io.Discard)
 	_, err := tp.UserInfo()
 	require.Error(t, err)
 	assert.NotErrorIs(t, err, ErrNotAuthenticated)
@@ -165,7 +171,7 @@ func TestGetToken(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			tp := NewTokenProvider(tt.store, &config.Config{})
+			tp := NewTokenProvider(tt.store, &config.Config{}, io.Discard)
 			tok, err := tp.GetToken(context.Background())
 
 			if tt.wantErr != nil {
@@ -186,7 +192,7 @@ func TestGetTokenLoadError(t *testing.T) {
 
 	store := &mockStore{loadErr: errors.New("disk failure")}
 
-	tp := NewTokenProvider(store, &config.Config{})
+	tp := NewTokenProvider(store, &config.Config{}, io.Discard)
 	_, err := tp.GetToken(context.Background())
 
 	require.Error(t, err)
@@ -202,7 +208,7 @@ func TestLogout(t *testing.T) {
 		tok: &token.StoredToken{AccessToken: "test"},
 	}
 
-	tp := NewTokenProvider(store, &config.Config{})
+	tp := NewTokenProvider(store, &config.Config{}, io.Discard)
 	require.NoError(t, tp.Logout())
 	assert.True(t, store.cleared, "Logout() did not call Clear()")
 }
@@ -212,7 +218,7 @@ func TestUserInfoNotAuthenticated(t *testing.T) {
 
 	store := &mockStore{} // nil token
 
-	tp := NewTokenProvider(store, &config.Config{})
+	tp := NewTokenProvider(store, &config.Config{}, io.Discard)
 	_, err := tp.UserInfo()
 
 	require.Error(t, err)
@@ -231,7 +237,7 @@ func TestUserInfoDecodesIDToken(t *testing.T) {
 		},
 	}
 
-	tp := NewTokenProvider(store, &config.Config{})
+	tp := NewTokenProvider(store, &config.Config{}, io.Discard)
 	info, err := tp.UserInfo()
 	require.NoError(t, err)
 
@@ -240,6 +246,127 @@ func TestUserInfoDecodesIDToken(t *testing.T) {
 	assert.Equal(t, []string{"admin"}, info.Groups)
 	assert.False(t, info.ExpiresAt.IsZero(), "ExpiresAt should be set from stored token")
 	assert.False(t, info.FromEnv, "claims of the stored session must not be marked FromEnv")
+}
+
+func TestNewTokenProviderNilWriterPanics(t *testing.T) {
+	t.Parallel()
+
+	assert.PanicsWithValue(t, "auth.NewTokenProvider: nil writer", func() {
+		NewTokenProvider(&mockStore{}, &config.Config{}, nil)
+	})
+}
+
+func TestWriteLoginSummary(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		claims UserInfo
+		want   string
+	}{
+		{
+			name:   "without groups",
+			claims: UserInfo{Email: "user@example.com", Name: "Test User"},
+			want:   "Logged in as user@example.com (Test User)\n",
+		},
+		{
+			name:   "with groups",
+			claims: UserInfo{Email: "user@example.com", Name: "Test User", Groups: []string{"admin", "developers"}},
+			want:   "Logged in as user@example.com (Test User)\nGroups: admin, developers\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var buf bytes.Buffer
+
+			writeLoginSummary(&buf, &tt.claims)
+
+			assert.Equal(t, tt.want, buf.String())
+		})
+	}
+}
+
+// newRefreshIDP serves OIDC discovery and a refresh_token grant over TLS.
+func newRefreshIDP(t *testing.T) *httptest.Server {
+	t.Helper()
+
+	var idp *httptest.Server
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"issuer":                 idp.URL,
+			"authorization_endpoint": idp.URL + "/auth",
+			"token_endpoint":         idp.URL + "/token",
+			"jwks_uri":               idp.URL + "/keys",
+		})
+	})
+	mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token":  "new-access",
+			"token_type":    "Bearer",
+			"refresh_token": "new-refresh",
+			"expires_in":    3600,
+			"id_token":      fakeJWT(`{"email":"user@example.com"}`),
+		})
+	})
+
+	idp = httptest.NewTLSServer(mux)
+	t.Cleanup(idp.Close)
+
+	return idp
+}
+
+func TestRefreshPersistenceWarning(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		saveErr error
+		want    string
+	}{
+		{
+			name:    "save fails",
+			saveErr: errors.New("disk full"),
+			want: "Warning: failed to persist refreshed credentials: disk full\n" +
+				"You may need to re-authenticate on next use.\n",
+		},
+		{name: "save succeeds"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			idp := newRefreshIDP(t)
+
+			store := &mockStore{
+				tok: &token.StoredToken{
+					AccessToken:  "expired",
+					RefreshToken: "old-refresh",
+					ExpiresAt:    time.Now().Add(-time.Minute),
+					IssuerURL:    idp.URL,
+					ClientID:     "krci-cli",
+				},
+				saveErr: tt.saveErr,
+			}
+
+			var buf bytes.Buffer
+
+			tp := NewTokenProvider(store, &config.Config{}, &buf)
+
+			refreshed, err := tp.resolveStoredToken(oidc.ClientContext(t.Context(), idp.Client()))
+			require.NoError(t, err)
+
+			assert.Equal(t, "new-refresh", refreshed.RefreshToken)
+			assert.Equal(t, tt.want, buf.String())
+		})
+	}
 }
 
 func TestValidateIssuerURL(t *testing.T) {
