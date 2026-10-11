@@ -145,6 +145,7 @@ func TestGetToken(t *testing.T) {
 				tok: &token.StoredToken{
 					IDToken:   "cached-id-token",
 					ExpiresAt: time.Now().Add(time.Hour),
+					PortalURL: portalA,
 				},
 			},
 			wantTok: "cached-id-token",
@@ -161,6 +162,7 @@ func TestGetToken(t *testing.T) {
 					AccessToken:  "expired",
 					RefreshToken: "", // no refresh token
 					ExpiresAt:    time.Now().Add(-time.Minute),
+					PortalURL:    portalA,
 				},
 			},
 			wantErr: ErrTokenExpired,
@@ -171,7 +173,7 @@ func TestGetToken(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			tp := NewTokenProvider(tt.store, &config.Config{}, io.Discard)
+			tp := NewTokenProvider(tt.store, &config.Config{PortalURL: portalA}, io.Discard)
 			tok, err := tp.GetToken(context.Background())
 
 			if tt.wantErr != nil {
@@ -185,6 +187,91 @@ func TestGetToken(t *testing.T) {
 			assert.Equal(t, tt.wantTok, tok)
 		})
 	}
+}
+
+const (
+	portalA = "https://portal-a.example.com"
+	portalB = "https://portal-b.example.com"
+)
+
+func TestGetTokenPortalBinding(t *testing.T) {
+	t.Parallel()
+
+	const loginHint = "not authenticated: run 'krci auth login'"
+
+	valid := func(portalURL string) *token.StoredToken {
+		return &token.StoredToken{
+			IDToken:   "cached-id-token",
+			ExpiresAt: time.Now().Add(time.Hour),
+			PortalURL: portalURL,
+		}
+	}
+
+	tests := []struct {
+		name      string
+		stored    *token.StoredToken
+		cfgPortal string
+		wantTok   string
+		wantErr   bool
+	}{
+		{name: "bound to the configured portal", stored: valid(portalA), cfgPortal: portalA, wantTok: "cached-id-token"},
+		{name: "unbound token is rejected", stored: valid(""), cfgPortal: portalB, wantErr: true},
+		{name: "bound to another portal", stored: valid(portalA), cfgPortal: portalB, wantErr: true},
+		{name: "bound, no portal configured", stored: valid(portalA), cfgPortal: "", wantErr: true},
+		{
+			// Non-HTTPS issuer: any refresh attempt fails with ErrRefreshFailed.
+			name: "expired and bound to another portal",
+			stored: &token.StoredToken{
+				RefreshToken: "old-refresh",
+				ExpiresAt:    time.Now().Add(-time.Minute),
+				IssuerURL:    "http://idp.invalid",
+				ClientID:     "krci-cli",
+				PortalURL:    portalA,
+			},
+			cfgPortal: portalB,
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			store := &mockStore{tok: tt.stored}
+			tp := NewTokenProvider(store, &config.Config{PortalURL: tt.cfgPortal}, io.Discard)
+
+			tok, err := tp.GetToken(context.Background())
+
+			if tt.wantErr {
+				require.ErrorIs(t, err, ErrNotAuthenticated)
+				assert.NotErrorIs(t, err, ErrRefreshFailed)
+				assert.EqualError(t, err, loginHint)
+				assert.Same(t, tt.stored, store.tok, "a rejected token must be left in the store")
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantTok, tok)
+		})
+	}
+}
+
+func TestGetTokenEnvVarIgnoresPortalBinding(t *testing.T) {
+	t.Setenv("KRCI_TOKEN", "env-token-value")
+
+	store := &mockStore{
+		tok: &token.StoredToken{
+			IDToken:   "cached-id-token",
+			ExpiresAt: time.Now().Add(time.Hour),
+			PortalURL: portalA,
+		},
+	}
+
+	tp := NewTokenProvider(store, &config.Config{PortalURL: portalB}, io.Discard)
+	tok, err := tp.GetToken(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "env-token-value", tok)
 }
 
 func TestGetTokenLoadError(t *testing.T) {
@@ -352,13 +439,14 @@ func TestRefreshPersistenceWarning(t *testing.T) {
 					ExpiresAt:    time.Now().Add(-time.Minute),
 					IssuerURL:    idp.URL,
 					ClientID:     "krci-cli",
+					PortalURL:    portalA,
 				},
 				saveErr: tt.saveErr,
 			}
 
 			var buf bytes.Buffer
 
-			tp := NewTokenProvider(store, &config.Config{}, &buf)
+			tp := NewTokenProvider(store, &config.Config{PortalURL: portalA}, &buf)
 
 			refreshed, err := tp.resolveStoredToken(oidc.ClientContext(t.Context(), idp.Client()))
 			require.NoError(t, err)
@@ -367,6 +455,32 @@ func TestRefreshPersistenceWarning(t *testing.T) {
 			assert.Equal(t, tt.want, buf.String())
 		})
 	}
+}
+
+func TestRefreshRecordsPortalURL(t *testing.T) {
+	t.Parallel()
+
+	idp := newRefreshIDP(t)
+
+	store := &mockStore{
+		tok: &token.StoredToken{
+			AccessToken:  "expired",
+			RefreshToken: "old-refresh",
+			ExpiresAt:    time.Now().Add(-time.Minute),
+			IssuerURL:    idp.URL,
+			ClientID:     "krci-cli",
+			PortalURL:    portalA,
+		},
+	}
+
+	tp := NewTokenProvider(store, &config.Config{PortalURL: portalA}, io.Discard)
+
+	refreshed, err := tp.resolveStoredToken(oidc.ClientContext(t.Context(), idp.Client()))
+	require.NoError(t, err)
+
+	assert.Equal(t, "new-refresh", refreshed.RefreshToken)
+	assert.Equal(t, portalA, refreshed.PortalURL)
+	assert.Equal(t, portalA, store.tok.PortalURL, "the persisted token must carry the portal")
 }
 
 func TestValidateIssuerURL(t *testing.T) {

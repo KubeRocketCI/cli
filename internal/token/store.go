@@ -24,7 +24,6 @@ type Store interface {
 }
 
 // StoredToken holds the persisted OAuth token data.
-// StoredToken holds the persisted OAuth token data.
 type StoredToken struct {
 	AccessToken  string    `json:"access_token"`
 	RefreshToken string    `json:"refresh_token"`
@@ -32,10 +31,13 @@ type StoredToken struct {
 	ExpiresAt    time.Time `json:"expires_at"`
 	IssuerURL    string    `json:"issuer_url"`
 	ClientID     string    `json:"client_id"`
+	// PortalURL is the portal the token was bound to at login or refresh. Empty
+	// means unbound; the provider rejects unbound tokens.
+	PortalURL string `json:"portal_url,omitempty"`
 }
 
 // NewStoredToken creates a StoredToken from an oauth2.Token and metadata.
-func NewStoredToken(tok *oauth2.Token, issuerURL, clientID string) *StoredToken {
+func NewStoredToken(tok *oauth2.Token, issuerURL, clientID, portalURL string) *StoredToken {
 	rawIDToken, _ := tok.Extra("id_token").(string)
 
 	return &StoredToken{
@@ -45,6 +47,7 @@ func NewStoredToken(tok *oauth2.Token, issuerURL, clientID string) *StoredToken 
 		ExpiresAt:    tok.Expiry,
 		IssuerURL:    issuerURL,
 		ClientID:     clientID,
+		PortalURL:    portalURL,
 	}
 }
 

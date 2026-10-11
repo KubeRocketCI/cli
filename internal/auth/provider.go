@@ -79,6 +79,9 @@ func (p *tokenProvider) GetToken(ctx context.Context) (string, error) {
 }
 
 // resolveStoredToken loads, validates, and optionally refreshes the cached token.
+// A stored token is usable only when bound to the configured portal URL. A
+// token bound to another portal, or to none, is treated as absent: it is
+// neither refreshed nor returned.
 func (p *tokenProvider) resolveStoredToken(ctx context.Context) (*token.StoredToken, error) {
 	stored, err := p.store.Load()
 	if err != nil {
@@ -86,6 +89,10 @@ func (p *tokenProvider) resolveStoredToken(ctx context.Context) (*token.StoredTo
 			return nil, ErrNotAuthenticated
 		}
 		return nil, fmt.Errorf("loading cached token: %w", err)
+	}
+
+	if stored.PortalURL == "" || stored.PortalURL != p.cfg.PortalURL {
+		return nil, ErrNotAuthenticated
 	}
 
 	if stored.Valid() {
@@ -128,8 +135,10 @@ func (p *tokenProvider) Logout() error {
 }
 
 // UserInfo returns user claims by decoding the token GetToken resolves
-// (unverified, display only). For KRCI_TOKEN, FromEnv is true and ExpiresAt
-// comes from its exp claim, zero when the token has none.
+// (unverified, display only). Non-authorising: it does not apply the portal
+// binding check; callers resolve the token with GetToken first. For
+// KRCI_TOKEN, FromEnv is true and ExpiresAt comes from its exp claim, zero
+// when the token has none.
 func (p *tokenProvider) UserInfo() (*UserInfo, error) {
 	if t := os.Getenv(envTokenVar); t != "" {
 		info, err := decodeIDTokenClaims(t)
@@ -163,6 +172,8 @@ func (p *tokenProvider) UserInfo() (*UserInfo, error) {
 
 // refresh uses the OIDC refresh_token grant to obtain new tokens.
 // oauth2.TokenSource handles the grant automatically.
+// The caller has already rejected a token not bound to the configured
+// portal, so the refreshed token is bound to the configured one.
 func (p *tokenProvider) refresh(ctx context.Context, stored *token.StoredToken) (*token.StoredToken, error) {
 	if err := ValidateIssuerURL(stored.IssuerURL); err != nil {
 		return nil, fmt.Errorf("stored issuer URL: %w", err)
@@ -184,7 +195,7 @@ func (p *tokenProvider) refresh(ctx context.Context, stored *token.StoredToken) 
 		return nil, err
 	}
 
-	refreshed := token.NewStoredToken(newTok, stored.IssuerURL, stored.ClientID)
+	refreshed := token.NewStoredToken(newTok, stored.IssuerURL, stored.ClientID, p.cfg.PortalURL)
 	if refreshed.IDToken == "" {
 		refreshed.IDToken = stored.IDToken
 	}

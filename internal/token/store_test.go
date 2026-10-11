@@ -2,6 +2,7 @@ package token
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,7 +15,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
 )
+
+// legacyTokenJSON is a token payload without the portal_url key.
+const legacyTokenJSON = `{"access_token":"access-123","refresh_token":"refresh-456","id_token":"id-789",` +
+	`"expires_at":"2026-01-02T03:04:05Z","issuer_url":"https://idp.example.com/realms/shared","client_id":"krci-cli"}`
 
 func TestStoreSaveLoadRoundTrip(t *testing.T) {
 	t.Parallel()
@@ -30,6 +36,7 @@ func TestStoreSaveLoadRoundTrip(t *testing.T) {
 		ExpiresAt:    time.Now().Add(time.Hour).Truncate(time.Second),
 		IssuerURL:    "https://idp.example.com/realms/shared",
 		ClientID:     "krci-cli",
+		PortalURL:    "https://portal.example.com",
 	}
 
 	require.NoError(t, store.Save(tok))
@@ -48,6 +55,72 @@ func TestStoreSaveLoadRoundTrip(t *testing.T) {
 	assert.True(t, loaded.ExpiresAt.Equal(tok.ExpiresAt), "ExpiresAt = %v, want %v", loaded.ExpiresAt, tok.ExpiresAt)
 	assert.Equal(t, tok.IssuerURL, loaded.IssuerURL)
 	assert.Equal(t, tok.ClientID, loaded.ClientID)
+	assert.Equal(t, tok.PortalURL, loaded.PortalURL)
+}
+
+func TestStoreLoadLegacyFileWithoutPortalURL(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "tokens.enc")
+	enc := newTestEncryptor()
+
+	ciphertext, err := enc.Encrypt([]byte(legacyTokenJSON))
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(path, ciphertext, 0600))
+
+	loaded, err := NewEncryptedStore(path, enc, io.Discard).Load()
+	require.NoError(t, err)
+
+	assert.Equal(t, "access-123", loaded.AccessToken)
+	assert.Equal(t, "refresh-456", loaded.RefreshToken)
+	assert.Equal(t, "id-789", loaded.IDToken)
+	assert.Equal(t, "https://idp.example.com/realms/shared", loaded.IssuerURL)
+	assert.Equal(t, "krci-cli", loaded.ClientID)
+	assert.Empty(t, loaded.PortalURL)
+}
+
+func TestStoredTokenJSONPortalURL(t *testing.T) {
+	t.Parallel()
+
+	var tok StoredToken
+	require.NoError(t, json.Unmarshal([]byte(legacyTokenJSON), &tok))
+	require.Empty(t, tok.PortalURL)
+
+	data, err := json.Marshal(&tok)
+	require.NoError(t, err)
+	assert.JSONEq(t, legacyTokenJSON, string(data), "an empty PortalURL must not change the payload")
+
+	tok.PortalURL = "https://portal.example.com"
+
+	data, err = json.Marshal(&tok)
+	require.NoError(t, err)
+
+	withPortal := strings.Replace(legacyTokenJSON, `"client_id":"krci-cli"`,
+		`"client_id":"krci-cli","portal_url":"https://portal.example.com"`, 1)
+	assert.JSONEq(t, withPortal, string(data))
+}
+
+func TestNewStoredToken(t *testing.T) {
+	t.Parallel()
+
+	expiry := time.Now().Add(time.Hour)
+	oauthTok := (&oauth2.Token{
+		AccessToken:  "access-123",
+		RefreshToken: "refresh-456",
+		Expiry:       expiry,
+	}).WithExtra(map[string]any{"id_token": "id-789"})
+
+	stored := NewStoredToken(oauthTok, "https://idp.example.com/realms/shared", "krci-cli", "https://portal.example.com")
+
+	assert.Equal(t, &StoredToken{
+		AccessToken:  "access-123",
+		RefreshToken: "refresh-456",
+		IDToken:      "id-789",
+		ExpiresAt:    expiry,
+		IssuerURL:    "https://idp.example.com/realms/shared",
+		ClientID:     "krci-cli",
+		PortalURL:    "https://portal.example.com",
+	}, stored)
 }
 
 func TestStoreLoadNonExistent(t *testing.T) {

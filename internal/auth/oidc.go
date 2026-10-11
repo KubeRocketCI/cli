@@ -112,7 +112,7 @@ func (p *tokenProvider) login(ctx context.Context) (*UserInfo, error) {
 		return nil, fmt.Errorf("extracting claims: %w", err)
 	}
 
-	stored := token.NewStoredToken(tok, p.cfg.IssuerURL, p.cfg.ClientID)
+	stored := token.NewStoredToken(tok, p.cfg.IssuerURL, p.cfg.ClientID, p.cfg.PortalURL)
 	if err := p.store.Save(stored); err != nil {
 		return nil, fmt.Errorf("saving credentials: %w", err)
 	}
