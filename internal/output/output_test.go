@@ -2,9 +2,6 @@ package output
 
 import (
 	"bytes"
-	"encoding/json"
-	"errors"
-	"fmt"
 	"regexp"
 	"strings"
 	"testing"
@@ -16,63 +13,6 @@ import (
 // sgr matches the colour codes lipgloss emits into a buffer when CLICOLOR_FORCE
 // is set; tests strip them before comparing bytes.
 var sgr = regexp.MustCompile("\x1b\\[[0-9;]*m")
-
-func TestPrintJSONEnvelope(t *testing.T) {
-	t.Parallel()
-
-	var buf bytes.Buffer
-	payload := map[string]int{"bugs": 3}
-
-	if err := PrintJSONEnvelope(&buf, "1", payload); err != nil {
-		t.Fatalf("PrintJSONEnvelope returned error: %v", err)
-	}
-
-	var got struct {
-		SchemaVersion string         `json:"schemaVersion"`
-		Data          map[string]int `json:"data"`
-	}
-
-	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
-		t.Fatalf("invalid JSON: %v", err)
-	}
-
-	if got.SchemaVersion != "1" {
-		t.Errorf("schemaVersion = %q, want 1", got.SchemaVersion)
-	}
-
-	if got.Data["bugs"] != 3 {
-		t.Errorf("data.bugs = %d, want 3", got.Data["bugs"])
-	}
-}
-
-func TestPrintJSONErrorEnvelope(t *testing.T) {
-	t.Parallel()
-
-	var buf bytes.Buffer
-
-	if err := PrintJSONErrorEnvelope(&buf, "1", errors.New("boom")); err != nil {
-		t.Fatalf("PrintJSONErrorEnvelope returned error: %v", err)
-	}
-
-	var got struct {
-		SchemaVersion string `json:"schemaVersion"`
-		Error         struct {
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-
-	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
-		t.Fatalf("invalid JSON: %v", err)
-	}
-
-	if got.SchemaVersion != "1" {
-		t.Errorf("schemaVersion = %q, want 1", got.SchemaVersion)
-	}
-
-	if got.Error.Message != "boom" {
-		t.Errorf("error.message = %q, want boom", got.Error.Message)
-	}
-}
 
 func TestSonarGateStatusColor_PassthroughWhenUnknown(t *testing.T) {
 	t.Parallel()
@@ -189,56 +129,6 @@ func TestFormatRelativeTime_ValidRFC3339(t *testing.T) {
 	got := FormatRelativeTime(ts)
 	if !strings.HasSuffix(got, "h ago") {
 		t.Errorf("FormatRelativeTime(2h ago RFC3339) = %q, want something like '2h ago'", got)
-	}
-}
-
-func TestPrintJSONEnvelope_StructuredOutput(t *testing.T) {
-	t.Parallel()
-
-	var buf bytes.Buffer
-	payload := map[string]string{"project": "my-app", "status": "OK"}
-
-	if err := PrintJSONEnvelope(&buf, "1", payload); err != nil {
-		t.Fatalf("PrintJSONEnvelope returned error: %v", err)
-	}
-
-	var got struct {
-		SchemaVersion string            `json:"schemaVersion"`
-		Data          map[string]string `json:"data"`
-	}
-	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
-		t.Fatalf("invalid JSON: %v (raw: %q)", err, buf.String())
-	}
-	if got.SchemaVersion != "1" {
-		t.Errorf("schemaVersion = %q, want %q", got.SchemaVersion, "1")
-	}
-	if got.Data["project"] != "my-app" {
-		t.Errorf("data.project = %q, want %q", got.Data["project"], "my-app")
-	}
-}
-
-func TestPrintJSONErrorEnvelope_WrappedError(t *testing.T) {
-	t.Parallel()
-
-	var buf bytes.Buffer
-	inner := errors.New("y")
-	wrapped := fmt.Errorf("x: %w", inner)
-
-	if err := PrintJSONErrorEnvelope(&buf, "1", wrapped); err != nil {
-		t.Fatalf("PrintJSONErrorEnvelope returned error: %v", err)
-	}
-
-	var got struct {
-		SchemaVersion string `json:"schemaVersion"`
-		Error         struct {
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
-		t.Fatalf("invalid JSON: %v (raw: %q)", err, buf.String())
-	}
-	if got.Error.Message != "x: y" {
-		t.Errorf("error.message = %q, want %q", got.Error.Message, "x: y")
 	}
 }
 

@@ -3,14 +3,10 @@ package render_test
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"io"
 	"testing"
 
 	"github.com/KubeRocketCI/cli/internal/iostreams"
-	"github.com/KubeRocketCI/cli/internal/output"
-	"github.com/KubeRocketCI/cli/internal/portal"
-	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
@@ -177,70 +173,6 @@ func TestRenderBare_UnknownFormat(t *testing.T) {
 
 	if want := "unknown output format: xml (use 'json' or 'table')"; err == nil || err.Error() != want {
 		t.Errorf("error = %v, want %q", err, want)
-	}
-
-	if stdout.Len() != 0 {
-		t.Errorf("stdout = %q, want empty", stdout.String())
-	}
-}
-
-// TestPrintError_NoAuthPrefix pins the difference from HandleError: an
-// unauthorized error keeps its own text, as auth status prints it.
-func TestPrintError_NoAuthPrefix(t *testing.T) {
-	t.Parallel()
-
-	ios, stdout := newBufferedIO()
-
-	if got := render.PrintError(ios, "json", portal.ErrUnauthorized); got != portal.ErrUnauthorized {
-		t.Errorf("PrintError must return the original error; got %v", got)
-	}
-
-	want := output.JSONErrorEnvelope{
-		SchemaVersion: render.SchemaVersion,
-		Error:         output.JSONErrorBody{Message: portal.ErrUnauthorized.Error()},
-	}
-	if got := cmdtest.DecodeErrorEnvelope(t, stdout); got != want {
-		t.Errorf("envelope = %+v, want %+v", got, want)
-	}
-}
-
-func TestPrintEnvelope(t *testing.T) {
-	t.Parallel()
-
-	var buf bytes.Buffer
-	if err := render.PrintEnvelope(&buf, map[string]int{"bugs": 3}); err != nil {
-		t.Fatalf("PrintEnvelope: %v", err)
-	}
-
-	if want := "{\n  \"schemaVersion\": \"1\",\n  \"data\": {\n    \"bugs\": 3\n  }\n}\n"; buf.String() != want {
-		t.Errorf("PrintEnvelope = %q, want %q", buf.String(), want)
-	}
-}
-
-func TestHandleError_JSONEnvelopePrinted(t *testing.T) {
-	t.Parallel()
-
-	ios, stdout := newBufferedIO()
-	boom := errors.New("boom")
-
-	if got := render.HandleError(ios, "json", boom); got != boom {
-		t.Errorf("HandleError must return the original error; got %v", got)
-	}
-
-	want := output.JSONErrorEnvelope{SchemaVersion: render.SchemaVersion, Error: output.JSONErrorBody{Message: "boom"}}
-	if got := cmdtest.DecodeErrorEnvelope(t, stdout); got != want {
-		t.Errorf("envelope = %+v, want %+v", got, want)
-	}
-}
-
-func TestHandleError_TableWritesNothing(t *testing.T) {
-	t.Parallel()
-
-	ios, stdout := newBufferedIO()
-	boom := errors.New("boom")
-
-	if got := render.HandleError(ios, "table", boom); got != boom {
-		t.Errorf("HandleError must return the original error; got %v", got)
 	}
 
 	if stdout.Len() != 0 {

@@ -18,6 +18,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/pipelinerun"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 const (
@@ -171,7 +172,7 @@ func fetchRun(
 	case errors.Is(err, portal.ErrNotFound):
 		return nil, cmdutil.Rewritef(err, "pipeline run %q not found", opts.Name)
 	default:
-		return nil, cmdutil.HandleAuthError(err)
+		return nil, render.HandleAuthError(err)
 	}
 }
 

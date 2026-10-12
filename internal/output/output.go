@@ -285,37 +285,6 @@ func PrintYAML(w io.Writer, v any) error {
 	return enc.Close()
 }
 
-// JSONEnvelope wraps a success payload with the shared schemaVersion/data contract.
-// Used by commands that need a stable JSON output shape (e.g. `krci sonar *`).
-type JSONEnvelope struct {
-	SchemaVersion string `json:"schemaVersion"`
-	Data          any    `json:"data"`
-}
-
-// JSONErrorEnvelope wraps an error message with the shared schemaVersion/error contract.
-type JSONErrorEnvelope struct {
-	SchemaVersion string        `json:"schemaVersion"`
-	Error         JSONErrorBody `json:"error"`
-}
-
-// JSONErrorBody carries the human-readable error message.
-type JSONErrorBody struct {
-	Message string `json:"message"`
-}
-
-// PrintJSONEnvelope writes `{"schemaVersion":"<v>","data":<payload>}` to w.
-func PrintJSONEnvelope(w io.Writer, schemaVersion string, payload any) error {
-	return PrintJSON(w, JSONEnvelope{SchemaVersion: schemaVersion, Data: payload})
-}
-
-// PrintJSONErrorEnvelope writes `{"schemaVersion":"<v>","error":{"message":"<err>"}}` to w.
-func PrintJSONErrorEnvelope(w io.Writer, schemaVersion string, err error) error {
-	return PrintJSON(w, JSONErrorEnvelope{
-		SchemaVersion: schemaVersion,
-		Error:         JSONErrorBody{Message: err.Error()},
-	})
-}
-
 // SCASeverityColor colorizes a Dep-Track vulnerability severity for TTY
 // rendering. Unknown severities pass through unstyled so future values never
 // break existing renderers.

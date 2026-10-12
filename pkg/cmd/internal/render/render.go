@@ -1,20 +1,15 @@
-// Package render holds the output dispatch shared by the verb groups: the
-// `{schemaVersion, data}` JSON envelope, the table callback, error-envelope
-// plumbing, and output-format validation.
+// Package render owns the output contract shared by the verb groups: `-o`
+// dispatch and validation, the table callback, the `{schemaVersion, data}`
+// and `{schemaVersion, error}` envelopes, and the auth-error prefix.
 // Importable only from packages below pkg/cmd/.
 package render
 
 import (
 	"io"
 
-	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 )
-
-// SchemaVersion is the version in every success and error envelope. Bump only
-// when the envelope shape changes in a way scripting consumers must detect.
-const SchemaVersion = "1"
 
 // TableRenderer emits the table view. It receives the output writer and the
 // TTY state of stdout.
@@ -53,21 +48,4 @@ func dispatch(
 	default:
 		return unknownFormatError(format, output.FormatJSON, output.FormatTable)
 	}
-}
-
-// PrintEnvelope writes data in the `{schemaVersion, data}` envelope to w.
-func PrintEnvelope(w io.Writer, data any) error {
-	return output.PrintJSONEnvelope(w, SchemaVersion, data)
-}
-
-// PrintError writes the error envelope to stdout under -o json, unless err
-// reports context cancellation. It adds no auth-error prefix. It returns err.
-func PrintError(ios *iostreams.IOStreams, outputFormat string, err error) error {
-	return cmdutil.PrintError(ios, outputFormat, SchemaVersion, err)
-}
-
-// HandleError is cmdutil.HandleError with SchemaVersion: the auth-error prefix,
-// then PrintError.
-func HandleError(ios *iostreams.IOStreams, outputFormat string, err error) error {
-	return cmdutil.HandleError(ios, outputFormat, SchemaVersion, err)
 }
