@@ -97,22 +97,22 @@ Limits:
 func podsRun(ctx context.Context, opts *PodsOptions) error {
 	cfg, err := opts.Config()
 	if err != nil {
-		return discovery.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
 	client, err := opts.RestClient()
 	if err != nil {
-		return discovery.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
 	svc := portal.NewEnvService(client, cfg.ClusterName, cfg.Namespace)
 
 	payload, err := svc.Pods(ctx, opts.Deployment, opts.Env)
 	if err != nil {
-		return discovery.HandleError(opts.IO, opts.OutputFormat, envinternal.MapNotFound(err, opts.Deployment, opts.Env))
+		return render.HandleError(opts.IO, opts.OutputFormat, envinternal.MapNotFound(err, opts.Deployment, opts.Env))
 	}
 
-	if err := discovery.Render(opts.IO, opts.OutputFormat, payload, func(w io.Writer, isTTY bool) error {
+	if err := render.Render(opts.IO, opts.OutputFormat, payload, func(w io.Writer, isTTY bool) error {
 		return renderTable(w, isTTY, payload.Pods)
 	}); err != nil {
 		return err

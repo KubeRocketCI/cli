@@ -56,7 +56,7 @@ ascending, then by Stage.spec.order ascending.`,
   # JSON envelope for scripting
   krci env list -o json | jq -r '.data.stages[] | "\(.deployment)/\(.env): \(.status)"'`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := discovery.ValidateOutputFormat(opts.OutputFormat); err != nil {
+			if err := render.ValidateJSONOrTable(opts.OutputFormat); err != nil {
 				return err
 			}
 
@@ -93,12 +93,12 @@ ascending, then by Stage.spec.order ascending.`,
 func listRun(ctx context.Context, opts *ListOptions) error {
 	cfg, err := opts.Config()
 	if err != nil {
-		return discovery.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
 	client, err := opts.RestClient()
 	if err != nil {
-		return discovery.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
 	svc := portal.NewEnvService(client, cfg.ClusterName, cfg.Namespace)
@@ -108,12 +108,12 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		Cluster:    opts.Cluster,
 	})
 	if err != nil {
-		return discovery.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
 	payload := portal.EnvListPayload{Stages: rows}
 
-	if err := discovery.Render(opts.IO, opts.OutputFormat, payload, func(w io.Writer, isTTY bool) error {
+	if err := render.Render(opts.IO, opts.OutputFormat, payload, func(w io.Writer, isTTY bool) error {
 		return renderTable(w, isTTY, rows)
 	}); err != nil {
 		return err
