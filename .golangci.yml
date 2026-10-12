@@ -42,6 +42,24 @@ linters:
           deny:
             - pkg: github.com/KubeRocketCI/cli/internal/portal
               desc: internal/output renders generic values; portal-specific renderers live under pkg/cmd
+            - pkg: github.com/KubeRocketCI/cli/internal/iostreams
+              desc: internal/output primitives take an io.Writer; the -o contract lives in pkg/cmd/internal/render
+            - pkg: github.com/KubeRocketCI/cli/internal/cmdutil
+              desc: internal/output primitives take an io.Writer; the -o contract lives in pkg/cmd/internal/render
+        cmdutil:
+          list-mode: lax
+          files:
+            - ${base-path}/internal/cmdutil/**
+          deny:
+            - pkg: github.com/KubeRocketCI/cli/internal/output
+              desc: the Factory does not render; output goes through pkg/cmd/internal/render
+        render:
+          list-mode: lax
+          files:
+            - ${base-path}/pkg/cmd/internal/render/**
+          deny:
+            - pkg: github.com/KubeRocketCI/cli/internal/cmdutil
+              desc: the output contract does not depend on the Factory module
         viper:
           list-mode: lax
           files:
