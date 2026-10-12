@@ -242,5 +242,5 @@ func renderTable(w io.Writer, isTTY bool, project, pullRequest, branch string, r
 		})
 	}
 
-	return render.PrintTable(w, isTTY, headers, rows)
+	return output.PrintTable(w, isTTY, headers, rows)
 }

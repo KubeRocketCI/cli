@@ -42,11 +42,6 @@ func HandleError(ios *iostreams.IOStreams, outputFormat string, err error) error
 	return cmdutil.HandleError(ios, outputFormat, SchemaVersion, err)
 }
 
-// PrintTable is output.PrintTable.
-func PrintTable(w io.Writer, isTTY bool, headers []string, rows [][]string) error {
-	return output.PrintTable(w, isTTY, headers, rows)
-}
-
 // PageCount returns the number of pages of pageSize needed to hold total
 // items. The result is at least 1, also for a non-positive pageSize.
 func PageCount(total, pageSize int) int {

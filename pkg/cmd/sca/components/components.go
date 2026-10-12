@@ -10,6 +10,7 @@ import (
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
+	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
@@ -142,7 +143,7 @@ func renderTable(
 		})
 	}
 
-	if err := render.PrintTable(w, isTTY, headers, rows); err != nil {
+	if err := output.PrintTable(w, isTTY, headers, rows); err != nil {
 		return err
 	}
 

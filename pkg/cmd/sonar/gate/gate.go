@@ -138,5 +138,5 @@ func renderTable(w io.Writer, isTTY bool, project string, g *portal.SonarGate) e
 		rows = append(rows, []string{c.MetricKey, c.Comparator, c.ErrorThreshold, c.ActualValue, s})
 	}
 
-	return render.PrintTable(w, isTTY, headers, rows)
+	return output.PrintTable(w, isTTY, headers, rows)
 }

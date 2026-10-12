@@ -1,6 +1,6 @@
 // Package discovery holds the table cells and section output shared by the
 // deployment-discovery verbs. SchemaVersion, TableRenderer, Render,
-// HandleError, PrintTable and ValidateOutputFormat delegate to
+// HandleError and ValidateOutputFormat delegate to
 // pkg/cmd/internal/render; new callers import render directly.
 // Importable only from packages below pkg/cmd/.
 package discovery
@@ -46,11 +46,6 @@ func Render[T any](ios *iostreams.IOStreams, outputFormat string, data T, render
 // HandleError is render.HandleError.
 func HandleError(ios *iostreams.IOStreams, outputFormat string, err error) error {
 	return render.HandleError(ios, outputFormat, err)
-}
-
-// PrintTable is render.PrintTable.
-func PrintTable(w io.Writer, isTTY bool, headers []string, rows [][]string) error {
-	return render.PrintTable(w, isTTY, headers, rows)
 }
 
 // PrintEmptyNote writes the note of an empty result to stderr. Under -o json

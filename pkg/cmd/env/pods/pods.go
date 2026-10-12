@@ -140,7 +140,7 @@ func renderTable(w io.Writer, isTTY bool, pods []portal.EnvPod) error {
 		})
 	}
 
-	if err := discovery.PrintTable(w, isTTY, headers, rows); err != nil {
+	if err := output.PrintTable(w, isTTY, headers, rows); err != nil {
 		return err
 	}
 

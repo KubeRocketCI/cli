@@ -123,7 +123,7 @@ func renderTable(w io.Writer, isTTY bool, page, pageSize int, result *portal.SCA
 		})
 	}
 
-	if err := render.PrintTable(w, isTTY, headers, rows); err != nil {
+	if err := output.PrintTable(w, isTTY, headers, rows); err != nil {
 		return err
 	}
 
