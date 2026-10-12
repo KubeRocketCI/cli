@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/pipelinerun"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 type ListOptions struct {
@@ -224,7 +226,7 @@ const (
 )
 
 func renderSummaryTable(opts *ListOptions, result *portal.PipelineRunListResult) error {
-	return output.RenderList(opts.IO, opts.OutputFormat, result, func(isTTY bool) ([]string, [][]string) {
+	return render.RenderBare(opts.IO, opts.OutputFormat, result, func(w io.Writer, isTTY bool) error {
 		rows := make([][]string, 0, len(result.PipelineRuns))
 
 		for _, pr := range result.PipelineRuns {
@@ -257,6 +259,6 @@ func renderSummaryTable(opts *ListOptions, result *portal.PipelineRunListResult)
 			})
 		}
 
-		return pipelinerun.Headers, rows
+		return output.PrintTable(w, isTTY, pipelinerun.Headers, rows)
 	})
 }

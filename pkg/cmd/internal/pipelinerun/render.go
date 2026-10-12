@@ -9,6 +9,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 // renderRow renders the shared pipeline-run row (NAME/STATUS/PROJECT/PR/
@@ -16,7 +17,7 @@ import (
 // -o json emits the schemaVersion envelope, -o table (default) colours
 // STATUS on a TTY via output.PipelineStatusColor.
 func renderRow(ios *iostreams.IOStreams, format string, result *portal.StartResult) error {
-	return output.RenderList(ios, format, result, func(isTTY bool) ([]string, [][]string) {
+	return render.Render(ios, format, result, func(w io.Writer, isTTY bool) error {
 		status := output.OrDash(result.Status)
 		if isTTY && result.Status != "" {
 			status = output.PipelineStatusColor(result.Status)
@@ -33,7 +34,7 @@ func renderRow(ios *iostreams.IOStreams, format string, result *portal.StartResu
 			output.OrDash(result.Duration),
 		}
 
-		return Headers, [][]string{row}
+		return output.PrintTable(w, isTTY, Headers, [][]string{row})
 	})
 }
 

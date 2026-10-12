@@ -379,29 +379,6 @@ type DetailRenderer[T any] struct {
 	Plain  func(io.Writer, T) error
 }
 
-// RenderList handles the common format-resolution and output logic for list commands.
-// toRows receives the isTTY flag so callers can apply color only when rendering to a terminal.
-func RenderList[T any](
-	ios *iostreams.IOStreams,
-	outputFormat string,
-	data T,
-	toRows func(isTTY bool) (headers []string, rows [][]string),
-) error {
-	isTTY := ios.IsStdoutTTY()
-	format := ResolveFormat(outputFormat)
-
-	switch format {
-	case FormatJSON:
-		return PrintJSON(ios.Out, data)
-	case FormatTable:
-		headers, rows := toRows(isTTY)
-
-		return PrintTable(ios.Out, isTTY, headers, rows)
-	default:
-		return fmt.Errorf("unknown output format: %s (use 'json' or 'table')", format)
-	}
-}
-
 // RenderDetail handles the common format-resolution and output logic for detail commands.
 func RenderDetail[T any](ios *iostreams.IOStreams, outputFormat string, data T, r DetailRenderer[T]) error {
 	format := ResolveFormat(outputFormat)

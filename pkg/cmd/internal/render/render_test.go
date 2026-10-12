@@ -120,6 +120,68 @@ func TestRender_TableCallbackReceivesNonTTY(t *testing.T) {
 	}
 }
 
+func TestRenderBare_JSONHasNoEnvelope(t *testing.T) {
+	t.Parallel()
+
+	ios, stdout := newBufferedIO()
+
+	err := RenderBare(ios, "json", map[string]int{"bugs": 3}, func(_ io.Writer, _ bool) error {
+		t.Fatal("table renderer must not run for -o json")
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("RenderBare returned error: %v", err)
+	}
+
+	if want := "{\n  \"bugs\": 3\n}\n"; stdout.String() != want {
+		t.Errorf("stdout = %q, want %q", stdout.String(), want)
+	}
+}
+
+func TestRenderBare_TableWritesToStdout(t *testing.T) {
+	t.Parallel()
+
+	for _, format := range []string{"", "table"} {
+		ios, stdout := newBufferedIO()
+
+		err := RenderBare(ios, format, "unused", func(w io.Writer, isTTY bool) error {
+			if isTTY {
+				t.Error("isTTY should be false for a bytes.Buffer writer")
+			}
+
+			_, err := io.WriteString(w, "row\n")
+
+			return err
+		})
+		if err != nil {
+			t.Fatalf("RenderBare(-o %q) returned error: %v", format, err)
+		}
+
+		if stdout.String() != "row\n" {
+			t.Errorf("RenderBare(-o %q) stdout = %q, want %q", format, stdout.String(), "row\n")
+		}
+	}
+}
+
+func TestRenderBare_UnknownFormat(t *testing.T) {
+	t.Parallel()
+
+	ios, stdout := newBufferedIO()
+
+	err := RenderBare(ios, "xml", "unused", func(_ io.Writer, _ bool) error {
+		t.Fatal("table renderer must not run for an unknown format")
+		return nil
+	})
+
+	if want := "unknown output format: xml (use 'json' or 'table')"; err == nil || err.Error() != want {
+		t.Errorf("error = %v, want %q", err, want)
+	}
+
+	if stdout.Len() != 0 {
+		t.Errorf("stdout = %q, want empty", stdout.String())
+	}
+}
+
 func TestHandleError_JSONEnvelopePrinted(t *testing.T) {
 	t.Parallel()
 
