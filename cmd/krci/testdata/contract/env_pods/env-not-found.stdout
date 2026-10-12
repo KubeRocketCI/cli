@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "1",
+  "error": {
+    "message": "environment \"prod\" not found in deployment \"my-pipeline\""
+  }
+}
