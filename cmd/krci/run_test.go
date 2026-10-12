@@ -22,9 +22,11 @@ import (
 
 // Not parallel: the tests set HOME and KRCI_* through t.Setenv.
 
-// isolatedConfigDir points HOME and USERPROFILE at an empty directory and
-// blanks every KRCI_* variable (viper ignores empty env values), so the run
-// sees no configuration. It returns the config directory, which is not created.
+// isolatedConfigDir points HOME and USERPROFILE at an empty directory, blanks
+// every KRCI_* variable (viper ignores empty env values) and the variables that
+// force a colour profile onto a buffer (CLICOLOR_FORCE, TTY_FORCE), so the run
+// sees no configuration and plain output. It returns the config directory,
+// which is not created.
 func isolatedConfigDir(t *testing.T) string {
 	t.Helper()
 
@@ -37,6 +39,9 @@ func isolatedConfigDir(t *testing.T) string {
 			t.Setenv(name, "")
 		}
 	}
+
+	t.Setenv("CLICOLOR_FORCE", "")
+	t.Setenv("TTY_FORCE", "")
 
 	return config.DefaultConfigDir()
 }
@@ -97,7 +102,7 @@ func describe(ms []matcher) string {
 }
 
 func newFactory(out, errOut *bytes.Buffer) *cmdutil.Factory {
-	return cmdutil.New(iostreams.New(nil, out, errOut, false))
+	return cmdutil.New(iostreams.FromWriters(nil, out, errOut))
 }
 
 // portalURLAfter runs args through runWith, requires exit code 0, and returns

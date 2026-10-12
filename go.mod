@@ -4,6 +4,7 @@ go 1.26.1
 
 require (
 	charm.land/lipgloss/v2 v2.0.2
+	github.com/charmbracelet/colorprofile v0.4.2
 	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/google/uuid v1.5.0
 	github.com/oapi-codegen/nullable v1.1.0
@@ -22,7 +23,6 @@ require (
 require (
 	al.essio.dev/pkg/shellescape v1.5.1 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
-	github.com/charmbracelet/colorprofile v0.4.2 // indirect
 	github.com/charmbracelet/ultraviolet v0.0.0-20251205161215-1948445e3318 // indirect
 	github.com/charmbracelet/x/ansi v0.11.6 // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect

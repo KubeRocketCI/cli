@@ -2,6 +2,7 @@
 package output
 
 import (
+	"bytes"
 	"cmp"
 	"encoding/json"
 	"fmt"
@@ -227,7 +228,7 @@ func printStyledTable(w io.Writer, headers []string, rows [][]string) error {
 		Headers(headers...).
 		Rows(rows...)
 
-	_, err := lipgloss.Fprintln(w, t)
+	_, err := fmt.Fprintln(w, t)
 
 	return err
 }
@@ -262,13 +263,51 @@ func PrintHeading(w io.Writer, isTTY bool, text string) error {
 	return err
 }
 
-// PrintJSON encodes v as indented JSON to w.
+// PrintJSON encodes v as indented JSON to w. DEL and the C1 runes
+// U+0080-U+009F are written as \u escapes: the process streams drop them raw.
 func PrintJSON(w io.Writer, v any) error {
-	enc := json.NewEncoder(w)
+	var buf bytes.Buffer
+
+	enc := json.NewEncoder(&buf)
 	enc.SetIndent("", "  ")
 
-	return enc.Encode(v)
+	if err := enc.Encode(v); err != nil {
+		return err
+	}
+
+	_, err := w.Write(escapeC1(buf.Bytes()))
+
+	return err
 }
+
+// escapeC1 replaces DEL and C1 runes with \u escapes. encoding/json emits them
+// raw and only inside strings, so the decoded value is unchanged.
+func escapeC1(b []byte) []byte {
+	isC1 := func(r rune) bool { return r >= del && r <= 0x9f }
+	if !bytes.ContainsFunc(b, isC1) {
+		return b
+	}
+
+	out := make([]byte, 0, len(b)+16)
+
+	for i := 0; i < len(b); {
+		r, size := utf8.DecodeRune(b[i:])
+		if isC1(r) {
+			out = append(out, `\u00`...)
+			out = append(out, hexDigit(byte(r)>>4), hexDigit(byte(r)&0xf))
+		} else {
+			out = append(out, b[i:i+size]...)
+		}
+
+		i += size
+	}
+
+	return out
+}
+
+const del = 0x7f
+
+func hexDigit(n byte) byte { return "0123456789abcdef"[n] }
 
 func PrintYAML(w io.Writer, v any) error {
 	enc := yaml.NewEncoder(w)
@@ -335,7 +374,7 @@ func PrintDetailLines(w io.Writer, isTTY bool, lines []DetailLine) error {
 	for _, l := range lines {
 		var err error
 		if isTTY {
-			_, err = lipgloss.Fprintf(w, "%s %s\n", LabelStyle.Render(l.Label+":"), cmp.Or(l.Styled, ValueStyle.Render(l.Value)))
+			_, err = fmt.Fprintf(w, "%s %s\n", LabelStyle.Render(l.Label+":"), cmp.Or(l.Styled, ValueStyle.Render(l.Value)))
 		} else {
 			_, err = fmt.Fprintf(w, "%-*s%s\n", detailLabelWidth, l.Label+":", l.Value)
 		}

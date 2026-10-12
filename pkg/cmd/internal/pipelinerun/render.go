@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"io"
 
-	"charm.land/lipgloss/v2"
-
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
@@ -73,7 +71,7 @@ func PresentResult(ios *iostreams.IOStreams, format string, dryRun bool, result 
 		msg := fmt.Sprintf(
 			"note: the controller may briefly 404 on 'krci pipelinerun get %s' until labels reconcile",
 			result.Name)
-		_, _ = lipgloss.Fprintln(ios.ErrOut, output.DimStyle.Render(msg))
+		_, _ = fmt.Fprintln(ios.ErrOut, output.DimStyle.Render(msg))
 	}
 
 	return nil
