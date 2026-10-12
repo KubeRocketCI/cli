@@ -13,7 +13,6 @@ import (
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
-	"github.com/KubeRocketCI/cli/pkg/cmd/internal/discovery"
 )
 
 // The environment Portal serves.
@@ -126,7 +125,7 @@ func CheckNotFound[T any](t *testing.T, cmd newCmd[T], kind, items string) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			cmdtest.CheckErrorOutput(t, cmd, Portal(LocalCluster, kind, items), tc.args, discovery.SchemaVersion, tc.want)
+			cmdtest.CheckErrorOutput(t, cmd, Portal(LocalCluster, kind, items), tc.args, tc.want)
 		})
 	}
 }
@@ -140,5 +139,5 @@ func CheckRemoteCluster[T any](t *testing.T, cmd newCmd[T], kind, items string) 
 		`the Portal reads pods and events only on its own cluster`
 
 	cmdtest.CheckErrorOutput(t, cmd, Portal("prod-cluster", kind, items),
-		[]string{Deployment, Env}, discovery.SchemaVersion, want)
+		[]string{Deployment, Env}, want)
 }

@@ -16,10 +16,8 @@ import (
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
-
-// SchemaVersion is the JSON envelope version emitted by `krci auth status -o json`.
-const SchemaVersion = "1"
 
 // StatusOptions holds all inputs for the status command.
 type StatusOptions struct {
@@ -113,7 +111,7 @@ func statusRun(ctx context.Context, opts *StatusOptions) error {
 	// locally. KRCI_TOKEN, or claims that cannot be read, prove nothing
 	// locally: the portal decides.
 	if infoErr == nil && !info.FromEnv {
-		return opts.render(info, true)
+		return opts.printStatus(info, true)
 	}
 
 	if err := opts.verifySession(ctx); err != nil {
@@ -121,10 +119,10 @@ func statusRun(ctx context.Context, opts *StatusOptions) error {
 	}
 
 	if infoErr != nil {
-		return opts.render(&auth.UserInfo{}, false)
+		return opts.printStatus(&auth.UserInfo{}, false)
 	}
 
-	return opts.render(info, true)
+	return opts.printStatus(info, true)
 }
 
 // verifySession asks the portal to validate the token through the same
@@ -162,14 +160,14 @@ func classifyTokenError(err error) error {
 // consumers get a structured error next to the exit-1 signal, then returns
 // err for the root command to print and exit on.
 func (opts *StatusOptions) fail(err error) error {
-	return cmdutil.PrintError(opts.IO, opts.OutputFormat, SchemaVersion, err)
+	return render.PrintError(opts.IO, opts.OutputFormat, err)
 }
 
-// render prints the authenticated state. haveInfo is false when the token's
+// printStatus prints the authenticated state. haveInfo is false when the token's
 // claims could not be read and the portal accepted the token.
-func (opts *StatusOptions) render(info *auth.UserInfo, haveInfo bool) error {
+func (opts *StatusOptions) printStatus(info *auth.UserInfo, haveInfo bool) error {
 	if output.ResolveFormat(opts.OutputFormat) == output.FormatJSON {
-		return output.PrintJSONEnvelope(opts.IO.Out, SchemaVersion, buildPayload(info))
+		return render.PrintEnvelope(opts.IO.Out, buildPayload(info))
 	}
 
 	if !haveInfo {

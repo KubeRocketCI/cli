@@ -11,7 +11,6 @@ import (
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
-	"github.com/KubeRocketCI/cli/pkg/cmd/internal/pipelinerun"
 )
 
 var newFactory = cmdtest.NewFactory
@@ -293,9 +292,9 @@ func TestBuild_ErrorOutput(t *testing.T) {
 	notFound := cmdtest.PortalReply(http.StatusNotFound,
 		`{"error":{"code":"NOT_FOUND","reason":"codebase_not_found","message":"Not Found"}}`)
 	cmdtest.CheckErrorOutput(t, NewCmdBuild, notFound, []string{"my-app"},
-		pipelinerun.SchemaVersion, "project 'my-app' not found")
+		"project 'my-app' not found")
 
 	emptyManifest := cmdtest.PortalReply(http.StatusOK, `{"kind":"dryRun","manifest":null}`)
 	cmdtest.CheckErrorOutput(t, NewCmdBuild, emptyManifest, []string{"my-app", "--dry-run"},
-		pipelinerun.SchemaVersion, "portal returned empty dry-run manifest")
+		"portal returned empty dry-run manifest")
 }

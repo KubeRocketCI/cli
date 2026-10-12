@@ -14,6 +14,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/pipelinerun"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 // BuildOptions holds all inputs for `krci project build <name>`.
@@ -142,7 +143,7 @@ func (opts *BuildOptions) validateBranch() error {
 // the JSON error envelope.
 func buildRun(ctx context.Context, opts *BuildOptions) error {
 	if err := build(ctx, opts); err != nil {
-		return pipelinerun.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
 	return nil

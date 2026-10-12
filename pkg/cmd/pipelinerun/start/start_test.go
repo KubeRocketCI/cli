@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
-	"github.com/KubeRocketCI/cli/pkg/cmd/internal/pipelinerun"
 )
 
 var newFactory = cmdtest.NewFactory
@@ -203,9 +202,9 @@ func TestStart_ErrorOutput(t *testing.T) {
 	notFound := cmdtest.PortalReply(http.StatusNotFound,
 		`{"error":{"code":"NOT_FOUND","reason":"pipeline_not_found","message":"Not Found"}}`)
 	cmdtest.CheckErrorOutput(t, NewCmdStart, notFound, []string{"ghost"},
-		pipelinerun.SchemaVersion, "pipeline 'ghost' not found")
+		"pipeline 'ghost' not found")
 
 	emptyManifest := cmdtest.PortalReply(http.StatusOK, `{"kind":"dryRun","manifest":null}`)
 	cmdtest.CheckErrorOutput(t, NewCmdStart, emptyManifest, []string{"ghost", "--dry-run"},
-		pipelinerun.SchemaVersion, "portal returned empty dry-run manifest")
+		"portal returned empty dry-run manifest")
 }

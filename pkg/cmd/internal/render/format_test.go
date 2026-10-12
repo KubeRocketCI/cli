@@ -1,6 +1,10 @@
-package render
+package render_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
+)
 
 func TestValidateOutputFormat_EmptyAllowedPanics(t *testing.T) {
 	t.Parallel()
@@ -11,7 +15,7 @@ func TestValidateOutputFormat_EmptyAllowedPanics(t *testing.T) {
 		}
 	}()
 
-	_ = ValidateOutputFormat("json")
+	_ = render.ValidateOutputFormat("json")
 }
 
 func TestValidateOutputFormat(t *testing.T) {
@@ -39,7 +43,7 @@ func TestValidateOutputFormat(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := ValidateOutputFormat(tc.format, tc.allowed...)
+			err := render.ValidateOutputFormat(tc.format, tc.allowed...)
 
 			switch {
 			case tc.want == "" && err != nil:

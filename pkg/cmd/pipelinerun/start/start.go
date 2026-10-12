@@ -12,6 +12,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/pipelinerun"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 type StartOptions struct {
@@ -120,7 +121,7 @@ func (opts *StartOptions) validate() error {
 // JSON error envelope.
 func startRun(ctx context.Context, opts *StartOptions) error {
 	if err := start(ctx, opts); err != nil {
-		return pipelinerun.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
 	return nil

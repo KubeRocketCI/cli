@@ -47,7 +47,7 @@ func renderDryRun(out io.Writer, format string, manifest map[string]any) error {
 	}
 
 	if format == output.FormatJSON {
-		return output.PrintJSONEnvelope(out, SchemaVersion, manifest)
+		return render.PrintEnvelope(out, manifest)
 	}
 
 	return output.PrintYAML(out, manifest)
@@ -62,7 +62,7 @@ func PresentResult(ios *iostreams.IOStreams, format string, dryRun bool, result 
 	}
 
 	if output.ResolveFormat(format) == output.FormatJSON {
-		return output.PrintJSONEnvelope(ios.Out, SchemaVersion, result)
+		return render.PrintEnvelope(ios.Out, result)
 	}
 
 	if err := renderRow(ios, format, result); err != nil {

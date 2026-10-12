@@ -11,6 +11,7 @@ import (
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/output"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 // RunCmd builds the command with newCmd, executes it with argv, and returns
@@ -78,7 +79,7 @@ func CheckErrorOutput[T any](
 	newCmd func(*cmdutil.Factory, func(*T) error) *cobra.Command,
 	handler http.Handler,
 	argv []string,
-	schemaVersion, want string,
+	want string,
 ) {
 	t.Helper()
 
@@ -104,7 +105,7 @@ func CheckErrorOutput[T any](
 		}
 
 		wantEnvelope := output.JSONErrorEnvelope{
-			SchemaVersion: schemaVersion,
+			SchemaVersion: render.SchemaVersion,
 			Error:         output.JSONErrorBody{Message: want},
 		}
 		if got := DecodeErrorEnvelope(t, stdout); got != wantEnvelope {

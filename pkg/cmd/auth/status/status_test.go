@@ -18,6 +18,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 // mockTokenProvider implements auth.TokenProvider for testing.
@@ -72,8 +73,8 @@ func parseEnvelope(t *testing.T, stdout string) envelope {
 		t.Fatalf("stdout is not a JSON envelope: %v\nstdout=%s", err, stdout)
 	}
 
-	if env.SchemaVersion != SchemaVersion {
-		t.Errorf("schemaVersion = %q, want %q", env.SchemaVersion, SchemaVersion)
+	if env.SchemaVersion != render.SchemaVersion {
+		t.Errorf("schemaVersion = %q, want %q", env.SchemaVersion, render.SchemaVersion)
 	}
 
 	return env
