@@ -185,6 +185,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-project-list)
 |---|---|---|---|---|
 | projects | `krci project list -o json` | 0 | bare | empty |
 | unauthorized | `krci project list -o json` | 1 | empty | `Error: authentication required: listing projects: unauthorized: please run 'krci auth login'` |
+| unknown-format | `krci project list -o xml` | 1 | empty | `Error: unknown output format: xml (use 'json' or 'table')` |
 | insecure-portal-url | `KRCI_PORTAL_URL=http://portal.example.com krci project list -o json` | 1 | empty | `Error: invalid portal URL: must use https, or http on localhost or a loopback IP: http://portal.example.com` |
 
 ## `krci project get`
@@ -196,6 +197,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-project-get-name)
 | detail | `krci project get my-app -o json` | 0 | bare | empty |
 | not-found | `krci project get my-app -o json` | 1 | empty | `Error: project "my-app" not found` |
 | unauthorized | `krci project get my-app -o json` | 1 | empty | `Error: authentication required: getting project "my-app": unauthorized: please run 'krci auth login'` |
+| unknown-format | `krci project get my-app -o xml` | 1 | empty | `Error: unknown output format: xml (use 'json' or 'table')` |
 
 ## `krci project versions`
 
@@ -224,6 +226,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-deployment-list)
 |---|---|---|---|---|
 | deployments | `krci deployment list -o json` | 0 | bare | empty |
 | unauthorized | `krci deployment list -o json` | 1 | empty | `Error: authentication required: unauthorized: please run 'krci auth login'` |
+| unknown-format | `krci deployment list -o xml` | 1 | empty | `Error: unknown output format: xml (use 'json' or 'table')` |
 
 ## `krci deployment get`
 
