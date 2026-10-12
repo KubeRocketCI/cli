@@ -71,6 +71,9 @@ const (
 	nameUnknownFormat = "unknown-format"
 	nameNotFound      = "not-found"
 
+	nameDeploymentNotFound = "deployment-not-found"
+	nameEnvNotFound        = "env-not-found"
+
 	runSucceeded = "review-my-app-main-s1a2b"
 	runFailed    = "build-my-app-main-f9x8y"
 	failedResult = "3f2504e0-4f89-41d3-9a0c-0305e82c3301"
@@ -85,6 +88,7 @@ const (
 
 	envDeployment = "my-pipeline"
 	envName       = "dev"
+	missingEnv    = "prod"
 	envNamespace  = "my-pipeline-dev"
 
 	emptyDeployment = "api-pipeline"
@@ -187,6 +191,18 @@ var contractRows = []contractRow{
 	{cmd: cmdEnvEvents, args: []string{envDeployment, envName}, format: formatJSON, fixture: "env", name: "events"},
 	{cmd: cmdEnvEvents, args: []string{envDeployment, envName}, format: formatJSON, fixture: "env-events-401",
 		wantExit: 1, name: nameUnauthorized},
+	{cmd: cmdEnvGet, args: []string{envDeployment, envName}, format: formatJSON, fixture: "cdpipeline-404",
+		wantExit: 1, name: nameDeploymentNotFound},
+	{cmd: cmdEnvGet, args: []string{envDeployment, missingEnv}, format: formatJSON, fixture: "env",
+		wantExit: 1, name: nameEnvNotFound},
+	{cmd: cmdEnvPods, args: []string{envDeployment, envName}, format: formatJSON, fixture: "cdpipeline-404",
+		wantExit: 1, name: nameDeploymentNotFound},
+	{cmd: cmdEnvPods, args: []string{envDeployment, missingEnv}, format: formatJSON, fixture: "env",
+		wantExit: 1, name: nameEnvNotFound},
+	{cmd: cmdEnvEvents, args: []string{envDeployment, envName}, format: formatJSON, fixture: "cdpipeline-404",
+		wantExit: 1, name: nameDeploymentNotFound},
+	{cmd: cmdEnvEvents, args: []string{envDeployment, missingEnv}, format: formatJSON, fixture: "env",
+		wantExit: 1, name: nameEnvNotFound},
 
 	{cmd: cmdAuthStatus, format: formatJSON, fixture: "config", name: "env-token"},
 	{cmd: cmdAuthStatus, format: formatJSON, fixture: "config-401", wantExit: 1, name: nameUnauthorized},

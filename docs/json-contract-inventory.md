@@ -63,6 +63,8 @@ Schema: [json-schemas.md](json-schemas.md#krci-env-get-deployment-env)
 | detail | `krci env get my-pipeline dev -o json` | 0 | envelope | empty |
 | unauthorized | `krci env get my-pipeline dev -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'` |
 | unknown-format | `krci env get my-pipeline dev -o xml` | 1 | empty | `Error: unknown output format: xml (use 'json' or 'table')` |
+| deployment-not-found | `krci env get my-pipeline dev -o json` | 1 | error envelope | `Error: deployment "my-pipeline" not found` |
+| env-not-found | `krci env get my-pipeline prod -o json` | 1 | error envelope | `Error: environment "prod" not found in deployment "my-pipeline"` |
 
 ## `krci env pods`
 
@@ -72,6 +74,8 @@ Schema: [json-schemas.md](json-schemas.md#krci-env-pods-deployment-env)
 |---|---|---|---|---|
 | pods | `krci env pods my-pipeline dev -o json` | 0 | envelope | empty |
 | unauthorized | `krci env pods my-pipeline dev -o json` | 1 | error envelope | `Error: authentication required: listing pods in namespace "my-pipeline-dev": unauthorized: please run 'krci auth login'` |
+| deployment-not-found | `krci env pods my-pipeline dev -o json` | 1 | error envelope | `Error: deployment "my-pipeline" not found` |
+| env-not-found | `krci env pods my-pipeline prod -o json` | 1 | error envelope | `Error: environment "prod" not found in deployment "my-pipeline"` |
 
 ## `krci env events`
 
@@ -81,6 +85,8 @@ Schema: [json-schemas.md](json-schemas.md#krci-env-events-deployment-env)
 |---|---|---|---|---|
 | events | `krci env events my-pipeline dev -o json` | 0 | envelope | empty |
 | unauthorized | `krci env events my-pipeline dev -o json` | 1 | error envelope | `Error: authentication required: listing events in namespace "my-pipeline-dev": unauthorized: please run 'krci auth login'` |
+| deployment-not-found | `krci env events my-pipeline dev -o json` | 1 | error envelope | `Error: deployment "my-pipeline" not found` |
+| env-not-found | `krci env events my-pipeline prod -o json` | 1 | error envelope | `Error: environment "prod" not found in deployment "my-pipeline"` |
 
 ## `krci auth status`
 
