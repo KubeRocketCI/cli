@@ -22,7 +22,7 @@ func HandleError(ios *iostreams.IOStreams, outputFormat string, err error) error
 
 // PageFooter formats the paging summary printed below a paginated sca table.
 func PageFooter(noun string, total, pageIndex, pageSize int) string {
-	totalPages := render.PageCount(total, pageSize)
+	totalPages := output.PageCount(total, pageSize)
 
 	if total == 0 {
 		return fmt.Sprintf("no %s (page-size %d)", pluralise(noun, 0), pageSize)
@@ -54,7 +54,7 @@ func pluralise(noun string, n int) string {
 const EmptyPlaceholder = "—"
 
 // OrDash returns s when non-empty, otherwise EmptyPlaceholder. sca cells use
-// this, not render.OrDash, which returns output.EmptyCell.
+// this, not output.OrDash, which returns output.EmptyCell.
 func OrDash(s string) string {
 	if s == "" {
 		return EmptyPlaceholder

@@ -132,6 +132,21 @@ func OrDash(s string) string {
 	return s
 }
 
+// PageCount returns the number of pages of pageSize needed to hold total
+// items. The result is at least 1, also for a non-positive pageSize.
+func PageCount(total, pageSize int) int {
+	if pageSize <= 0 {
+		return 1
+	}
+
+	n := total / pageSize
+	if total%pageSize != 0 {
+		n++
+	}
+
+	return max(n, 1)
+}
+
 // MaxMessageLen caps a free-text MESSAGE column on a TTY. Piped output is not
 // truncated.
 const MaxMessageLen = 80

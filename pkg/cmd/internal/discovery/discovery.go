@@ -87,7 +87,7 @@ func PrintSection(w io.Writer, isTTY bool, title string, lines []string) error {
 // OptCell renders an optional string field, output.EmptyCell when the pointer
 // is nil or the value is empty.
 func OptCell(s *string) string {
-	return render.OrDash(ptr.Deref(s, ""))
+	return output.OrDash(ptr.Deref(s, ""))
 }
 
 // OptTimeCell renders an optional RFC 3339 timestamp as a relative time,
@@ -108,7 +108,7 @@ func OptStatusCell(s *string, isTTY bool) string {
 		return ColorForArgoStatus(v)
 	}
 
-	return render.OrDash(v)
+	return output.OrDash(v)
 }
 
 // ShortDigestCell shortens a sha256 digest for table display: keeps the
