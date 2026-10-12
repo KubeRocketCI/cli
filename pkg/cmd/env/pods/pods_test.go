@@ -10,7 +10,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/ptr"
 	"github.com/KubeRocketCI/cli/pkg/cmd/env/internal/envtestutil"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
-	"github.com/KubeRocketCI/cli/pkg/cmd/internal/discovery"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 const crashingPod = `{
@@ -67,8 +67,8 @@ func TestPodsRun_JSONEnvelope(t *testing.T) {
 		t.Fatalf("stdout is not the JSON envelope: %v\n%s", err, stdout)
 	}
 
-	if env.SchemaVersion != discovery.SchemaVersion {
-		t.Errorf("schemaVersion = %q, want %q", env.SchemaVersion, discovery.SchemaVersion)
+	if env.SchemaVersion != render.SchemaVersion {
+		t.Errorf("schemaVersion = %q, want %q", env.SchemaVersion, render.SchemaVersion)
 	}
 
 	want := portal.EnvNamespace{

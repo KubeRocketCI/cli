@@ -83,22 +83,22 @@ ingress URLs, ArgoCD link, and last-deployed timestamp.
 func getRun(ctx context.Context, opts *GetOptions) error {
 	cfg, err := opts.Config()
 	if err != nil {
-		return discovery.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
 	client, err := opts.RestClient()
 	if err != nil {
-		return discovery.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
 	svc := portal.NewEnvService(client, cfg.ClusterName, cfg.Namespace)
 
 	detail, err := svc.Get(ctx, opts.Deployment, opts.Env)
 	if err != nil {
-		return discovery.HandleError(opts.IO, opts.OutputFormat, envinternal.MapNotFound(err, opts.Deployment, opts.Env))
+		return render.HandleError(opts.IO, opts.OutputFormat, envinternal.MapNotFound(err, opts.Deployment, opts.Env))
 	}
 
-	return discovery.Render(opts.IO, opts.OutputFormat, detail, func(w io.Writer, isTTY bool) error {
+	return render.Render(opts.IO, opts.OutputFormat, detail, func(w io.Writer, isTTY bool) error {
 		return renderDetail(w, isTTY, detail)
 	})
 }

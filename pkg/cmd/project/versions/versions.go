@@ -68,7 +68,7 @@ newest first.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Project = args[0]
 
-			if err := discovery.ValidateOutputFormat(opts.OutputFormat); err != nil {
+			if err := render.ValidateJSONOrTable(opts.OutputFormat); err != nil {
 				return err
 			}
 
@@ -99,19 +99,19 @@ newest first.`,
 func listRun(ctx context.Context, opts *ListOptions) error {
 	cfg, err := opts.Config()
 	if err != nil {
-		return discovery.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
 	client, err := opts.RestClient()
 	if err != nil {
-		return discovery.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
 	svc := portal.NewProjectVersionsService(client, cfg.ClusterName, cfg.Namespace)
 
 	streams, err := svc.List(ctx, opts.Project, opts.Branch)
 	if err != nil {
-		return discovery.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
 	payload := portal.ProjectVersionsPayload{
@@ -119,7 +119,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		Streams: streams,
 	}
 
-	if err := discovery.Render(opts.IO, opts.OutputFormat, payload, func(w io.Writer, isTTY bool) error {
+	if err := render.Render(opts.IO, opts.OutputFormat, payload, func(w io.Writer, isTTY bool) error {
 		if opts.Branch != "" {
 			return renderVersionsTable(w, isTTY, streams)
 		}

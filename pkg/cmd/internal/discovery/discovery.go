@@ -1,7 +1,5 @@
-// Package discovery holds the table cells and section output shared by the
-// deployment-discovery verbs. SchemaVersion, TableRenderer, Render,
-// HandleError and ValidateOutputFormat delegate to
-// pkg/cmd/internal/render; new callers import render directly.
+// Package discovery holds the table cells, section output and empty-result note
+// shared by the deployment-discovery verbs.
 // Importable only from packages below pkg/cmd/.
 package discovery
 
@@ -17,36 +15,13 @@ import (
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
-// SchemaVersion is render.SchemaVersion.
-const SchemaVersion = render.SchemaVersion
-
-// ShortDigestLen is the maximum length of an image digest as shown in table
-// mode: `sha256:` (7 chars) + first 8 hex chars = 15 visible characters.
-const ShortDigestLen = 15
+// ShortDigestLen is the maximum length of an image digest in table mode: the
+// `sha256:` prefix plus the first 8 hex characters.
+const ShortDigestLen = len("sha256:") + 8
 
 // MaxIngressHostLen caps the visible width of an ingress hostname in table
-// mode (mirrors the pipelinerun-list approach of truncating long names).
-// The OSC 8 hyperlink target carries the full URL regardless.
+// mode. The OSC 8 hyperlink target carries the full URL regardless.
 const MaxIngressHostLen = 50
-
-// TableRenderer is render.TableRenderer.
-type TableRenderer = render.TableRenderer
-
-// ValidateOutputFormat is render.ValidateOutputFormat with "json" and "table"
-// allowed.
-func ValidateOutputFormat(format string) error {
-	return render.ValidateJSONOrTable(format)
-}
-
-// Render is render.Render.
-func Render[T any](ios *iostreams.IOStreams, outputFormat string, data T, renderTable TableRenderer) error {
-	return render.Render(ios, outputFormat, data, renderTable)
-}
-
-// HandleError is render.HandleError.
-func HandleError(ios *iostreams.IOStreams, outputFormat string, err error) error {
-	return render.HandleError(ios, outputFormat, err)
-}
 
 // PrintEmptyNote writes the note of an empty result to stderr. Under -o json
 // it writes nothing: the empty array is the answer.
@@ -111,9 +86,8 @@ func OptStatusCell(s *string, isTTY bool) string {
 	return output.OrDash(v)
 }
 
-// ShortDigestCell shortens a sha256 digest for table display: keeps the
-// `sha256:` prefix plus the first 8 hex chars (ShortDigestLen visible chars).
-// output.EmptyCell when the pointer is nil or the value is empty.
+// ShortDigestCell truncates a digest to ShortDigestLen characters for table
+// display. output.EmptyCell when the pointer is nil or the value is empty.
 func ShortDigestCell(digest *string) string {
 	if digest == nil || *digest == "" {
 		return output.EmptyCell
@@ -183,8 +157,8 @@ func ExpandIngressRows(cells []string, ingressLines []string) [][]string {
 	return out
 }
 
-// HostnameFromURL strips the scheme + path from a URL, returning just the
-// host. Falls back to the original string if no scheme separator is present.
+// HostnameFromURL strips the scheme and the path from a URL, returning
+// host[:port]. Input without "://" has only its path stripped.
 func HostnameFromURL(u string) string {
 	stripped := u
 

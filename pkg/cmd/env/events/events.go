@@ -107,12 +107,12 @@ Limits:
 func eventsRun(ctx context.Context, opts *EventsOptions) error {
 	cfg, err := opts.Config()
 	if err != nil {
-		return discovery.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
 	client, err := opts.RestClient()
 	if err != nil {
-		return discovery.HandleError(opts.IO, opts.OutputFormat, err)
+		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
 	svc := portal.NewEnvService(client, cfg.ClusterName, cfg.Namespace)
@@ -122,10 +122,10 @@ func eventsRun(ctx context.Context, opts *EventsOptions) error {
 		WarningsOnly: opts.Warnings,
 	})
 	if err != nil {
-		return discovery.HandleError(opts.IO, opts.OutputFormat, envinternal.MapNotFound(err, opts.Deployment, opts.Env))
+		return render.HandleError(opts.IO, opts.OutputFormat, envinternal.MapNotFound(err, opts.Deployment, opts.Env))
 	}
 
-	if err := discovery.Render(opts.IO, opts.OutputFormat, payload, func(w io.Writer, isTTY bool) error {
+	if err := render.Render(opts.IO, opts.OutputFormat, payload, func(w io.Writer, isTTY bool) error {
 		return renderTable(w, isTTY, payload.Events)
 	}); err != nil {
 		return err

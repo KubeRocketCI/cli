@@ -11,7 +11,7 @@ import (
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/portal"
-	"github.com/KubeRocketCI/cli/pkg/cmd/internal/discovery"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 // TargetHelp explains the two positionals in the long help of a verb.
@@ -28,7 +28,7 @@ func TargetArgs(verb string) cobra.PositionalArgs {
 // ValidateTarget checks the output format and both positionals, before any
 // Portal call.
 func ValidateTarget(outputFormat, deployment, env string) error {
-	if err := discovery.ValidateOutputFormat(outputFormat); err != nil {
+	if err := render.ValidateJSONOrTable(outputFormat); err != nil {
 		return err
 	}
 

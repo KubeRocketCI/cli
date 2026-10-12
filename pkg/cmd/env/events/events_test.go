@@ -12,7 +12,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/ptr"
 	"github.com/KubeRocketCI/cli/pkg/cmd/env/internal/envtestutil"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
-	"github.com/KubeRocketCI/cli/pkg/cmd/internal/discovery"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 const namespaceEvents = `{
@@ -109,7 +109,7 @@ func TestEventsRun_JSONEnvelope(t *testing.T) {
 				Deployment: envtestutil.Deployment, Env: envtestutil.Env,
 				Cluster: envtestutil.LocalCluster, Namespace: envtestutil.Namespace,
 			}
-			if env.SchemaVersion != discovery.SchemaVersion || env.Data.EnvNamespace != want {
+			if env.SchemaVersion != render.SchemaVersion || env.Data.EnvNamespace != want {
 				t.Errorf("envelope = %+v", env)
 			}
 
