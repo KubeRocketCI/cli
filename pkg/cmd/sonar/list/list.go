@@ -72,7 +72,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().IntVar(&opts.Page, "page", 1, "Page index (1-based)")
-	cmd.Flags().IntVar(&opts.PageSize, "page-size", defaultPageSize, "Page size (max 500)")
+	cmd.Flags().IntVar(&opts.PageSize, "page-size", defaultPageSize,
+		fmt.Sprintf("Page size (max %d)", sonarinternal.MaxPageSize))
 	cmd.Flags().StringVar(&opts.Search, "search", "", "Filter projects by partial name")
 	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "",
 		"Output format: table, json (default: table)")
