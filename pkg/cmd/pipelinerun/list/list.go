@@ -198,7 +198,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 
 	if result.Logs != "" {
 		pr := result.PipelineRuns[0]
-		header := fmt.Sprintf("Logs: %s (%s)", pr.Name, pr.Status)
+		header := output.SingleLine(fmt.Sprintf("Logs: %s (%s)", pr.Name, pr.Status))
 
 		if _, err := fmt.Fprintln(opts.IO.Out); err != nil {
 			return err

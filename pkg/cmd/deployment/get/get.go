@@ -157,7 +157,7 @@ func printStageMessages(w io.Writer, stages []portal.Stage, styled bool) error {
 
 	for _, s := range stages {
 		if s.DetailedMessage != "" {
-			lines = append(lines, fmt.Sprintf("  %s: %s", s.Name, output.SingleLine(s.DetailedMessage)))
+			lines = append(lines, "  "+output.SingleLine(s.Name+": "+s.DetailedMessage))
 		}
 	}
 

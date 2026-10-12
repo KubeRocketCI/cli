@@ -70,7 +70,7 @@ func PresentResult(ios *iostreams.IOStreams, format string, dryRun bool, result 
 	if result.Name != "" {
 		msg := fmt.Sprintf(
 			"note: the controller may briefly 404 on 'krci pipelinerun get %s' until labels reconcile",
-			result.Name)
+			output.SingleLine(result.Name))
 		_, _ = fmt.Fprintln(ios.ErrOut, output.DimStyle.Render(msg))
 	}
 

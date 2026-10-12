@@ -222,7 +222,7 @@ func renderRun(opts *GetOptions, result *portal.PipelineRunListResult) error {
 			return err
 		}
 
-		header := fmt.Sprintf("Logs: %s", run.Name)
+		header := output.SingleLine(fmt.Sprintf("Logs: %s", run.Name))
 
 		if _, err := fmt.Fprintln(opts.IO.Out, output.SectionStyle.Render(header)); err != nil {
 			return err

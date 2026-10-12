@@ -191,7 +191,7 @@ func restartsCell(p portal.EnvPod) string {
 func detailLines(pods []portal.EnvPod) []string {
 	lines := make([]string, 0, len(pods))
 	row := func(subject, text string) string {
-		return "  - " + output.SingleLine(subject+": "+text)
+		return discovery.Bullet(subject + ": " + text)
 	}
 	add := func(subject, text string) {
 		lines = append(lines, row(subject, text))

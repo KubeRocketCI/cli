@@ -105,7 +105,8 @@ func printDetail(w io.Writer, codebase, requestedBranch string, d *portal.SCAPro
 
 	// Header line shows which branch was queried; when --branch was omitted,
 	// the Portal fills in the resolved default and returns it verbatim.
-	if _, err := fmt.Fprintf(w, "%s @ %s\n\n", project.Name, project.Version); err != nil {
+	name, version := output.SingleLine(project.Name), output.SingleLine(project.Version)
+	if _, err := fmt.Fprintf(w, "%s @ %s\n\n", name, version); err != nil {
 		return err
 	}
 
@@ -119,7 +120,7 @@ func printDetail(w io.Writer, codebase, requestedBranch string, d *portal.SCAPro
 		{Label: "Last BOM", Value: formatTimestamp(project.LastBomImport, project.LastBomImportFormat)},
 		{Label: "Last vuln scan", Value: formatRelativeTimestamp(project.LastVulnerabilityAnalysis)},
 	}
-	if err := output.PrintAligned(w, styled, pairs, ""); err != nil {
+	if err := output.PrintAligned(w, styled, pairs, "", 0); err != nil {
 		return err
 	}
 
@@ -143,7 +144,7 @@ func printDetail(w io.Writer, codebase, requestedBranch string, d *portal.SCAPro
 		severityRow("Info/Unassigned", "INFO", d.Metrics.Unassigned),
 		{Label: "Total", Value: fmt.Sprintf("%d", d.Metrics.Vulnerabilities)},
 	}
-	if err := output.PrintAligned(w, styled, vulnPairs, "  "); err != nil {
+	if err := output.PrintAligned(w, styled, vulnPairs, "  ", 0); err != nil {
 		return err
 	}
 
@@ -159,7 +160,7 @@ func printDetail(w io.Writer, codebase, requestedBranch string, d *portal.SCAPro
 		{Label: "Total", Value: fmt.Sprintf("%d", d.Metrics.Components)},
 		{Label: "Vulnerable", Value: fmt.Sprintf("%d", d.Metrics.VulnerableComponents)},
 	}
-	return output.PrintAligned(w, styled, compPairs, "  ")
+	return output.PrintAligned(w, styled, compPairs, "  ", 0)
 }
 
 // severityRow builds a "label: count" detail line. For count>0 and a known

@@ -28,6 +28,13 @@ succeed, which prints the run and then exits `1`. The bare verbs are
 [`deployment get`](#krci-deployment-get-name). Moving them to the envelope is
 a breaking change.
 
+Table output is for people. Cluster-supplied text stays on one row, and a
+control character in it is shown in caret notation (`^[` for ESC). On a
+terminal, an SGR colour or http(s) link sequence in cluster text passes as the
+CLI's own styling; every other escape sequence is shown in caret notation.
+JSON keeps the values and writes DEL and the C1 characters U+0080–U+009F as
+`\u` escapes.
+
 Every error exits `1` and writes `Error: <message>` to stderr. A rejected flag
 or argument is reported on stderr only. Each verb's cases, exit codes, and
 error text are listed in
