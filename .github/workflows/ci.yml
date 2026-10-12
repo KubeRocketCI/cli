@@ -30,6 +30,3 @@ jobs:
 
       - name: Run CI pipeline
         run: make ci
-
-      - name: Generate coverage report
-        run: make test-coverage
