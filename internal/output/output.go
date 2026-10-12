@@ -2,6 +2,7 @@
 package output
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -424,6 +425,34 @@ func PrintStyledDetailLines(w io.Writer, lines []DetailLine) error {
 func PrintPlainDetailLines(w io.Writer, lines []DetailLine) error {
 	for _, l := range lines {
 		if _, err := fmt.Fprintf(w, "%-14s%s\n", l.Label+":", l.Value); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// alignedLabelStyle is LabelStyle without its fixed width; PrintAligned pads
+// labels to the longest one itself.
+var alignedLabelStyle = LabelStyle.UnsetWidth()
+
+// PrintAligned writes "<indent><label><pad>   <value>" per line, padding every
+// label to the longest in lines. When isTTY, labels use alignedLabelStyle and
+// a non-empty Styled replaces Value.
+func PrintAligned(w io.Writer, isTTY bool, lines []DetailLine, indent string) error {
+	width := 0
+	for _, l := range lines {
+		width = max(width, len(l.Label))
+	}
+
+	for _, l := range lines {
+		label, value := l.Label, l.Value
+		if isTTY {
+			label = alignedLabelStyle.Render(l.Label)
+			value = cmp.Or(l.Styled, l.Value)
+		}
+
+		if _, err := fmt.Fprintf(w, "%s%s%*s   %s\n", indent, label, width-len(l.Label), "", value); err != nil {
 			return err
 		}
 	}

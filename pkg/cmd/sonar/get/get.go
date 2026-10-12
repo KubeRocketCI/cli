@@ -101,32 +101,19 @@ func getRun(ctx context.Context, opts *GetOptions) error {
 	})
 }
 
-// kvPair is one aligned "label: value" row in the `get` output. display holds
-// the optional styled rendering of the value (used for the Quality Gate color);
-// when display is empty, value is rendered verbatim.
-type kvPair struct {
-	label   string
-	value   string
-	display string
-}
-
 func printDetail(w io.Writer, d *portal.SonarProjectDetail, styled bool) error {
 	gate := cmp.Or(d.QualityGateStatus, portal.QualityGateNone)
-	gateDisplay := ""
-	if styled {
-		gateDisplay = output.SonarGateStatusColor(gate)
+
+	header := []output.DetailLine{
+		{Label: "Project", Value: d.Key},
+		{Label: "Name", Value: d.Name},
+		{Label: "Visibility", Value: cmp.Or(d.Visibility, "—")},
+		{Label: "Last run", Value: formatLastRun(d.LastAnalysisDate)},
+		{Label: "Revision", Value: cmp.Or(d.Revision, "—")},
+		{Label: "Quality Gate", Value: string(gate), Styled: output.SonarGateStatusColor(gate)},
 	}
 
-	header := []kvPair{
-		{label: "Project", value: d.Key},
-		{label: "Name", value: d.Name},
-		{label: "Visibility", value: cmp.Or(d.Visibility, "—")},
-		{label: "Last run", value: formatLastRun(d.LastAnalysisDate)},
-		{label: "Revision", value: cmp.Or(d.Revision, "—")},
-		{label: "Quality Gate", value: string(gate), display: gateDisplay},
-	}
-
-	if err := printAligned(w, header, "", styled); err != nil {
+	if err := output.PrintAligned(w, styled, header, ""); err != nil {
 		return err
 	}
 
@@ -139,13 +126,13 @@ func printDetail(w io.Writer, d *portal.SonarProjectDetail, styled bool) error {
 			return err
 		}
 
-		pairs := make([]kvPair, 0, len(section.lines))
+		pairs := make([]output.DetailLine, 0, len(section.lines))
 		for _, ml := range section.lines {
 			raw, ok := d.Measures[ml.key]
-			pairs = append(pairs, kvPair{label: ml.label, value: formatMeasure(raw, ok, ml)})
+			pairs = append(pairs, output.DetailLine{Label: ml.label, Value: formatMeasure(raw, ok, ml)})
 		}
 
-		if err := printAligned(w, pairs, "  ", styled); err != nil {
+		if err := output.PrintAligned(w, styled, pairs, "  "); err != nil {
 			return err
 		}
 	}
@@ -188,41 +175,6 @@ var measureSections = []measureSection{
 			{label: "Lines of code", key: "ncloc"},
 		},
 	},
-}
-
-// sonarLabelStyle is output.LabelStyle without a fixed width; printAligned
-// pads labels itself.
-var sonarLabelStyle = output.LabelStyle.UnsetWidth()
-
-// printAligned prints "<indent><label padded to column width>   <value>" for
-// each pair. Column width is the longest label in pairs.
-func printAligned(w io.Writer, pairs []kvPair, indent string, styled bool) error {
-	maxLabel := 0
-	for _, p := range pairs {
-		if len(p.label) > maxLabel {
-			maxLabel = len(p.label)
-		}
-	}
-
-	for _, p := range pairs {
-		pad := maxLabel - len(p.label)
-		value := p.display
-		if value == "" {
-			value = p.value
-		}
-
-		var err error
-		if styled {
-			_, err = fmt.Fprintf(w, "%s%s%*s   %s\n", indent, sonarLabelStyle.Render(p.label), pad, "", value)
-		} else {
-			_, err = fmt.Fprintf(w, "%s%s%*s   %s\n", indent, p.label, pad, "", value)
-		}
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 type measureLine struct {

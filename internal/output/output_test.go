@@ -351,3 +351,68 @@ func TestPrintHeading(t *testing.T) {
 		})
 	}
 }
+
+func TestPrintAligned_Empty(t *testing.T) {
+	t.Parallel()
+
+	for _, isTTY := range []bool{false, true} {
+		var buf bytes.Buffer
+		if err := PrintAligned(&buf, isTTY, nil, "  "); err != nil {
+			t.Fatalf("PrintAligned(isTTY=%v, nil): %v", isTTY, err)
+		}
+
+		if buf.Len() != 0 {
+			t.Errorf("PrintAligned(isTTY=%v, nil) wrote %q, want nothing", isTTY, buf.String())
+		}
+	}
+}
+
+func TestPrintAligned(t *testing.T) {
+	t.Parallel()
+
+	lines := []DetailLine{
+		{Label: "Short", Value: "val1"},
+		{Label: "A longer label", Value: "OK", Styled: "[OK-styled]"},
+	}
+
+	cases := []struct {
+		name   string
+		isTTY  bool
+		indent string
+		want   string
+	}{
+		{
+			name:   "plain pads to the longest label and ignores Styled",
+			indent: "  ",
+			want:   "  Short            val1\n  A longer label   OK\n",
+		},
+		{
+			name:  "styled renders labels and prefers Styled",
+			isTTY: true,
+			want: alignedLabelStyle.Render("Short") + "            val1\n" +
+				alignedLabelStyle.Render("A longer label") + "   [OK-styled]\n",
+		},
+		{
+			name:   "styled keeps the indent outside the label style",
+			isTTY:  true,
+			indent: "  ",
+			want: "  " + alignedLabelStyle.Render("Short") + "            val1\n" +
+				"  " + alignedLabelStyle.Render("A longer label") + "   [OK-styled]\n",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var buf bytes.Buffer
+			if err := PrintAligned(&buf, tc.isTTY, lines, tc.indent); err != nil {
+				t.Fatalf("PrintAligned: %v", err)
+			}
+
+			if got := buf.String(); got != tc.want {
+				t.Errorf("PrintAligned(isTTY=%v) = %q, want %q", tc.isTTY, got, tc.want)
+			}
+		})
+	}
+}

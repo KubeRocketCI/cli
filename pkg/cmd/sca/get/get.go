@@ -88,15 +88,6 @@ func getRun(ctx context.Context, opts *GetOptions) error {
 	})
 }
 
-// kvPair is one aligned "label: value" row in the `get` output. display holds
-// the optional styled rendering of the value (used for coloured severity
-// badges); when display is empty, value is rendered verbatim.
-type kvPair struct {
-	label   string
-	value   string
-	display string
-}
-
 func printDetail(w io.Writer, codebase, requestedBranch string, d *portal.SCAProjectDetail, styled bool) error {
 	if d.Status == portal.SCAStatusNone {
 		branchLabel := cmp.Or(requestedBranch, "default branch")
@@ -118,17 +109,17 @@ func printDetail(w io.Writer, codebase, requestedBranch string, d *portal.SCAPro
 		return err
 	}
 
-	pairs := []kvPair{
-		{label: "Project", value: codebase},
-		{label: "Branch", value: project.Version},
-		{label: "Classifier", value: scainternal.OrDash(project.Classifier)},
-		{label: "Active", value: formatActive(project.Active, styled)},
-		{label: "Is latest", value: scainternal.BoolYesNo(project.IsLatest)},
-		{label: "Risk score", value: scainternal.FormatRisk(project.RiskScore)},
-		{label: "Last BOM", value: formatTimestamp(project.LastBomImport, project.LastBomImportFormat)},
-		{label: "Last vuln scan", value: formatRelativeTimestamp(project.LastVulnerabilityAnalysis)},
+	pairs := []output.DetailLine{
+		{Label: "Project", Value: codebase},
+		{Label: "Branch", Value: project.Version},
+		{Label: "Classifier", Value: scainternal.OrDash(project.Classifier)},
+		activeLine(project.Active),
+		{Label: "Is latest", Value: scainternal.BoolYesNo(project.IsLatest)},
+		{Label: "Risk score", Value: scainternal.FormatRisk(project.RiskScore)},
+		{Label: "Last BOM", Value: formatTimestamp(project.LastBomImport, project.LastBomImportFormat)},
+		{Label: "Last vuln scan", Value: formatRelativeTimestamp(project.LastVulnerabilityAnalysis)},
 	}
-	if err := printAligned(w, pairs, "", styled); err != nil {
+	if err := output.PrintAligned(w, styled, pairs, ""); err != nil {
 		return err
 	}
 
@@ -144,15 +135,15 @@ func printDetail(w io.Writer, codebase, requestedBranch string, d *portal.SCAPro
 		return err
 	}
 
-	vulnPairs := []kvPair{
-		severityRow("Critical", "CRITICAL", d.Metrics.Critical, styled),
-		severityRow("High", "HIGH", d.Metrics.High, styled),
-		severityRow("Medium", "MEDIUM", d.Metrics.Medium, styled),
-		severityRow("Low", "LOW", d.Metrics.Low, styled),
-		severityRow("Info/Unassigned", "INFO", d.Metrics.Unassigned, styled),
-		{label: "Total", value: fmt.Sprintf("%d", d.Metrics.Vulnerabilities)},
+	vulnPairs := []output.DetailLine{
+		severityRow("Critical", "CRITICAL", d.Metrics.Critical),
+		severityRow("High", "HIGH", d.Metrics.High),
+		severityRow("Medium", "MEDIUM", d.Metrics.Medium),
+		severityRow("Low", "LOW", d.Metrics.Low),
+		severityRow("Info/Unassigned", "INFO", d.Metrics.Unassigned),
+		{Label: "Total", Value: fmt.Sprintf("%d", d.Metrics.Vulnerabilities)},
 	}
-	if err := printAligned(w, vulnPairs, "  ", styled); err != nil {
+	if err := output.PrintAligned(w, styled, vulnPairs, "  "); err != nil {
 		return err
 	}
 
@@ -164,32 +155,32 @@ func printDetail(w io.Writer, codebase, requestedBranch string, d *portal.SCAPro
 		return err
 	}
 
-	compPairs := []kvPair{
-		{label: "Total", value: fmt.Sprintf("%d", d.Metrics.Components)},
-		{label: "Vulnerable", value: fmt.Sprintf("%d", d.Metrics.VulnerableComponents)},
+	compPairs := []output.DetailLine{
+		{Label: "Total", Value: fmt.Sprintf("%d", d.Metrics.Components)},
+		{Label: "Vulnerable", Value: fmt.Sprintf("%d", d.Metrics.VulnerableComponents)},
 	}
-	return printAligned(w, compPairs, "  ", styled)
+	return output.PrintAligned(w, styled, compPairs, "  ")
 }
 
-// severityRow builds a "label: count" kvPair. When styled && count>0, the
-// value is augmented with the coloured canonical severity badge so the user
-// sees e.g. "3 CRITICAL" in red.
-func severityRow(label, canonical string, count int, styled bool) kvPair {
-	p := kvPair{label: label, value: fmt.Sprintf("%d", count)}
-	if styled && count > 0 && canonical != "" {
-		p.display = fmt.Sprintf("%s %s", p.value, output.SCASeverityColor(canonical))
+// severityRow builds a "label: count" detail line. For count>0 and a known
+// severity, Styled appends the coloured severity badge, e.g. "3 CRITICAL" in
+// red.
+func severityRow(label, canonical string, count int) output.DetailLine {
+	p := output.DetailLine{Label: label, Value: fmt.Sprintf("%d", count)}
+	if count > 0 && canonical != "" {
+		p.Styled = fmt.Sprintf("%s %s", p.Value, output.SCASeverityColor(canonical))
 	}
 	return p
 }
 
-func formatActive(active, styled bool) string {
+// activeLine renders the Active flag as "yes" or "no"; Styled shows "yes" in
+// green.
+func activeLine(active bool) output.DetailLine {
+	l := output.DetailLine{Label: "Active", Value: scainternal.BoolYesNo(active)}
 	if active {
-		if styled {
-			return output.GreenText("yes")
-		}
-		return "yes"
+		l.Styled = output.GreenText(l.Value)
 	}
-	return "no"
+	return l
 }
 
 func formatTimestamp(ms int64, format string) string {
@@ -213,37 +204,4 @@ func formatRelativeTimestamp(ms int64) string {
 		return scainternal.EmptyPlaceholder
 	}
 	return output.RelativeTime(time.UnixMilli(ms))
-}
-
-// printAligned mirrors the sonar helper verbatim so the two
-// groups render with the same visual rhythm.
-var scaLabelStyle = output.LabelStyle.UnsetWidth()
-
-func printAligned(w io.Writer, pairs []kvPair, indent string, styled bool) error {
-	maxLabel := 0
-	for _, p := range pairs {
-		if len(p.label) > maxLabel {
-			maxLabel = len(p.label)
-		}
-	}
-
-	for _, p := range pairs {
-		pad := maxLabel - len(p.label)
-		value := p.display
-		if value == "" {
-			value = p.value
-		}
-
-		var err error
-		if styled {
-			_, err = fmt.Fprintf(w, "%s%s%*s   %s\n", indent, scaLabelStyle.Render(p.label), pad, "", value)
-		} else {
-			_, err = fmt.Fprintf(w, "%s%s%*s   %s\n", indent, p.label, pad, "", value)
-		}
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
