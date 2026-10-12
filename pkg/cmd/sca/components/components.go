@@ -89,7 +89,8 @@ func NewCmdComponents(f *cmdutil.Factory, runF func(*ComponentsOptions) error) *
 		"Only components Dep-Track marks outdated (newer version exists; independent of vulnerability status)")
 	cmd.Flags().BoolVar(&opts.OnlyDirect, "only-direct", false, "Only direct (non-transitive) dependencies")
 	cmd.Flags().IntVar(&opts.Page, "page", 1, "Page index (1-based)")
-	cmd.Flags().IntVar(&opts.PageSize, "page-size", defaultComponentsPageSize, "Page size (max 500)")
+	cmd.Flags().IntVar(&opts.PageSize, "page-size", defaultComponentsPageSize,
+		fmt.Sprintf("Page size (max %d)", scainternal.MaxPageSize))
 	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "",
 		"Output format: table, json (default: table)")
 

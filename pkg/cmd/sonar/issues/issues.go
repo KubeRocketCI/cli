@@ -155,7 +155,8 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*IssuesOptions) error) *cobra.Co
 	cmd.Flags().StringVar(&opts.Sort, "sort", "", "Sort field (forwarded to SonarQube)")
 	cmd.Flags().BoolVar(&opts.Asc, "asc", false, "Sort ascending")
 	cmd.Flags().IntVar(&opts.Page, "page", defaultPage, "Page index (1-based)")
-	cmd.Flags().IntVar(&opts.PageSize, "page-size", defaultPageSize, "Page size (max 500)")
+	cmd.Flags().IntVar(&opts.PageSize, "page-size", defaultPageSize,
+		fmt.Sprintf("Page size (max %d)", sonarinternal.MaxPageSize))
 	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "",
 		"Output format: table, json (default: table)")
 

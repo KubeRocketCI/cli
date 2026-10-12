@@ -292,3 +292,35 @@ func TestList_PageFooter_SingularProject(t *testing.T) {
 		t.Errorf("should not use plural 'projects' for total=1, got: %s", got)
 	}
 }
+
+// TestList_OutputFormats pins the -o values list.go passes to render.ValidateOutputFormat.
+func TestList_OutputFormats(t *testing.T) {
+	t.Parallel()
+
+	for _, format := range []string{"", "json", "table"} {
+		t.Run("format="+format, func(t *testing.T) {
+			t.Parallel()
+
+			var captured *ListOptions
+			cmd := NewCmdList(newFactory(), func(o *ListOptions) error {
+				captured = o
+				return nil
+			})
+
+			args := []string{}
+			if format != "" {
+				args = append(args, "-o", format)
+			}
+			cmd.SetArgs(args)
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("Execute(-o %q): %v", format, err)
+			}
+			if captured == nil || captured.OutputFormat != format {
+				t.Errorf("captured OutputFormat = %+v, want %q", captured, format)
+			}
+		})
+	}
+}

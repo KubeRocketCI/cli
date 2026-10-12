@@ -264,3 +264,30 @@ func TestValidateProjectCommand(t *testing.T) {
 		}
 	})
 }
+
+func TestValidateProjectCommand_OutputFormats(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]string{
+		"":      "",
+		"json":  "",
+		"table": "",
+		"yaml":  "unknown output format: yaml (use 'json' or 'table')",
+		"xml":   "unknown output format: xml (use 'json' or 'table')",
+	}
+
+	for format, want := range cases {
+		t.Run("format="+format, func(t *testing.T) {
+			t.Parallel()
+
+			err := ValidateProjectCommand(newTestCmd(scopeFlag{}, scopeFlag{}), format, "svc", "", "")
+
+			switch {
+			case want == "" && err != nil:
+				t.Errorf("unexpected error: %v", err)
+			case want != "" && (err == nil || err.Error() != want):
+				t.Errorf("error = %v, want %q", err, want)
+			}
+		})
+	}
+}

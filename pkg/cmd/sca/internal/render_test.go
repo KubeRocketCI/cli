@@ -61,23 +61,27 @@ func TestFormatVulnCounts(t *testing.T) {
 
 func TestPageFooter(t *testing.T) {
 	t.Parallel()
+
 	cases := []struct {
-		noun                         string
-		total, pageIndex, pageSize   int
-		wantSubstr                   string
-		wantSingular                 bool
-		wantBeyondLastPage, wantNone bool
+		name                       string
+		noun                       string
+		total, pageIndex, pageSize int
+		want                       string
 	}{
-		{"project", 0, 1, 25, "no projects", false, false, true},
-		{"project", 1, 1, 25, "1 project,", true, false, false},
-		{"project", 42, 2, 25, "42 projects, page 2 of 2", false, false, false},
-		{"project", 42, 99, 25, "beyond last page", false, true, false},
+		{"none", "project", 0, 1, 25, "no projects (page-size 25)"},
+		{"singular", "project", 1, 1, 25, "1 project, page 1 of 1 (page-size 25)"},
+		{"plural", "project", 42, 2, 25, "42 projects, page 2 of 2 (page-size 25)"},
+		{"beyond last page", "project", 42, 99, 25, "42 projects — page 99 is beyond last page 2 (page-size 25)"},
 	}
-	for _, c := range cases {
-		got := PageFooter(c.noun, c.total, c.pageIndex, c.pageSize)
-		if !strings.Contains(got, c.wantSubstr) {
-			t.Errorf("PageFooter(%s,%d,%d,%d) = %q; want substr %q",
-				c.noun, c.total, c.pageIndex, c.pageSize, got, c.wantSubstr)
-		}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := PageFooter(tc.noun, tc.total, tc.pageIndex, tc.pageSize); got != tc.want {
+				t.Errorf("PageFooter(%q, %d, %d, %d) = %q, want %q",
+					tc.noun, tc.total, tc.pageIndex, tc.pageSize, got, tc.want)
+			}
+		})
 	}
 }

@@ -75,7 +75,8 @@ By default excludes inactive projects and child versions.`,
 	}
 
 	cmd.Flags().IntVar(&opts.Page, "page", 1, "Page index (1-based)")
-	cmd.Flags().IntVar(&opts.PageSize, "page-size", defaultListPageSize, "Page size (max 500)")
+	cmd.Flags().IntVar(&opts.PageSize, "page-size", defaultListPageSize,
+		fmt.Sprintf("Page size (max %d)", scainternal.MaxPageSize))
 	cmd.Flags().StringVar(&opts.Search, "search", "", "Filter projects by partial name / version")
 	cmd.Flags().BoolVar(&opts.IncludeInactive, "include-inactive", false, "Include inactive projects")
 	cmd.Flags().BoolVar(&opts.IncludeChildren, "include-children", false, "Include child (non-root) versions")
