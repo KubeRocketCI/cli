@@ -433,8 +433,8 @@ func TestPrintable(t *testing.T) {
 	}
 
 	for name, tc := range cases {
-		if got := Printable(tc.in); got != tc.want {
-			t.Errorf("%s: Printable = %q, want %q", name, got, tc.want)
+		if got := printable(tc.in); got != tc.want {
+			t.Errorf("%s: printable = %q, want %q", name, got, tc.want)
 		}
 	}
 }
@@ -570,6 +570,7 @@ func TestStyledCell(t *testing.T) {
 		"too many SGR fields":                 {in: "\x1b[1;1;1;1;1;1;1;1;1mX", want: "^[[1;1;1;1;1;1;1;1;1mX"},
 		"a malformed link payload":            {in: "\x1b]8;x\x07t", want: "^[]8;x^Gt"},
 		"a javascript link":                   {in: "\x1b]8;;javascript:alert(1)\x07t", want: "^[]8;;javascript:alert(1)^Gt"},
+		"a link over the limit":               {in: "\x1b]8;;http://h/" + strings.Repeat("a", 2048) + "\x07t", want: "^[]8;;http://h/" + strings.Repeat("a", 2048) + "^Gt"},
 	}
 
 	for name, tc := range cases {
@@ -601,12 +602,15 @@ func TestHyperlink(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]struct{ text, target, want string }{
-		"http link":             {"t", "http://h/", lipgloss.NewStyle().Hyperlink("http://h/").Render("t")},
-		"no target":             {"t", "", "t"},
-		"javascript":            {"t", "javascript:alert(1)", "t"},
-		"no host":               {"t", "http:///p", "t"},
-		"newline in target":     {"t", "http://h/\nb", "t"},
-		"text stays on one row": {"a\nb", "http://h/", lipgloss.NewStyle().Hyperlink("http://h/").Render("a b")},
+		"http link":              {"t", "http://h/", lipgloss.NewStyle().Hyperlink("http://h/").Render("t")},
+		"no target":              {"t", "", "t"},
+		"javascript":             {"t", "javascript:alert(1)", "t"},
+		"no host":                {"t", "http:///p", "t"},
+		"newline in target":      {"t", "http://h/\nb", "t"},
+		"text stays on one row":  {"a\nb", "http://h/", lipgloss.NewStyle().Hyperlink("http://h/").Render("a b")},
+		"unicode path encoded":   {"t", "https://h/путь", lipgloss.NewStyle().Hyperlink("https://h/%D0%BF%D1%83%D1%82%D1%8C").Render("t")},
+		"unicode host":           {"t", "https://münchen.de/", "t"},
+		"encoded over the limit": {"PR", "https://example.com/" + strings.Repeat("п", 400), "PR"},
 	}
 
 	for name, tc := range cases {

@@ -8,10 +8,11 @@ import (
 	"github.com/KubeRocketCI/cli/internal/termseq"
 )
 
-// Limits on a sequence under collection. A sequence past its limit is dropped.
+// Limits on a sequence under collection, the termseq limits. A sequence past
+// its limit is dropped whole.
 const (
-	maxCSILen = 64
-	maxOSCLen = 2048
+	maxCSILen = termseq.MaxSGRLen
+	maxOSCLen = termseq.MaxOSCLen
 )
 
 const (
@@ -44,7 +45,7 @@ const (
 //   - \r\n becomes \n. A lone \r becomes \n.
 //   - Every other C0 byte, DEL and the C1 runes U+0080-U+009F are dropped.
 //   - SGR sequences pass when termseq.SGR accepts their parameters,
-//     re-serialised canonically.
+//     re-serialised canonically; a disallowed parameter drops the sequence.
 //   - OSC 8 passes when termseq.OSC8 accepts its payload, re-emitted with ST
 //     and without params.
 //   - Every other CSI, ESC, OSC, DCS, SOS, PM and APC sequence is dropped whole.
@@ -129,7 +130,7 @@ func (t *terminalWriter) Write(p []byte) (int, error) {
 		r, size := utf8.DecodeRune(data)
 		data = data[size:]
 
-		t.rune(r, size)
+		t.rune(r)
 	}
 
 	if _, err := t.w.Write(t.out); err != nil {
@@ -153,14 +154,13 @@ func (t *terminalWriter) ascii(b byte) {
 	}
 }
 
-func (t *terminalWriter) rune(r rune, size int) {
-	switch {
-	case r == utf8.RuneError && size == 1:
-		t.out = utf8.AppendRune(t.out, utf8.RuneError)
-	case r >= 0x80 && r <= 0x9f:
-	default:
-		t.out = utf8.AppendRune(t.out, r)
+// rune forwards r, which is U+FFFD for an invalid byte, and drops the C1 range.
+func (t *terminalWriter) rune(r rune) {
+	if r >= 0x80 && r <= 0x9f {
+		return
 	}
+
+	t.out = utf8.AppendRune(t.out, r)
 }
 
 func (t *terminalWriter) newline() {
