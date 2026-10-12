@@ -80,7 +80,7 @@ func getRun(ctx context.Context, opts *GetOptions) error {
 			return cmdutil.Rewritef(err, "project %q not found", opts.Name)
 		}
 
-		return cmdutil.HandleAuthError(err)
+		return render.HandleAuthError(err)
 	}
 
 	return render.RenderBare(opts.IO, opts.OutputFormat, project, func(w io.Writer, isTTY bool) error {

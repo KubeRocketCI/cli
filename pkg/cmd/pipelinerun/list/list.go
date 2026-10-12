@@ -163,7 +163,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		IncludeReason: opts.IncludeReason,
 	})
 	if err != nil {
-		return cmdutil.HandleAuthError(err)
+		return render.HandleAuthError(err)
 	}
 
 	if opts.IncludeReason {

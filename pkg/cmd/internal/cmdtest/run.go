@@ -56,10 +56,10 @@ func Execute[T any](
 
 // DecodeErrorEnvelope returns the JSON error envelope a verb wrote to stdout;
 // the test fails when stdout holds anything else.
-func DecodeErrorEnvelope(t *testing.T, stdout *bytes.Buffer) output.JSONErrorEnvelope {
+func DecodeErrorEnvelope(t *testing.T, stdout *bytes.Buffer) render.ErrorEnvelope {
 	t.Helper()
 
-	var env output.JSONErrorEnvelope
+	var env render.ErrorEnvelope
 
 	dec := json.NewDecoder(bytes.NewReader(stdout.Bytes()))
 	dec.DisallowUnknownFields()
@@ -104,9 +104,9 @@ func CheckErrorOutput[T any](
 			continue
 		}
 
-		wantEnvelope := output.JSONErrorEnvelope{
+		wantEnvelope := render.ErrorEnvelope{
 			SchemaVersion: render.SchemaVersion,
-			Error:         output.JSONErrorBody{Message: want},
+			Error:         render.ErrorBody{Message: want},
 		}
 		if got := DecodeErrorEnvelope(t, stdout); got != wantEnvelope {
 			t.Errorf("envelope = %+v, want %+v", got, wantEnvelope)

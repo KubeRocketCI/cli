@@ -80,7 +80,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 
 	deployments, err := svc.List(ctx)
 	if err != nil {
-		return cmdutil.HandleAuthError(err)
+		return render.HandleAuthError(err)
 	}
 
 	return render.RenderBare(opts.IO, opts.OutputFormat, deployments, func(w io.Writer, isTTY bool) error {

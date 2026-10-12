@@ -75,7 +75,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 
 	projects, err := svc.List(ctx)
 	if err != nil {
-		return cmdutil.HandleAuthError(err)
+		return render.HandleAuthError(err)
 	}
 
 	return render.RenderBare(opts.IO, opts.OutputFormat, projects, func(w io.Writer, isTTY bool) error {
