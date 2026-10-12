@@ -17,6 +17,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 // GetOptions holds all inputs for the deployment get command.
@@ -84,14 +85,14 @@ func getRun(ctx context.Context, opts *GetOptions) error {
 		return cmdutil.HandleAuthError(err)
 	}
 
-	return output.RenderDetail(opts.IO, opts.OutputFormat, detail, output.DetailRenderer[*portal.DeploymentDetail]{
-		Styled: printStyledDeploymentDetail,
-		Plain:  printPlainDeploymentDetail,
+	return render.RenderBare(opts.IO, opts.OutputFormat, detail, func(w io.Writer, isTTY bool) error {
+		return printDeploymentDetail(w, isTTY, detail)
 	})
 }
 
 // deploymentDetailLines builds the ordered field list for a deployment detail.
-func deploymentDetailLines(d *portal.DeploymentDetail, styled bool) []output.DetailLine {
+// Status and Available carry their terminal colour in Styled.
+func deploymentDetailLines(d *portal.DeploymentDetail) []output.DetailLine {
 	lines := []output.DetailLine{
 		{Label: "Name", Value: d.Name},
 		{Label: "Namespace", Value: d.Namespace},
@@ -102,15 +103,12 @@ func deploymentDetailLines(d *portal.DeploymentDetail, styled bool) []output.Det
 		lines = append(lines, output.DetailLine{Label: "Description", Value: d.Description})
 	}
 
-	statusLine := output.DetailLine{Label: "Status", Value: d.Status}
-	availableLine := output.DetailLine{Label: "Available", Value: strconv.FormatBool(d.Available)}
-
-	if styled {
-		statusLine.Styled = output.StatusColor(d.Status)
-		availableLine.Styled = output.AvailableText(d.Available)
-	}
-
-	lines = append(lines, statusLine, availableLine)
+	lines = append(lines,
+		output.DetailLine{Label: "Status", Value: d.Status, Styled: output.StatusColor(d.Status)},
+		output.DetailLine{
+			Label: "Available", Value: strconv.FormatBool(d.Available), Styled: output.AvailableText(d.Available),
+		},
+	)
 
 	if d.DetailedMessage != "" {
 		lines = append(lines, output.DetailLine{Label: "Message", Value: output.SingleLine(d.DetailedMessage)})
@@ -119,22 +117,13 @@ func deploymentDetailLines(d *portal.DeploymentDetail, styled bool) []output.Det
 	return lines
 }
 
-// printStyledDeploymentDetail renders deployment details with lipgloss styling.
-func printStyledDeploymentDetail(w io.Writer, d *portal.DeploymentDetail) error {
-	if err := output.PrintStyledDetailLines(w, deploymentDetailLines(d, true)); err != nil {
+// printDeploymentDetail renders the detail lines and the stage table.
+func printDeploymentDetail(w io.Writer, isTTY bool, d *portal.DeploymentDetail) error {
+	if err := output.PrintDetailLines(w, isTTY, deploymentDetailLines(d)); err != nil {
 		return err
 	}
 
-	return printStageSection(w, d.Stages, true)
-}
-
-// printPlainDeploymentDetail renders deployment details as plain text for piped output.
-func printPlainDeploymentDetail(w io.Writer, d *portal.DeploymentDetail) error {
-	if err := output.PrintPlainDetailLines(w, deploymentDetailLines(d, false)); err != nil {
-		return err
-	}
-
-	return printStageSection(w, d.Stages, false)
+	return printStageSection(w, d.Stages, isTTY)
 }
 
 // printStageSection renders the stages table below the detail lines.

@@ -15,6 +15,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 // GetOptions holds all inputs for the project get command.
@@ -82,15 +83,14 @@ func getRun(ctx context.Context, opts *GetOptions) error {
 		return cmdutil.HandleAuthError(err)
 	}
 
-	return output.RenderDetail(opts.IO, opts.OutputFormat, project, output.DetailRenderer[*portal.Project]{
-		Styled: printStyledProjectDetail,
-		Plain:  printPlainProjectDetail,
+	return render.RenderBare(opts.IO, opts.OutputFormat, project, func(w io.Writer, isTTY bool) error {
+		return output.PrintDetailLines(w, isTTY, projectDetailLines(project))
 	})
 }
 
-// projectDetailLines builds the ordered field list for a project.
-// When styled is true, Status and Available get colorized representations.
-func projectDetailLines(p *portal.Project, styled bool) []output.DetailLine {
+// projectDetailLines builds the ordered field list for a project. Status and
+// Available carry their terminal colour in Styled.
+func projectDetailLines(p *portal.Project) []output.DetailLine {
 	lines := []output.DetailLine{
 		{Label: "Name", Value: p.Name},
 		{Label: "Namespace", Value: p.Namespace},
@@ -109,25 +109,12 @@ func projectDetailLines(p *portal.Project, styled bool) []output.DetailLine {
 		lines = append(lines, output.DetailLine{Label: "Git URL", Value: p.GitURL})
 	}
 
-	statusLine := output.DetailLine{Label: "Status", Value: p.Status}
-	availableLine := output.DetailLine{Label: "Available", Value: strconv.FormatBool(p.Available)}
-
-	if styled {
-		statusLine.Styled = output.StatusColor(p.Status)
-		availableLine.Styled = output.AvailableText(p.Available)
-	}
-
-	lines = append(lines, statusLine, availableLine)
+	lines = append(lines,
+		output.DetailLine{Label: "Status", Value: p.Status, Styled: output.StatusColor(p.Status)},
+		output.DetailLine{
+			Label: "Available", Value: strconv.FormatBool(p.Available), Styled: output.AvailableText(p.Available),
+		},
+	)
 
 	return lines
-}
-
-// printStyledProjectDetail renders project details with lipgloss styling.
-func printStyledProjectDetail(w io.Writer, p *portal.Project) error {
-	return output.PrintStyledDetailLines(w, projectDetailLines(p, true))
-}
-
-// printPlainProjectDetail renders project details as plain text for piped output.
-func printPlainProjectDetail(w io.Writer, p *portal.Project) error {
-	return output.PrintPlainDetailLines(w, projectDetailLines(p, false))
 }

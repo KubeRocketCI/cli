@@ -16,7 +16,6 @@ import (
 	"charm.land/lipgloss/v2/table"
 	"gopkg.in/yaml.v3"
 
-	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/portal"
 )
 
@@ -29,13 +28,16 @@ const (
 // ANSI color code used for borders and header accents.
 const accentColor = "99"
 
+// detailLabelWidth is the column width of "<label>:" in detail output.
+const detailLabelWidth = 14
+
 // Style definitions shared across all commands.
 var (
 	HeaderStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(accentColor)).Padding(0, 1)
 	EvenRowStyle = lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.BrightWhite)
 	OddRowStyle  = lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("245"))
 	BorderStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(accentColor))
-	LabelStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("245")).Width(14)
+	LabelStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("245")).Width(detailLabelWidth)
 	ValueStyle   = lipgloss.NewStyle()
 )
 
@@ -366,57 +368,26 @@ func ResolveFormat(explicit string) string {
 }
 
 // DetailLine holds one label-value pair for resource detail rendering.
-// When Styled is populated, the styled renderer uses it instead of Value.
+// In a terminal, a non-empty Styled is shown instead of Value.
 type DetailLine struct {
 	Label  string
 	Value  string
 	Styled string
 }
 
-// DetailRenderer defines styled and plain rendering for a resource detail view.
-type DetailRenderer[T any] struct {
-	Styled func(io.Writer, T) error
-	Plain  func(io.Writer, T) error
-}
-
-// RenderDetail handles the common format-resolution and output logic for detail commands.
-func RenderDetail[T any](ios *iostreams.IOStreams, outputFormat string, data T, r DetailRenderer[T]) error {
-	format := ResolveFormat(outputFormat)
-
-	switch format {
-	case FormatJSON:
-		return PrintJSON(ios.Out, data)
-	case FormatTable:
-		if ios.IsStdoutTTY() {
-			return r.Styled(ios.Out, data)
-		}
-
-		return r.Plain(ios.Out, data)
-	default:
-		return fmt.Errorf("unknown output format: %s (use 'json' or 'table')", format)
-	}
-}
-
-// PrintStyledDetailLines renders detail lines with lipgloss styling.
-func PrintStyledDetailLines(w io.Writer, lines []DetailLine) error {
+// PrintDetailLines writes one "<label>: <value>" line per entry. Plain output
+// pads "<label>:" to detailLabelWidth columns. When isTTY, labels use
+// LabelStyle and a non-empty Styled replaces the ValueStyle rendering of Value.
+func PrintDetailLines(w io.Writer, isTTY bool, lines []DetailLine) error {
 	for _, l := range lines {
-		v := l.Styled
-		if v == "" {
-			v = ValueStyle.Render(l.Value)
+		var err error
+		if isTTY {
+			_, err = lipgloss.Fprintf(w, "%s %s\n", LabelStyle.Render(l.Label+":"), cmp.Or(l.Styled, ValueStyle.Render(l.Value)))
+		} else {
+			_, err = fmt.Fprintf(w, "%-*s%s\n", detailLabelWidth, l.Label+":", l.Value)
 		}
 
-		if _, err := lipgloss.Fprintf(w, "%s %s\n", LabelStyle.Render(l.Label+":"), v); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// PrintPlainDetailLines renders detail lines as plain text for piped output.
-func PrintPlainDetailLines(w io.Writer, lines []DetailLine) error {
-	for _, l := range lines {
-		if _, err := fmt.Fprintf(w, "%-14s%s\n", l.Label+":", l.Value); err != nil {
+		if err != nil {
 			return err
 		}
 	}

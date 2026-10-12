@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
@@ -187,35 +186,28 @@ func (opts *StatusOptions) render(info *auth.UserInfo, haveInfo bool) error {
 		lines = append(lines, output.DetailLine{Label: "Name", Value: info.Name})
 	}
 
-	lines = append(lines, output.DetailLine{Label: "Status", Value: "Authenticated"})
+	lines = append(lines, output.DetailLine{
+		Label: "Status", Value: "Authenticated", Styled: output.GreenText("Authenticated"),
+	})
 
 	if expiry := info.ExpiresAt; !expiry.IsZero() {
 		remaining := time.Until(expiry).Round(time.Second)
-		expiresVal := fmt.Sprintf("%s (%s)", expiry.Local().Format(time.RFC822), remaining)
-		lines = append(lines, output.DetailLine{Label: "Expires", Value: expiresVal})
+		expires := output.DetailLine{
+			Label: "Expires", Value: fmt.Sprintf("%s (%s)", expiry.Local().Format(time.RFC822), remaining),
+		}
+
+		if remaining < 5*time.Minute {
+			expires.Styled = output.YellowText(expires.Value)
+		}
+
+		lines = append(lines, expires)
 	}
 
 	if len(info.Groups) > 0 {
 		lines = append(lines, output.DetailLine{Label: "Groups", Value: strings.Join(info.Groups, ", ")})
 	}
 
-	return output.RenderDetail(opts.IO, "", lines, output.DetailRenderer[[]output.DetailLine]{
-		Styled: func(w io.Writer, ls []output.DetailLine) error {
-			for i, l := range ls {
-				switch l.Label {
-				case "Status":
-					ls[i].Styled = output.GreenText(l.Value)
-				case "Expires":
-					remaining := time.Until(info.ExpiresAt).Round(time.Second)
-					if remaining < 5*time.Minute {
-						ls[i].Styled = output.YellowText(l.Value)
-					}
-				}
-			}
-			return output.PrintStyledDetailLines(w, ls)
-		},
-		Plain: output.PrintPlainDetailLines,
-	})
+	return output.PrintDetailLines(opts.IO.Out, opts.IO.IsStdoutTTY(), lines)
 }
 
 // buildPayload shapes the JSON data block. Groups is always an array and
