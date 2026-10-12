@@ -106,7 +106,7 @@ func renderTable(w io.Writer, isTTY bool, project string, g *portal.SonarGate) e
 		status = portal.QualityGateNone
 	}
 
-	displayStatus := string(status)
+	displayStatus := output.SingleLine(string(status))
 	if isTTY {
 		displayStatus = output.SonarGateStatusColor(status)
 	}

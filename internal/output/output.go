@@ -165,12 +165,12 @@ func Truncate(s string, maxWidth int) string {
 	return string(runes[:maxWidth-3]) + "..."
 }
 
-// Printable makes every control character in s visible: a C0 byte other than
+// printable makes every control character in s visible: a C0 byte other than
 // \n, \t and \r in caret notation (ESC is ^[), DEL as ^?, and a C1 rune
 // U+0080-U+009F as ^[ plus its 7-bit letter. The line and paragraph separators
 // become \n. Bidirectional overrides and isolates are dropped. Invalid UTF-8
 // becomes U+FFFD.
-func Printable(s string) string {
+func printable(s string) string {
 	var b strings.Builder
 
 	b.Grow(len(s))
@@ -211,13 +211,13 @@ func bidi(r rune) bool {
 // SingleLine makes s printable and collapses every whitespace run, newlines
 // included, into one space, so a multi-line operator message fits one row.
 func SingleLine(s string) string {
-	return strings.Join(strings.Fields(Printable(s)), " ")
+	return strings.Join(strings.Fields(printable(s)), " ")
 }
 
 var oneRow = strings.NewReplacer("\n", " ", "\r", " ", "\t", " ")
 
-// cell is Printable on one display row.
-func cell(s string) string { return oneRow.Replace(Printable(s)) }
+// cell is printable on one display row.
+func cell(s string) string { return oneRow.Replace(printable(s)) }
 
 // sgrShape and linkShape match the shapes of an SGR sequence and an OSC 8
 // link. A match passes styledCell only when the termseq policy, the one the
@@ -288,15 +288,17 @@ func mapRows(rows [][]string, f func(string) string) [][]string {
 }
 
 // Hyperlink renders text, on one row, as an OSC 8 link to target when
-// termseq.Link accepts the target. Otherwise it returns the text alone.
+// termseq.Link accepts the target, which it percent-encodes. Otherwise it
+// returns the text alone.
 func Hyperlink(text, target string) string {
 	text = cell(text)
 
-	if !termseq.Link(target) {
+	encoded, ok := termseq.Link(target)
+	if !ok {
 		return text
 	}
 
-	return lipgloss.NewStyle().Hyperlink(target).Render(text)
+	return lipgloss.NewStyle().Hyperlink(encoded).Render(text)
 }
 
 // GreenText returns s rendered in green.
