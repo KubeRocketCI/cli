@@ -246,6 +246,7 @@ var contractRows = []contractRow{
 
 	{cmd: cmdProjectList, format: formatJSON, fixture: "project", name: "projects"},
 	{cmd: cmdProjectList, format: formatJSON, fixture: "codebase-401", wantExit: 1, name: nameUnauthorized},
+	{cmd: cmdProjectList, format: formatUnknown, fixture: "project", wantExit: 1, name: nameUnknownFormat},
 	{cmd: cmdProjectList, format: formatJSON, fixture: "none",
 		env: map[string]string{"KRCI_PORTAL_URL": "http://portal.example.com"}, wantExit: 1, name: "insecure-portal-url"},
 	{cmd: cmdProjectGet, args: []string{projectName}, format: formatJSON, fixture: "project", name: "detail"},
@@ -253,6 +254,8 @@ var contractRows = []contractRow{
 		name: nameNotFound},
 	{cmd: cmdProjectGet, args: []string{projectName}, format: formatJSON, fixture: "codebase-401", wantExit: 1,
 		name: nameUnauthorized},
+	{cmd: cmdProjectGet, args: []string{projectName}, format: formatUnknown, fixture: "project", wantExit: 1,
+		name: nameUnknownFormat},
 	{cmd: cmdProjectVersions, args: []string{projectName}, format: formatJSON, fixture: "project", name: "versions"},
 	{cmd: cmdProjectVersions, args: []string{projectName}, format: formatJSON, fixture: "codebase-404",
 		wantExit: 1, name: nameNotFound},
@@ -265,6 +268,7 @@ var contractRows = []contractRow{
 
 	{cmd: cmdDeploymentList, format: formatJSON, fixture: "project", name: "deployments"},
 	{cmd: cmdDeploymentList, format: formatJSON, fixture: "cdpipelines-401", wantExit: 1, name: nameUnauthorized},
+	{cmd: cmdDeploymentList, format: formatUnknown, fixture: "project", wantExit: 1, name: nameUnknownFormat},
 	{cmd: cmdDeploymentGet, args: []string{envDeployment}, format: formatJSON, fixture: "env", name: "detail"},
 	{cmd: cmdDeploymentGet, args: []string{emptyDeployment}, format: formatJSON, fixture: "project",
 		name: "no-stages"},
