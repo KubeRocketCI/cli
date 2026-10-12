@@ -60,7 +60,7 @@ func PrintError(ios *iostreams.IOStreams, outputFormat string, err error) error 
 		return err
 	}
 
-	if output.ResolveFormat(outputFormat) == output.FormatJSON {
+	if ResolveFormat(outputFormat) == FormatJSON {
 		_ = output.PrintJSON(ios.Out, ErrorEnvelope{
 			SchemaVersion: SchemaVersion,
 			Error:         ErrorBody{Message: err.Error()},

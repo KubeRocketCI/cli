@@ -56,3 +56,13 @@ func TestValidateOutputFormat(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveFormat(t *testing.T) {
+	t.Parallel()
+
+	for in, want := range map[string]string{"": render.FormatTable, "json": "json", "xml": "xml"} {
+		if got := render.ResolveFormat(in); got != want {
+			t.Errorf("ResolveFormat(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

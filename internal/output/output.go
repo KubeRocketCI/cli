@@ -19,12 +19,6 @@ import (
 	"github.com/KubeRocketCI/cli/internal/portal"
 )
 
-const (
-	FormatTable = "table"
-	FormatJSON  = "json"
-	FormatYAML  = "yaml"
-)
-
 // ANSI color code used for borders and header accents.
 const accentColor = "99"
 
@@ -324,16 +318,6 @@ func SonarGateStatusColor(status portal.QualityGateStatus) string {
 	default:
 		return s
 	}
-}
-
-// ResolveFormat returns the explicit format if provided, otherwise defaults to table.
-// Use -o json for JSON output.
-func ResolveFormat(explicit string) string {
-	if explicit != "" {
-		return explicit
-	}
-
-	return FormatTable
 }
 
 // DetailLine holds one label-value pair for resource detail rendering.

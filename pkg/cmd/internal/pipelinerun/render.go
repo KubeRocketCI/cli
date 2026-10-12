@@ -46,7 +46,7 @@ func renderDryRun(out io.Writer, format string, manifest map[string]any) error {
 		return fmt.Errorf("portal returned empty dry-run manifest")
 	}
 
-	if format == output.FormatJSON {
+	if format == render.FormatJSON {
 		return render.PrintEnvelope(out, manifest)
 	}
 
@@ -61,7 +61,7 @@ func PresentResult(ios *iostreams.IOStreams, format string, dryRun bool, result 
 		return renderDryRun(ios.Out, format, result.DryRunManifest)
 	}
 
-	if output.ResolveFormat(format) == output.FormatJSON {
+	if render.ResolveFormat(format) == render.FormatJSON {
 		return render.PrintEnvelope(ios.Out, result)
 	}
 

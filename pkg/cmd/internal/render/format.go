@@ -6,6 +6,22 @@ import (
 	"strings"
 )
 
+// The `-o` values.
+const (
+	FormatTable = "table"
+	FormatJSON  = "json"
+	FormatYAML  = "yaml"
+)
+
+// ResolveFormat returns explicit, or FormatTable when it is empty.
+func ResolveFormat(explicit string) string {
+	if explicit != "" {
+		return explicit
+	}
+
+	return FormatTable
+}
+
 // ValidateOutputFormat accepts "" (the default) and every value in allowed;
 // the match is case-sensitive. Any other value is an unknown-format error
 // that lists allowed, in order. allowed must not be empty.

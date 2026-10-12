@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
-	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
@@ -83,7 +82,7 @@ func CheckErrorOutput[T any](
 ) {
 	t.Helper()
 
-	for _, format := range []string{output.FormatJSON, ""} {
+	for _, format := range []string{render.FormatJSON, ""} {
 		f, stdout := NewPortalFactory(t, handler)
 
 		args := argv

@@ -171,10 +171,9 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		result = &truncated
 	}
 
-	// JSON consumers (jq, agents) depend on a stable envelope shape, so emit
-	// one even when the result is empty — before the human-readable
-	// "No pipeline runs found" short-circuit below.
-	if output.ResolveFormat(opts.OutputFormat) == output.FormatJSON {
+	// -o json writes the bare result, empty or not, before the
+	// "No pipeline runs found" short-circuit.
+	if render.ResolveFormat(opts.OutputFormat) == render.FormatJSON {
 		return output.PrintJSON(opts.IO.Out, result)
 	}
 

@@ -58,7 +58,7 @@ By default excludes inactive projects and child versions.`,
   # Scripting — every project with at least one CRITICAL finding
   krci sca list -o json | jq -r '.data.items[] | select(.metrics.critical>0) | .name'`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := render.ValidateOutputFormat(opts.OutputFormat, output.FormatJSON, output.FormatTable); err != nil {
+			if err := render.ValidateOutputFormat(opts.OutputFormat, render.FormatJSON, render.FormatTable); err != nil {
 				return err
 			}
 

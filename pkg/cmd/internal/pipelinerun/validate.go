@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/KubeRocketCI/cli/internal/output"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 // Kinds for ParseKeyValueList error messages.
@@ -35,23 +35,17 @@ const (
 //   - --dry-run + "table"  → rejected (no row to render for a manifest).
 //   - any other -o value   → rejected as unknown.
 func ValidateOutputAndDryRun(format string, dryRun bool) error {
-	switch format {
-	case "", output.FormatJSON:
-		return nil
-	case output.FormatTable:
-		if dryRun {
-			return fmt.Errorf("--dry-run cannot use -o table (use -o json or -o yaml)")
-		}
+	if err := render.ValidateOutputFormat(format, render.FormatJSON, render.FormatYAML, render.FormatTable); err != nil {
+		return err
+	}
 
-		return nil
-	case output.FormatYAML:
-		if !dryRun {
-			return fmt.Errorf("-o yaml requires --dry-run")
-		}
-
-		return nil
+	switch {
+	case format == render.FormatTable && dryRun:
+		return fmt.Errorf("--dry-run cannot use -o table (use -o json or -o yaml)")
+	case format == render.FormatYAML && !dryRun:
+		return fmt.Errorf("-o yaml requires --dry-run")
 	default:
-		return fmt.Errorf("unknown output format: %s (use 'json', 'yaml', or 'table')", format)
+		return nil
 	}
 }
 

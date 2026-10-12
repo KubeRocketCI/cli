@@ -196,7 +196,7 @@ func renderRun(opts *GetOptions, result *portal.PipelineRunListResult) error {
 		result = &truncated
 	}
 
-	if output.ResolveFormat(opts.OutputFormat) == output.FormatJSON {
+	if render.ResolveFormat(opts.OutputFormat) == render.FormatJSON {
 		return output.PrintJSON(opts.IO.Out, result)
 	}
 
