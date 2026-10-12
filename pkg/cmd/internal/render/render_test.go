@@ -1,4 +1,4 @@
-package render
+package render_test
 
 import (
 	"bytes"
@@ -9,7 +9,9 @@ import (
 
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
+	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 func newBufferedIO() (*iostreams.IOStreams, *bytes.Buffer) {
@@ -24,7 +26,7 @@ func TestRender_JSONEnvelope(t *testing.T) {
 
 	ios, stdout := newBufferedIO()
 
-	err := Render(ios, "json", map[string]int{"bugs": 3}, func(_ io.Writer, _ bool) error {
+	err := render.Render(ios, "json", map[string]int{"bugs": 3}, func(_ io.Writer, _ bool) error {
 		t.Fatal("table renderer must not run for -o json")
 		return nil
 	})
@@ -40,8 +42,8 @@ func TestRender_JSONEnvelope(t *testing.T) {
 		t.Fatalf("invalid JSON: %v", err)
 	}
 
-	if got.SchemaVersion != SchemaVersion {
-		t.Errorf("schemaVersion = %q, want %q", got.SchemaVersion, SchemaVersion)
+	if got.SchemaVersion != render.SchemaVersion {
+		t.Errorf("schemaVersion = %q, want %q", got.SchemaVersion, render.SchemaVersion)
 	}
 
 	if got.Data["bugs"] != 3 {
@@ -55,7 +57,7 @@ func TestRender_TableDefault(t *testing.T) {
 	ios, _ := newBufferedIO()
 	called := false
 
-	err := Render(ios, "", "unused", func(_ io.Writer, _ bool) error {
+	err := render.Render(ios, "", "unused", func(_ io.Writer, _ bool) error {
 		called = true
 		return nil
 	})
@@ -73,7 +75,7 @@ func TestRender_UnknownFormat(t *testing.T) {
 
 	ios, stdout := newBufferedIO()
 
-	err := Render(ios, "yaml", "unused", func(_ io.Writer, _ bool) error {
+	err := render.Render(ios, "yaml", "unused", func(_ io.Writer, _ bool) error {
 		t.Fatal("table renderer must not run for an unknown format")
 		return nil
 	})
@@ -101,7 +103,7 @@ func TestRender_TableCallbackReceivesNonTTY(t *testing.T) {
 		rendererCalled bool
 	)
 
-	err := Render(ios, "table", "payload", func(_ io.Writer, isTTY bool) error {
+	err := render.Render(ios, "table", "payload", func(_ io.Writer, isTTY bool) error {
 		rendererCalled = true
 		capturedTTY = isTTY
 
@@ -125,7 +127,7 @@ func TestRenderBare_JSONHasNoEnvelope(t *testing.T) {
 
 	ios, stdout := newBufferedIO()
 
-	err := RenderBare(ios, "json", map[string]int{"bugs": 3}, func(_ io.Writer, _ bool) error {
+	err := render.RenderBare(ios, "json", map[string]int{"bugs": 3}, func(_ io.Writer, _ bool) error {
 		t.Fatal("table renderer must not run for -o json")
 		return nil
 	})
@@ -144,7 +146,7 @@ func TestRenderBare_TableWritesToStdout(t *testing.T) {
 	for _, format := range []string{"", "table"} {
 		ios, stdout := newBufferedIO()
 
-		err := RenderBare(ios, format, "unused", func(w io.Writer, isTTY bool) error {
+		err := render.RenderBare(ios, format, "unused", func(w io.Writer, isTTY bool) error {
 			if isTTY {
 				t.Error("isTTY should be false for a bytes.Buffer writer")
 			}
@@ -168,7 +170,7 @@ func TestRenderBare_UnknownFormat(t *testing.T) {
 
 	ios, stdout := newBufferedIO()
 
-	err := RenderBare(ios, "xml", "unused", func(_ io.Writer, _ bool) error {
+	err := render.RenderBare(ios, "xml", "unused", func(_ io.Writer, _ bool) error {
 		t.Fatal("table renderer must not run for an unknown format")
 		return nil
 	})
@@ -182,17 +184,50 @@ func TestRenderBare_UnknownFormat(t *testing.T) {
 	}
 }
 
+// TestPrintError_NoAuthPrefix pins the difference from HandleError: an
+// unauthorized error keeps its own text, as auth status prints it.
+func TestPrintError_NoAuthPrefix(t *testing.T) {
+	t.Parallel()
+
+	ios, stdout := newBufferedIO()
+
+	if got := render.PrintError(ios, "json", portal.ErrUnauthorized); got != portal.ErrUnauthorized {
+		t.Errorf("PrintError must return the original error; got %v", got)
+	}
+
+	want := output.JSONErrorEnvelope{
+		SchemaVersion: render.SchemaVersion,
+		Error:         output.JSONErrorBody{Message: portal.ErrUnauthorized.Error()},
+	}
+	if got := cmdtest.DecodeErrorEnvelope(t, stdout); got != want {
+		t.Errorf("envelope = %+v, want %+v", got, want)
+	}
+}
+
+func TestPrintEnvelope(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	if err := render.PrintEnvelope(&buf, map[string]int{"bugs": 3}); err != nil {
+		t.Fatalf("PrintEnvelope: %v", err)
+	}
+
+	if want := "{\n  \"schemaVersion\": \"1\",\n  \"data\": {\n    \"bugs\": 3\n  }\n}\n"; buf.String() != want {
+		t.Errorf("PrintEnvelope = %q, want %q", buf.String(), want)
+	}
+}
+
 func TestHandleError_JSONEnvelopePrinted(t *testing.T) {
 	t.Parallel()
 
 	ios, stdout := newBufferedIO()
 	boom := errors.New("boom")
 
-	if got := HandleError(ios, "json", boom); got != boom {
+	if got := render.HandleError(ios, "json", boom); got != boom {
 		t.Errorf("HandleError must return the original error; got %v", got)
 	}
 
-	want := output.JSONErrorEnvelope{SchemaVersion: SchemaVersion, Error: output.JSONErrorBody{Message: "boom"}}
+	want := output.JSONErrorEnvelope{SchemaVersion: render.SchemaVersion, Error: output.JSONErrorBody{Message: "boom"}}
 	if got := cmdtest.DecodeErrorEnvelope(t, stdout); got != want {
 		t.Errorf("envelope = %+v, want %+v", got, want)
 	}
@@ -204,7 +239,7 @@ func TestHandleError_TableWritesNothing(t *testing.T) {
 	ios, stdout := newBufferedIO()
 	boom := errors.New("boom")
 
-	if got := HandleError(ios, "table", boom); got != boom {
+	if got := render.HandleError(ios, "table", boom); got != boom {
 		t.Errorf("HandleError must return the original error; got %v", got)
 	}
 
