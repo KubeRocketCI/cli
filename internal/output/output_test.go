@@ -8,12 +8,14 @@ import (
 	"testing"
 	"time"
 
+	"charm.land/lipgloss/v2"
+
 	"github.com/KubeRocketCI/cli/internal/portal"
 )
 
 // sgr matches the SGR sequences Style.Render emits; tests strip them before
 // comparing bytes.
-var sgr = regexp.MustCompile("\x1b\\[[0-9;]*m")
+var sgr = regexp.MustCompile(sgrShape)
 
 func TestSonarGateStatusColor_PassthroughWhenUnknown(t *testing.T) {
 	t.Parallel()
@@ -144,11 +146,13 @@ func TestSingleLine(t *testing.T) {
 			in:   "  rpc error:\n\tcode = Unknown  desc = chart\r\nfailed \n",
 			want: "rpc error: code = Unknown desc = chart failed",
 		},
-		"escape sequences lose their control characters": {
-			in:   "boom \x1b]0;title\x07\x1b[2J done\u009b31m",
-			want: "boom ]0;title[2J done31m",
+		"control characters become visible": {
+			in:   "boom \x1b]0;title\x07\x1b[2J done\u009b31m\x7f",
+			want: "boom ^[]0;title^G^[[2J done^[[31m^?",
 		},
-		"text beyond ASCII stays": {in: "помилка —  кінець", want: "помилка — кінець"},
+		"bidi overrides drop, separators break": {in: "a\u202eb\u2066c\u2028d", want: "abc d"},
+		"invalid UTF-8 becomes U+FFFD":          {in: "a\xffb", want: "a\ufffdb"},
+		"text beyond ASCII stays":               {in: "помилка —  кінець", want: "помилка — кінець"},
 	}
 
 	for name, tc := range cases {
@@ -284,7 +288,7 @@ func TestPrintAligned_Empty(t *testing.T) {
 
 	for _, isTTY := range []bool{false, true} {
 		var buf bytes.Buffer
-		if err := PrintAligned(&buf, isTTY, nil, "  "); err != nil {
+		if err := PrintAligned(&buf, isTTY, nil, "  ", 0); err != nil {
 			t.Fatalf("PrintAligned(isTTY=%v, nil): %v", isTTY, err)
 		}
 
@@ -333,7 +337,7 @@ func TestPrintAligned(t *testing.T) {
 			t.Parallel()
 
 			var buf bytes.Buffer
-			if err := PrintAligned(&buf, tc.isTTY, lines, tc.indent); err != nil {
+			if err := PrintAligned(&buf, tc.isTTY, lines, tc.indent, 0); err != nil {
 				t.Fatalf("PrintAligned: %v", err)
 			}
 
@@ -413,5 +417,201 @@ func TestPrintJSON_PlainBytesUnchanged(t *testing.T) {
 
 	if got.String() != want.String() {
 		t.Errorf("PrintJSON = %q, want %q", got.String(), want.String())
+	}
+}
+
+func TestPrintable(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct{ in, want string }{
+		"plain is unchanged":          {in: "plain текст\n\tok\r", want: "plain текст\n\tok\r"},
+		"C0 in caret notation":        {in: "\x00\x07\x1b[2J", want: "^@^G^[[2J"},
+		"DEL":                         {in: "a\x7fb", want: "a^?b"},
+		"C1 as ESC plus letter":       {in: "\u009b31m\u009d0;t\u0085", want: "^[[31m^[]0;t^[E"},
+		"bidi drop, separators break": {in: "a\u202a\u202e\u2066\u2069b\u2028c\u2029d", want: "ab\nc\nd"},
+		"invalid UTF-8":               {in: "a\xff\xc3b", want: "a\ufffd\ufffdb"},
+	}
+
+	for name, tc := range cases {
+		if got := Printable(tc.in); got != tc.want {
+			t.Errorf("%s: Printable = %q, want %q", name, got, tc.want)
+		}
+	}
+}
+
+func TestPrintTable_HostileCells(t *testing.T) {
+	t.Parallel()
+
+	headers := []string{"NAME\nX"}
+	rows := [][]string{{"a\x1b[2J\nb\tc"}}
+
+	var plain bytes.Buffer
+	if err := PrintTable(&plain, false, headers, rows); err != nil {
+		t.Fatal(err)
+	}
+
+	if want := "NAME X\na^[[2J b c\n"; plain.String() != want {
+		t.Errorf("plain = %q, want %q", plain.String(), want)
+	}
+
+	// Every control that lipgloss measures as zero width but a terminal acts
+	// on, inside and outside the CLI's own sequences, plus link payloads that
+	// carry a line break.
+	link := Hyperlink("t", "http://h/")
+	hostile := [][]string{
+		{"legit\f\f\fpay\x7f\v\x1b[2J\u202ements " + greenStyle.Render("ok\fnot") + " " + link},
+		{"x\x1b]8;\nFORGED\x07"},
+		{"x\x1b]8;;http://h/\rFORGED\x07"},
+		{Hyperlink("a", "http://a/\nb")},
+		{"a\nb\t" + greenStyle.Render("ok")},
+	}
+	visible := [][]string{
+		{"legit^L^L^Lpay^?^K^[[2Jments " + greenStyle.Render("ok^Lnot") + " " + link},
+		{"x^[]8; FORGED^G"},
+		{"x^[]8;;http://h/ FORGED^G"},
+		{"a"},
+		{"a b " + greenStyle.Render("ok")},
+	}
+
+	var styled bytes.Buffer
+	if err := PrintTable(&styled, true, headers, hostile); err != nil {
+		t.Fatal(err)
+	}
+
+	var clean bytes.Buffer
+	if err := PrintTable(&clean, true, []string{"NAME X"}, visible); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, want := range []string{greenStyle.Render("ok^Lnot"), link, "x^[]8; FORGED^G"} {
+		if !strings.Contains(styled.String(), want) {
+			t.Errorf("styled table is missing %q:\n%q", want, styled.String())
+		}
+	}
+
+	if got, want := strings.Count(styled.String(), "\n"), strings.Count(clean.String(), "\n"); got != want {
+		t.Errorf("styled table has %d lines, want %d:\n%q", got, want, styled.String())
+	}
+
+	if styled.String() != clean.String() {
+		t.Errorf("styled = %q, want the render of the visible input %q", styled.String(), clean.String())
+	}
+}
+
+func TestPrintDetailLines_HostileValues(t *testing.T) {
+	t.Parallel()
+
+	lines := []DetailLine{{Label: "Na\nme", Value: "v\x1b]0;t\x07\nw", Styled: greenStyle.Render("x\fy") + "\nz"}}
+
+	var plain bytes.Buffer
+	if err := PrintDetailLines(&plain, false, lines); err != nil {
+		t.Fatal(err)
+	}
+
+	if want := "Na me:        v^[]0;t^G w\n"; plain.String() != want {
+		t.Errorf("plain = %q, want %q", plain.String(), want)
+	}
+
+	var styled bytes.Buffer
+	if err := PrintDetailLines(&styled, true, lines); err != nil {
+		t.Fatal(err)
+	}
+
+	if got, want := sgr.ReplaceAllString(styled.String(), ""), "Na me:         x^Ly z\n"; got != want {
+		t.Errorf("styled = %q, want %q", got, want)
+	}
+}
+
+func TestPrintAligned_MinimumWidth(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	if err := PrintAligned(&buf, false, []DetailLine{{Label: "Ab:", Value: "v\nw"}}, "", 6); err != nil {
+		t.Fatal(err)
+	}
+
+	if want := "Ab:      v w\n"; buf.String() != want {
+		t.Errorf("PrintAligned = %q, want %q", buf.String(), want)
+	}
+}
+
+func TestStatusColor_UnknownIsPrintable(t *testing.T) {
+	t.Parallel()
+
+	if got := StatusColor("odd\x1b[2J\nstate"); got != "odd^[[2J state" {
+		t.Errorf("StatusColor = %q", got)
+	}
+}
+
+func TestLabelWidth(t *testing.T) {
+	t.Parallel()
+
+	got := LabelWidth([]DetailLine{{Label: "ab"}}, []DetailLine{{Label: "a\tbc"}, {Label: "Опис"}})
+	if got != 4 {
+		t.Errorf("LabelWidth = %d, want 4", got)
+	}
+}
+
+func TestStyledCell(t *testing.T) {
+	t.Parallel()
+
+	link := "\x1b]8;;http://h/\x1b\\t\x1b]8;;\x1b\\"
+
+	cases := map[string]struct{ in, want string }{
+		"SGR and a link pass, the rest is visible": {
+			in:   "\x1b[32mok\x1b[m \x1b[2J\f" + link + "\u009b2J",
+			want: "\x1b[32mok\x1b[m ^[[2J^L" + link + "^[[2J",
+		},
+		"a newline in a link payload":         {in: "x\x1b]8;\nFORGED\x07", want: "x^[]8; FORGED^G"},
+		"a carriage return in a link payload": {in: "x\x1b]8;;http://h/\rFORGED\x07", want: "x^[]8;;http://h/ FORGED^G"},
+		"a bidi override in a link payload":   {in: "\x1b]8;;http://h/\u202e\x07t", want: "^[]8;;http://h/^Gt"},
+		"an SGR the stream drops is visible":  {in: "\x1b[7mrev\x1b[m", want: "^[[7mrev\x1b[m"},
+		"an index the stream rejects":         {in: "\x1b[38;5;999mX", want: "^[[38;5;999mX"},
+		"too many SGR fields":                 {in: "\x1b[1;1;1;1;1;1;1;1;1mX", want: "^[[1;1;1;1;1;1;1;1;1mX"},
+		"a malformed link payload":            {in: "\x1b]8;x\x07t", want: "^[]8;x^Gt"},
+		"a javascript link":                   {in: "\x1b]8;;javascript:alert(1)\x07t", want: "^[]8;;javascript:alert(1)^Gt"},
+	}
+
+	for name, tc := range cases {
+		if got := styledCell(tc.in); got != tc.want {
+			t.Errorf("%s: styledCell = %q, want %q", name, got, tc.want)
+		}
+	}
+}
+
+// Every style the CLI renders with, and a link, pass styledCell unchanged.
+func TestStyledCell_KeepsOwnStyles(t *testing.T) {
+	t.Parallel()
+
+	own := []string{
+		HeaderStyle.Render("h"), EvenRowStyle.Render("e"), OddRowStyle.Render("o"), LabelStyle.Render("l"),
+		SectionStyle.Render("s"), DimStyle.Render("d"), greenStyle.Render("g"), yellowStyle.Render("y"),
+		redStyle.Render("r"), blueStyle.Render("b"), grayStyle.Render("x"),
+		Hyperlink("t", "http://h/"), Hyperlink("t", "https://h/p?q=1#f"),
+	}
+
+	for _, s := range own {
+		if got := styledCell(s); got != s {
+			t.Errorf("styledCell(%q) = %q, want it unchanged", s, got)
+		}
+	}
+}
+
+func TestHyperlink(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct{ text, target, want string }{
+		"http link":             {"t", "http://h/", lipgloss.NewStyle().Hyperlink("http://h/").Render("t")},
+		"no target":             {"t", "", "t"},
+		"javascript":            {"t", "javascript:alert(1)", "t"},
+		"no host":               {"t", "http:///p", "t"},
+		"newline in target":     {"t", "http://h/\nb", "t"},
+		"text stays on one row": {"a\nb", "http://h/", lipgloss.NewStyle().Hyperlink("http://h/").Render("a b")},
+	}
+
+	for name, tc := range cases {
+		if got := Hyperlink(tc.text, tc.target); got != tc.want {
+			t.Errorf("%s: Hyperlink = %q, want %q", name, got, tc.want)
+		}
 	}
 }

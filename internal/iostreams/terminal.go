@@ -2,18 +2,16 @@ package iostreams
 
 import (
 	"io"
-	"net/url"
-	"strconv"
-	"strings"
 	"sync"
 	"unicode/utf8"
+
+	"github.com/KubeRocketCI/cli/internal/termseq"
 )
 
 // Limits on a sequence under collection. A sequence past its limit is dropped.
 const (
-	maxCSILen    = 64
-	maxOSCLen    = 2048
-	maxSGRParams = 8
+	maxCSILen = 64
+	maxOSCLen = 2048
 )
 
 const (
@@ -23,8 +21,7 @@ const (
 	sub = 0x1a
 	del = 0x7f
 
-	sgrReset = "\x1b[m"
-	linkEnd  = "\x1b]8;;\x1b\\"
+	linkEnd = "\x1b]8;;\x1b\\"
 )
 
 type seqState uint8
@@ -46,11 +43,10 @@ const (
 //   - Printable text, \n and \t pass. Invalid UTF-8 bytes become U+FFFD.
 //   - \r\n becomes \n. A lone \r becomes \n.
 //   - Every other C0 byte, DEL and the C1 runes U+0080-U+009F are dropped.
-//   - SGR sequences pass when every parameter is in the allow list (reset,
-//     bold, foreground 30-37, 90-97, 38;5;n, 38;2;r;g;b, 39), re-serialised
-//     canonically.
-//   - OSC 8 passes when the target is empty or an http(s) URL with a host and
-//     printable ASCII only, re-emitted with ST and without params.
+//   - SGR sequences pass when termseq.SGR accepts their parameters,
+//     re-serialised canonically.
+//   - OSC 8 passes when termseq.OSC8 accepts its payload, re-emitted with ST
+//     and without params.
 //   - Every other CSI, ESC, OSC, DCS, SOS, PM and APC sequence is dropped whole.
 //   - In a CSI, ESC or OSC sequence a C0 byte, DEL or a byte of 0x80 or above
 //     aborts the sequence: it is dropped and the byte is processed in ground
@@ -174,7 +170,7 @@ func (t *terminalWriter) newline() {
 	}
 
 	if t.style {
-		t.out = append(t.out, sgrReset...)
+		t.out = append(t.out, termseq.Reset...)
 		t.style = false
 	}
 
@@ -330,7 +326,7 @@ func (t *terminalWriter) finishCSI(final byte) {
 		return
 	}
 
-	canon, open, ok := sgr(params)
+	canon, open, ok := termseq.SGR(params)
 	if !ok {
 		return
 	}
@@ -339,102 +335,15 @@ func (t *terminalWriter) finishCSI(final byte) {
 	t.style = open
 }
 
-// sgr validates SGR parameters against the allow list and returns the
-// canonical sequence and whether it leaves a style open. A sequence whose net
-// effect is a reset is returned as the plain reset.
-func sgr(params string) (canon string, open, ok bool) {
-	if params == "" {
-		return sgrReset, false, true
-	}
-
-	fields := strings.Split(params, ";")
-	if len(fields) > maxSGRParams {
-		return "", false, false
-	}
-
-	values := make([]int, 0, len(fields))
-
-	for _, f := range fields {
-		if f == "" {
-			values = append(values, 0)
-
-			continue
-		}
-
-		v, err := strconv.Atoi(f)
-		if err != nil || strings.Trim(f, "0123456789") != "" {
-			return "", false, false
-		}
-
-		values = append(values, v)
-	}
-
-	parts := make([]string, 0, len(values))
-
-	for i := 0; i < len(values); i++ {
-		v := values[i]
-
-		switch {
-		case v == 0:
-			open = false
-		case v == 1 || v == 39 || (v >= 30 && v <= 37) || (v >= 90 && v <= 97):
-			open = true
-		case v == 38:
-			n := colorArgs(values[i+1:])
-			if n == 0 {
-				return "", false, false
-			}
-
-			parts = appendInts(parts, values[i:i+1+n])
-			i += n
-			open = true
-
-			continue
-		default:
-			return "", false, false
-		}
-
-		parts = append(parts, strconv.Itoa(v))
-	}
-
-	if !open {
-		return sgrReset, false, true
-	}
-
-	return "\x1b[" + strings.Join(parts, ";") + "m", true, true
-}
-
-// colorArgs returns the number of parameters that follow 38: 2 for 5;n and 4
-// for 2;r;g;b, or 0 when they are missing or out of range.
-func colorArgs(rest []int) int {
-	switch {
-	case len(rest) >= 2 && rest[0] == 5 && rest[1] <= 255:
-		return 2
-	case len(rest) >= 4 && rest[0] == 2 && rest[1] <= 255 && rest[2] <= 255 && rest[3] <= 255:
-		return 4
-	default:
-		return 0
-	}
-}
-
-func appendInts(parts []string, values []int) []string {
-	for _, v := range values {
-		parts = append(parts, strconv.Itoa(v))
-	}
-
-	return parts
-}
-
 func (t *terminalWriter) finishOSC() {
 	payload, over := string(t.seq), t.over
 	t.reset()
 
-	rest, ok := strings.CutPrefix(payload, "8;")
-	if !ok || over {
+	if over {
 		return
 	}
 
-	_, target, ok := strings.Cut(rest, ";")
+	target, ok := termseq.OSC8(payload)
 	if !ok {
 		return
 	}
@@ -448,27 +357,8 @@ func (t *terminalWriter) finishOSC() {
 		return
 	}
 
-	if !safeLink(target) {
-		return
-	}
-
 	t.out = append(t.out, "\x1b]8;;"...)
 	t.out = append(t.out, target...)
 	t.out = append(t.out, "\x1b\\"...)
 	t.link = true
-}
-
-// safeLink reports whether target is an http(s) URL with a host and printable
-// ASCII without spaces. Its length is bounded by maxOSCLen.
-func safeLink(target string) bool {
-	if strings.ContainsFunc(target, func(r rune) bool { return r <= ' ' || r >= del }) {
-		return false
-	}
-
-	u, err := url.Parse(target)
-	if err != nil || u.Host == "" {
-		return false
-	}
-
-	return u.Scheme == "http" || u.Scheme == "https"
 }

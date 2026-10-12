@@ -15,6 +15,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
+	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
@@ -472,5 +473,58 @@ func TestStatus_RejectsUnknownOutputFormat(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "unknown output format") {
 		t.Errorf("error = %v, want 'unknown output format'", err)
+	}
+}
+
+// TestStatus_Authenticated_Terminal: on a TTY the status is green and an
+// expiry under five minutes is yellow.
+func TestStatus_Authenticated_Terminal(t *testing.T) {
+	t.Parallel()
+
+	green := output.GreenText("Authenticated")
+	yellow, _, _ := strings.Cut(output.YellowText("x"), "x")
+
+	cases := map[string]struct {
+		expiresIn    time.Duration
+		want, absent []string
+	}{
+		"an hour left": {expiresIn: time.Hour, want: []string{green}, absent: []string{yellow}},
+		"minutes left": {expiresIn: 4 * time.Minute, want: []string{green, yellow}},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			tp := &mockTokenProvider{info: &auth.UserInfo{
+				Email: "user@example.com", ExpiresAt: time.Now().Add(tc.expiresIn),
+			}}
+
+			var out bytes.Buffer
+
+			f := cmdutil.New(iostreams.New(nil, &out, &bytes.Buffer{}, true))
+			f.TokenProvider = func() (auth.TokenProvider, error) { return tp, nil }
+
+			cmd := NewCmdStatus(f, nil)
+			cmd.SetArgs(nil)
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+
+			for _, want := range tc.want {
+				if !strings.Contains(out.String(), want) {
+					t.Errorf("stdout missing %q:\n%q", want, out.String())
+				}
+			}
+
+			for _, absent := range tc.absent {
+				if strings.Contains(out.String(), absent) {
+					t.Errorf("stdout has %q:\n%q", absent, out.String())
+				}
+			}
+		})
 	}
 }

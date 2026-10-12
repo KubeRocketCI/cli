@@ -31,9 +31,10 @@ func TestHostileDescription(t *testing.T) {
 
 	got := res.stdout
 
-	for _, bad := range []string{"\x1b", "\x07", "\x7f", "\u009b", "javascript:", "[2J"} {
+	for _, bad := range []string{"\x1b", "\x07", "\x7f", "\u009b", "\nFORGED"} {
 		assert.NotContains(t, got, bad)
 	}
 
-	assert.Contains(t, got, "Description:  Demo")
+	assert.Contains(t, got, "Description:  Demo^[]0;pwned^G FORGED: Status: created"+
+		"^[]8;;javascript:alert(1)^[\\click^[]8;;^[\\ ^[[2J ^[[2J tail\n")
 }

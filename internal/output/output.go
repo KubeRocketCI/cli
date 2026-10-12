@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/KubeRocketCI/cli/internal/portal"
+	"github.com/KubeRocketCI/cli/internal/termseq"
 )
 
 // ANSI color code used for borders and header accents.
@@ -51,7 +53,7 @@ var (
 //   - "in_progress" renders yellow
 //   - "failed"      renders red
 //
-// Any other value is returned unstyled.
+// Any other value is made printable on one row and left unstyled.
 func StatusColor(status string) string {
 	switch strings.ToLower(status) {
 	case "created":
@@ -61,7 +63,7 @@ func StatusColor(status string) string {
 	case "failed":
 		return redStyle.Render(status)
 	default:
-		return status
+		return cell(status)
 	}
 }
 
@@ -74,7 +76,7 @@ func PipelineStatusColor(status string) string {
 	case portal.StatusRunning:
 		return blueStyle.Render(status)
 	default:
-		return status
+		return cell(status)
 	}
 }
 
@@ -163,28 +165,138 @@ func Truncate(s string, maxWidth int) string {
 	return string(runes[:maxWidth-3]) + "..."
 }
 
-// SingleLine collapses every whitespace run, newlines included, into one
-// space so a multi-line operator message fits one display row. It drops every
-// other control character: the text comes from the cluster, and an escape
-// sequence in it would drive the terminal.
-func SingleLine(s string) string {
-	s = strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) && !unicode.IsSpace(r) {
-			return -1
+// Printable makes every control character in s visible: a C0 byte other than
+// \n, \t and \r in caret notation (ESC is ^[), DEL as ^?, and a C1 rune
+// U+0080-U+009F as ^[ plus its 7-bit letter. The line and paragraph separators
+// become \n. Bidirectional overrides and isolates are dropped. Invalid UTF-8
+// becomes U+FFFD.
+func Printable(s string) string {
+	var b strings.Builder
+
+	b.Grow(len(s))
+
+	for i := 0; i < len(s); {
+		r, size := utf8.DecodeRuneInString(s[i:])
+		i += size
+
+		switch {
+		case r == utf8.RuneError && size == 1:
+			b.WriteRune(utf8.RuneError)
+		case r == '\n' || r == '\t' || r == '\r':
+			b.WriteRune(r)
+		case r < 0x20:
+			b.WriteByte('^')
+			b.WriteByte(byte(r) + 0x40)
+		case r == del:
+			b.WriteString("^?")
+		case unicode.IsControl(r): // C1, U+0080-U+009F
+			b.WriteString("^[")
+			b.WriteByte(byte(r) - 0x40)
+		case unicode.In(r, unicode.Zl, unicode.Zp):
+			b.WriteByte('\n')
+		case bidi(r):
+		default:
+			b.WriteRune(r)
 		}
+	}
 
-		return r
-	}, s)
-
-	return strings.Join(strings.Fields(s), " ")
+	return b.String()
 }
 
-func Hyperlink(text, url string) string {
-	if url == "" {
+// bidi reports the bidirectional overrides and isolates.
+func bidi(r rune) bool {
+	return (r >= 0x202a && r <= 0x202e) || (r >= 0x2066 && r <= 0x2069)
+}
+
+// SingleLine makes s printable and collapses every whitespace run, newlines
+// included, into one space, so a multi-line operator message fits one row.
+func SingleLine(s string) string {
+	return strings.Join(strings.Fields(Printable(s)), " ")
+}
+
+var oneRow = strings.NewReplacer("\n", " ", "\r", " ", "\t", " ")
+
+// cell is Printable on one display row.
+func cell(s string) string { return oneRow.Replace(Printable(s)) }
+
+// sgrShape and linkShape match the shapes of an SGR sequence and an OSC 8
+// link. A match passes styledCell only when the termseq policy, the one the
+// stream applies, accepts it.
+const (
+	sgrShape  = `\x1b\[[0-9;]*m`
+	linkShape = `\x1b\]8;[^\x1b\x07]*(?:\x1b\\|\x07)`
+)
+
+var seqCandidate = regexp.MustCompile(sgrShape + "|" + linkShape)
+
+// styledCell is cell applied to the text between the sequences the stream
+// keeps, which pass unchanged. A sequence in cluster text passes too: it
+// cannot be told from the caller's own.
+func styledCell(s string) string {
+	var b strings.Builder
+
+	last := 0
+
+	for _, loc := range seqCandidate.FindAllStringIndex(s, -1) {
+		b.WriteString(cell(s[last:loc[0]]))
+
+		seq := s[loc[0]:loc[1]]
+		if kept(seq) {
+			b.WriteString(seq)
+		} else {
+			b.WriteString(cell(seq))
+		}
+
+		last = loc[1]
+	}
+
+	b.WriteString(cell(s[last:]))
+
+	return b.String()
+}
+
+// kept reports whether the stream passes seq, a seqCandidate match.
+func kept(seq string) bool {
+	if seq[1] == '[' {
+		_, _, ok := termseq.SGR(seq[2 : len(seq)-1])
+
+		return ok
+	}
+
+	payload := strings.TrimSuffix(strings.TrimSuffix(seq[2:], "\x07"), "\x1b\\")
+	_, ok := termseq.OSC8(payload)
+
+	return ok
+}
+
+func mapStrings(ss []string, f func(string) string) []string {
+	out := make([]string, len(ss))
+	for i, s := range ss {
+		out[i] = f(s)
+	}
+
+	return out
+}
+
+func mapRows(rows [][]string, f func(string) string) [][]string {
+	out := make([][]string, len(rows))
+	for i, r := range rows {
+		out[i] = mapStrings(r, f)
+	}
+
+	return out
+}
+
+// Hyperlink renders text, on one row, as an OSC 8 link to target when
+// termseq.Link accepts the target. Otherwise it returns the text alone.
+func Hyperlink(text, target string) string {
+	text = cell(text)
+
+	if !termseq.Link(target) {
 		return text
 	}
 
-	return lipgloss.NewStyle().Hyperlink(url).Render(text)
+	return lipgloss.NewStyle().Hyperlink(target).Render(text)
 }
 
 // GreenText returns s rendered in green.
@@ -200,13 +312,17 @@ func RedText(s string) string { return redStyle.Render(s) }
 func BlueText(s string) string { return blueStyle.Render(s) }
 
 // PrintTable writes a styled table when isTTY, a plain tabwriter table
-// otherwise.
+// otherwise. Every header and cell stays on one row with its control
+// characters visible. The styled table passes SGR and OSC 8 sequences in a
+// cell unchanged.
 func PrintTable(w io.Writer, isTTY bool, headers []string, rows [][]string) error {
+	headers = mapStrings(headers, cell)
+
 	if isTTY {
-		return printStyledTable(w, headers, rows)
+		return printStyledTable(w, headers, mapRows(rows, styledCell))
 	}
 
-	return printPlainTable(w, headers, rows)
+	return printPlainTable(w, headers, mapRows(rows, cell))
 }
 
 // printStyledTable renders a lipgloss table with colored headers, alternating row colors, and no borders.
@@ -253,6 +369,8 @@ func printPlainTable(w io.Writer, headers []string, rows [][]string) error {
 // PrintHeading writes a section heading: HeaderStyle when isTTY, "<text>:"
 // otherwise.
 func PrintHeading(w io.Writer, isTTY bool, text string) error {
+	text = cell(text)
+
 	if isTTY {
 		_, err := fmt.Fprintln(w, HeaderStyle.Render(text))
 		return err
@@ -319,8 +437,8 @@ func PrintYAML(w io.Writer, v any) error {
 }
 
 // SCASeverityColor colorizes a Dep-Track vulnerability severity for TTY
-// rendering. Unknown severities pass through unstyled so future values never
-// break existing renderers.
+// rendering. An unknown severity is made printable on one row and left
+// unstyled, so a future value never breaks a renderer.
 //
 //	CRITICAL  → red         HIGH      → yellow
 //	MEDIUM    → blue        LOW       → gray
@@ -336,12 +454,12 @@ func SCASeverityColor(severity string) string {
 	case "LOW", "INFO", "UNASSIGNED":
 		return grayStyle.Render(severity)
 	default:
-		return severity
+		return cell(severity)
 	}
 }
 
 // SonarGateStatusColor colorizes a SonarQube quality-gate / issue status value.
-// Unknown values pass through unstyled.
+// An unknown value is made printable on one row and left unstyled.
 func SonarGateStatusColor(status portal.QualityGateStatus) string {
 	s := string(status)
 
@@ -355,7 +473,7 @@ func SonarGateStatusColor(status portal.QualityGateStatus) string {
 	case portal.QualityGateNone:
 		return grayStyle.Render(s)
 	default:
-		return s
+		return cell(s)
 	}
 }
 
@@ -367,16 +485,21 @@ type DetailLine struct {
 	Styled string
 }
 
-// PrintDetailLines writes one "<label>: <value>" line per entry. Plain output
-// pads "<label>:" to detailLabelWidth columns. When isTTY, labels use
-// LabelStyle and a non-empty Styled replaces the ValueStyle rendering of Value.
+// PrintDetailLines writes one "<label>: <value>" line per entry, each on one
+// row with its control characters visible. Plain output pads "<label>:" to
+// detailLabelWidth columns. When isTTY, labels use LabelStyle and a non-empty
+// Styled replaces the ValueStyle rendering of Value; SGR and OSC 8 sequences
+// in it pass unchanged.
 func PrintDetailLines(w io.Writer, isTTY bool, lines []DetailLine) error {
 	for _, l := range lines {
+		label, value := cell(l.Label), cell(l.Value)
+
 		var err error
 		if isTTY {
-			_, err = fmt.Fprintf(w, "%s %s\n", LabelStyle.Render(l.Label+":"), cmp.Or(l.Styled, ValueStyle.Render(l.Value)))
+			_, err = fmt.Fprintf(w, "%s %s\n",
+				LabelStyle.Render(label+":"), cmp.Or(styledCell(l.Styled), ValueStyle.Render(value)))
 		} else {
-			_, err = fmt.Fprintf(w, "%-*s%s\n", detailLabelWidth, l.Label+":", l.Value)
+			_, err = fmt.Fprintf(w, "%-*s%s\n", detailLabelWidth, label+":", value)
 		}
 
 		if err != nil {
@@ -391,23 +514,38 @@ func PrintDetailLines(w io.Writer, isTTY bool, lines []DetailLine) error {
 // labels to the longest one itself.
 var alignedLabelStyle = LabelStyle.UnsetWidth()
 
-// PrintAligned writes "<indent><label><pad>   <value>" per line, padding every
-// label to the longest in lines. When isTTY, labels use alignedLabelStyle and
-// a non-empty Styled replaces Value.
-func PrintAligned(w io.Writer, isTTY bool, lines []DetailLine, indent string) error {
+// LabelWidth returns the display width of the longest label across groups, as
+// PrintAligned measures it, so sibling blocks can share one label column.
+func LabelWidth(groups ...[]DetailLine) int {
 	width := 0
-	for _, l := range lines {
-		width = max(width, len(l.Label))
+
+	for _, g := range groups {
+		for _, l := range g {
+			width = max(width, lipgloss.Width(cell(l.Label)))
+		}
 	}
 
+	return width
+}
+
+// PrintAligned writes "<indent><label><pad>   <value>" per line, each on one
+// row with its control characters visible. The label column is width or
+// LabelWidth(lines), whichever is wider. When isTTY, labels use
+// alignedLabelStyle and a non-empty Styled replaces Value; SGR and OSC 8
+// sequences in it pass unchanged.
+func PrintAligned(w io.Writer, isTTY bool, lines []DetailLine, indent string, width int) error {
+	width = max(width, LabelWidth(lines))
+
 	for _, l := range lines {
-		label, value := l.Label, l.Value
+		label, value := cell(l.Label), cell(l.Value)
+		pad := width - lipgloss.Width(label)
+
 		if isTTY {
-			label = alignedLabelStyle.Render(l.Label)
-			value = cmp.Or(l.Styled, l.Value)
+			label = alignedLabelStyle.Render(label)
+			value = cmp.Or(styledCell(l.Styled), value)
 		}
 
-		if _, err := fmt.Fprintf(w, "%s%s%*s   %s\n", indent, label, width-len(l.Label), "", value); err != nil {
+		if _, err := fmt.Fprintf(w, "%s%s%*s   %s\n", indent, label, pad, "", value); err != nil {
 			return err
 		}
 	}

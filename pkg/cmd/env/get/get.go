@@ -104,15 +104,15 @@ func getRun(ctx context.Context, opts *GetOptions) error {
 }
 
 func renderDetail(w io.Writer, isTTY bool, d *portal.EnvDetail) error {
-	headerPairs := buildHeaderPairs(d, isTTY)
+	headerPairs := buildHeaderPairs(d)
 	infraPairs := buildInfraPairs(d.Infrastructure)
 
 	// Shared label-column width so the header and infrastructure blocks line
 	// up across the section break (e.g. "Description" and "Deploy Pipeline"
 	// padded to the same column).
-	labelWidth := maxLabelWidth(headerPairs, infraPairs)
+	labelWidth := output.LabelWidth(headerPairs, infraPairs)
 
-	if err := printAligned(w, isTTY, headerPairs, "", labelWidth); err != nil {
+	if err := output.PrintAligned(w, isTTY, headerPairs, "", labelWidth); err != nil {
 		return err
 	}
 
@@ -124,7 +124,7 @@ func renderDetail(w io.Writer, isTTY bool, d *portal.EnvDetail) error {
 		return err
 	}
 
-	if err := printAligned(w, isTTY, infraPairs, "  ", labelWidth); err != nil {
+	if err := output.PrintAligned(w, isTTY, infraPairs, "  ", labelWidth); err != nil {
 		return err
 	}
 
@@ -147,30 +147,25 @@ func renderDetail(w io.Writer, isTTY bool, d *portal.EnvDetail) error {
 	return renderConditions(w, isTTY, d.Projects)
 }
 
-func buildHeaderPairs(d *portal.EnvDetail, isTTY bool) []labelValue {
+func buildHeaderPairs(d *portal.EnvDetail) []output.DetailLine {
 	desc := "—"
 	if d.Description != nil {
 		desc = *d.Description
 	}
 
-	statusValue := d.Status
-	if isTTY {
-		statusValue = output.StatusColor(d.Status)
-	}
-
-	pairs := []labelValue{
-		{Label: "Environment", Value: d.Env},
-		{Label: "Deployment", Value: d.Deployment},
-		{Label: "Status", Value: statusValue},
+	pairs := []output.DetailLine{
+		{Label: "Environment:", Value: d.Env},
+		{Label: "Deployment:", Value: d.Deployment},
+		{Label: "Status:", Value: d.Status, Styled: output.StatusColor(d.Status)},
 	}
 
 	if d.DetailedMessage != nil && *d.DetailedMessage != "" {
-		pairs = append(pairs, labelValue{Label: "Message", Value: output.SingleLine(*d.DetailedMessage)})
+		pairs = append(pairs, output.DetailLine{Label: "Message:", Value: output.SingleLine(*d.DetailedMessage)})
 	}
 
 	return append(pairs,
-		labelValue{Label: "Description", Value: desc},
-		labelValue{Label: "Order", Value: strconv.Itoa(d.Order)},
+		output.DetailLine{Label: "Description:", Value: desc},
+		output.DetailLine{Label: "Order:", Value: strconv.Itoa(d.Order)},
 	)
 }
 
@@ -193,7 +188,7 @@ func conditionLines(projects []portal.EnvProject) []string {
 
 	for _, p := range projects {
 		for _, c := range p.Conditions {
-			lines = append(lines, fmt.Sprintf("  - %s: %s: %s", p.Name, c.Type, output.SingleLine(c.Message)))
+			lines = append(lines, discovery.Bullet(fmt.Sprintf("%s: %s: %s", p.Name, c.Type, c.Message)))
 		}
 
 		op := p.Operation
@@ -201,42 +196,30 @@ func conditionLines(projects []portal.EnvProject) []string {
 			continue
 		}
 
-		line := fmt.Sprintf("  - %s: operation %s", p.Name, op.Phase)
+		line := fmt.Sprintf("%s: operation %s", p.Name, op.Phase)
 		if op.Message != nil && *op.Message != "" {
-			line += ": " + output.SingleLine(*op.Message)
+			line += ": " + *op.Message
 		}
 
-		lines = append(lines, line)
+		lines = append(lines, discovery.Bullet(line))
 	}
 
 	return lines
 }
 
-func buildInfraPairs(i portal.Infrastructure) []labelValue {
+func buildInfraPairs(i portal.Infrastructure) []output.DetailLine {
 	clean := "—"
 	if i.CleanPipeline != nil {
 		clean = *i.CleanPipeline
 	}
 
-	return []labelValue{
-		{Label: "Cluster", Value: i.Cluster},
-		{Label: "Namespace", Value: i.Namespace},
-		{Label: "Trigger Type", Value: i.TriggerType},
-		{Label: "Deploy Pipeline", Value: i.DeployPipeline},
-		{Label: "Clean Pipeline", Value: clean},
+	return []output.DetailLine{
+		{Label: "Cluster:", Value: i.Cluster},
+		{Label: "Namespace:", Value: i.Namespace},
+		{Label: "Trigger Type:", Value: i.TriggerType},
+		{Label: "Deploy Pipeline:", Value: i.DeployPipeline},
+		{Label: "Clean Pipeline:", Value: clean},
 	}
-}
-
-func maxLabelWidth(groups ...[]labelValue) int {
-	m := 0
-	for _, g := range groups {
-		for _, p := range g {
-			if len(p.Label) > m {
-				m = len(p.Label)
-			}
-		}
-	}
-	return m
 }
 
 func renderQualityGates(w io.Writer, isTTY bool, gates []portal.QualityGateDetail) error {
@@ -250,7 +233,7 @@ func renderQualityGates(w io.Writer, isTTY bool, gates []portal.QualityGateDetai
 	}
 
 	for _, g := range gates {
-		if _, err := fmt.Fprintln(w, formatQualityGateLine(g)); err != nil {
+		if _, err := fmt.Fprintln(w, discovery.Bullet(formatQualityGateLine(g))); err != nil {
 			return err
 		}
 	}
@@ -258,9 +241,9 @@ func renderQualityGates(w io.Writer, isTTY bool, gates []portal.QualityGateDetai
 	return nil
 }
 
-// formatQualityGateLine returns the per-gate display row used by `env get`:
+// formatQualityGateLine returns the per-gate display text used by `env get`:
 //
-//	"  - <type>: <stepName-or-autotestName>[ (branch: <branchName>)]"
+//	"<type>: <stepName-or-autotestName>[ (branch: <branchName>)]"
 //
 // AutotestName, when present, replaces stepName as the value (matches the
 // portal "autotests: smoke-tests (branch: main)" rendering).
@@ -270,7 +253,7 @@ func formatQualityGateLine(g portal.QualityGateDetail) string {
 		value = *g.AutotestName
 	}
 
-	line := fmt.Sprintf("  - %s: %s", g.Type, value)
+	line := fmt.Sprintf("%s: %s", g.Type, value)
 
 	if g.BranchName != nil && *g.BranchName != "" {
 		line += fmt.Sprintf(" (branch: %s)", *g.BranchName)
@@ -304,35 +287,4 @@ func renderProjects(w io.Writer, isTTY bool, projects []portal.EnvProject) error
 	}
 
 	return output.PrintTable(w, isTTY, headers, rows)
-}
-
-// labelValue is one aligned "label: value" row in the detail block.
-type labelValue struct {
-	Label string
-	Value string
-}
-
-// envLabelStyle reuses the shared LabelStyle but lets printAligned control
-// the column width dynamically via its own padding logic.
-var envLabelStyle = output.LabelStyle.UnsetWidth()
-
-// printAligned prints "<indent><label padded to width>   <value>" for each
-// pair. The width parameter lets callers force a column wider than this
-// block's own labels so sibling blocks (e.g. header + infrastructure) align
-// across a section break.
-func printAligned(w io.Writer, isTTY bool, pairs []labelValue, indent string, width int) error {
-	for _, p := range pairs {
-		pad := width - len(p.Label)
-
-		label := p.Label + ":"
-		if isTTY {
-			label = envLabelStyle.Render(label)
-		}
-
-		if _, err := fmt.Fprintf(w, "%s%s%*s   %s\n", indent, label, pad, "", p.Value); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }

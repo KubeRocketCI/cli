@@ -248,7 +248,7 @@ func TestDetailLines(t *testing.T) {
 		"  - mixed/retry: terminated (Completed); last termination: exit 2: config file not found",
 		"  - mixed/new: waiting",
 		"  - mixed/loaded: waiting\n      image: registry.example.com/loaded:1 (image ID sha256:fedcba98)",
-		"  - mixed/hostile: terminated (Error), exit 1: bye[2J]0;title",
+		"  - mixed/hostile: terminated (Error), exit 1: bye^[[2J^[]0;title^G",
 	}
 
 	got := detailLines(pods)

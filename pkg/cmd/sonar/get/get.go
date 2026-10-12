@@ -113,7 +113,7 @@ func printDetail(w io.Writer, d *portal.SonarProjectDetail, styled bool) error {
 		{Label: "Quality Gate", Value: string(gate), Styled: output.SonarGateStatusColor(gate)},
 	}
 
-	if err := output.PrintAligned(w, styled, header, ""); err != nil {
+	if err := output.PrintAligned(w, styled, header, "", 0); err != nil {
 		return err
 	}
 
@@ -132,7 +132,7 @@ func printDetail(w io.Writer, d *portal.SonarProjectDetail, styled bool) error {
 			pairs = append(pairs, output.DetailLine{Label: ml.label, Value: formatMeasure(raw, ok, ml)})
 		}
 
-		if err := output.PrintAligned(w, styled, pairs, "  "); err != nil {
+		if err := output.PrintAligned(w, styled, pairs, "  ", 0); err != nil {
 			return err
 		}
 	}

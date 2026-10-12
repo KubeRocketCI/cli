@@ -63,14 +63,14 @@ func RenderReason(w io.Writer, result *portal.PipelineRunListResult) error {
 			continue
 		}
 
-		if _, err := fmt.Fprintln(w, SectionStyle.Render("Failed: "+t.Name)); err != nil {
+		if _, err := fmt.Fprintln(w, SectionStyle.Render("Failed: "+SingleLine(t.Name))); err != nil {
 			return err
 		}
 
 		if t.FailedStep != "" {
 			if _, err := fmt.Fprintf(w, "%s %s (exit code %d)\n",
 				ReasonLabel.Render("Step:"),
-				t.FailedStep, t.ExitCode,
+				SingleLine(t.FailedStep), t.ExitCode,
 			); err != nil {
 				return err
 			}
@@ -79,7 +79,7 @@ func RenderReason(w io.Writer, result *portal.PipelineRunListResult) error {
 		if t.Message != "" {
 			if _, err := fmt.Fprintf(w, "%s %s\n",
 				ReasonLabel.Render("Message:"),
-				t.Message,
+				SingleLine(t.Message),
 			); err != nil {
 				return err
 			}
@@ -90,7 +90,7 @@ func RenderReason(w io.Writer, result *portal.PipelineRunListResult) error {
 				return err
 			}
 
-			if _, err := fmt.Fprintln(w, SectionStyle.Render("Logs: "+t.Name)); err != nil {
+			if _, err := fmt.Fprintln(w, SectionStyle.Render("Logs: "+SingleLine(t.Name))); err != nil {
 				return err
 			}
 
@@ -128,7 +128,7 @@ func RenderNoTaskData(w io.Writer, reason string) error {
 }
 
 func renderRunHeader(w io.Writer, run *portal.PipelineRunInfo) error {
-	if _, err := fmt.Fprintln(w, SectionStyle.Render("Pipeline: "+run.Name)); err != nil {
+	if _, err := fmt.Fprintln(w, SectionStyle.Render("Pipeline: "+SingleLine(run.Name))); err != nil {
 		return err
 	}
 
@@ -150,7 +150,7 @@ func renderRunHeader(w io.Writer, run *portal.PipelineRunInfo) error {
 			continue
 		}
 
-		if _, err := fmt.Fprintf(w, "%s %s\n", ReasonLabel.Render(field.label), field.value); err != nil {
+		if _, err := fmt.Fprintf(w, "%s %s\n", ReasonLabel.Render(field.label), SingleLine(field.value)); err != nil {
 			return err
 		}
 	}
@@ -170,7 +170,7 @@ func renderResults(w io.Writer, results map[string]any) error {
 			prefix = label
 		}
 
-		if _, err := fmt.Fprintf(w, "%s %s=%s\n", prefix, name, resultValue(results[name])); err != nil {
+		if _, err := fmt.Fprintf(w, "%s %s=%s\n", prefix, SingleLine(name), resultValue(results[name])); err != nil {
 			return err
 		}
 	}
@@ -180,15 +180,15 @@ func renderResults(w io.Writer, results map[string]any) error {
 
 func resultValue(v any) string {
 	if s, ok := v.(string); ok {
-		return s
+		return SingleLine(s)
 	}
 
 	b, err := json.Marshal(v)
 	if err != nil {
-		return fmt.Sprint(v)
+		return cell(fmt.Sprint(v))
 	}
 
-	return string(b)
+	return cell(string(b))
 }
 
 func taskListEnumerator(tasks []portal.TaskRunInfo) list.Enumerator {
@@ -206,10 +206,11 @@ func taskListEnumerator(tasks []portal.TaskRunInfo) list.Enumerator {
 }
 
 func formatTaskLine(t portal.TaskRunInfo) string {
-	status := SuccessStyle.Render(t.Status)
+	style := SuccessStyle
 	if portal.IsFailureStatus(t.Status) {
-		status = FailStyle.Render(t.Status)
+		style = FailStyle
 	}
 
-	return fmt.Sprintf("%-28s %s  %s", t.Name, status, DimStyle.Render(t.Duration))
+	return fmt.Sprintf("%-28s %s  %s",
+		SingleLine(t.Name), style.Render(cell(t.Status)), DimStyle.Render(SingleLine(t.Duration)))
 }

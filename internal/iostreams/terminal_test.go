@@ -6,6 +6,8 @@ import (
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/KubeRocketCI/cli/internal/output"
 )
 
 // policy has one row per rule of the terminalWriter policy.
@@ -209,3 +211,24 @@ func TestFromWriters_Profiles(t *testing.T) {
 
 // styledST is styled as the terminalWriter re-emits it: links end with ST.
 var styledST = strings.ReplaceAll(styled, "\x07", "\x1b\\")
+
+// The styles output renders with pass the stream unchanged, apart from the
+// link terminator, which the stream rewrites to ST.
+func TestFromWriters_KeepsOutputStyles(t *testing.T) {
+	t.Parallel()
+
+	in := output.Hyperlink("t", "https://h/p?q=1") + output.GreenText("g") + output.HeaderStyle.Render("h") +
+		output.LabelStyle.Render("l") + output.DimStyle.Render("d")
+	want := strings.ReplaceAll(in, "\x07", "\x1b\\")
+
+	var out bytes.Buffer
+
+	ios := fromWriters(nil, &out, &bytes.Buffer{}, []string{"TERM=xterm-256color", "COLORTERM=truecolor", "CLICOLOR_FORCE=1"})
+	if _, err := ios.Out.Write([]byte(in)); err != nil {
+		t.Fatal(err)
+	}
+
+	if out.String() != want {
+		t.Errorf("stream changed output's own styles:\n got %q\nwant %q", out.String(), want)
+	}
+}

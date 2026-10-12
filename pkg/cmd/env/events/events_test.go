@@ -193,10 +193,10 @@ func TestEventRow(t *testing.T) {
 		InvolvedObject: portal.EventObject{Kind: "Pod", Name: "foo"},
 		FirstSeen:      ptr.To("2026-01-02T03:04:00Z"), LastSeen: ptr.To("2026-01-02T03:10:00Z"),
 	}
-	fullMessage := "Readiness probe failed: ]0;title" + strings.TrimSpace(long)
+	fullMessage := "Readiness probe failed: ^[]0;title^G" + strings.TrimSpace(long)
 
 	piped := eventRow(warning, false)
-	if want := []string{"Jan 02 03:04", "Jan 02 03:10", portal.EventTypeWarning, "Unhealthy[2J", "Pod/foo", "3", fullMessage}; !slices.Equal(piped, want) {
+	if want := []string{"Jan 02 03:04", "Jan 02 03:10", portal.EventTypeWarning, "Unhealthy^[[2J", "Pod/foo", "3", fullMessage}; !slices.Equal(piped, want) {
 		t.Errorf("piped row = %q, want %q", piped, want)
 	}
 

@@ -35,6 +35,12 @@ func PrintEmptyNote(ios *iostreams.IOStreams, outputFormat, note string) error {
 	return err
 }
 
+// Bullet returns a PrintSection line: "  - " followed by text on one row with
+// its control characters visible. The prefix stays outside SingleLine.
+func Bullet(text string) string {
+	return "  - " + output.SingleLine(text)
+}
+
 // PrintSection prints a blank line, the heading "<title> (<number of lines>)"
 // and the lines. It prints nothing when there are no lines.
 func PrintSection(w io.Writer, isTTY bool, title string, lines []string) error {
@@ -176,7 +182,7 @@ func HostnameFromURL(u string) string {
 // ColorForArgoStatus renders an ArgoCD health-status string with a TTY color.
 // healthy → green, degraded/missing → red, progressing → blue (matching the
 // running-pipeline color in `output.PipelineStatusColor`). Anything else
-// (including suspended/unknown) passes through unstyled.
+// (including suspended/unknown) is made printable on one row and left unstyled.
 func ColorForArgoStatus(s string) string {
 	switch portal.ArgoHealthStatus(strings.ToLower(s)) {
 	case portal.ArgoHealthHealthy:
@@ -186,6 +192,6 @@ func ColorForArgoStatus(s string) string {
 	case portal.ArgoHealthProgressing:
 		return output.BlueText(s)
 	default:
-		return s
+		return output.SingleLine(s)
 	}
 }
