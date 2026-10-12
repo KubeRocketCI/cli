@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"strings"
 	"testing"
 
 	"github.com/KubeRocketCI/cli/internal/iostreams"
@@ -149,42 +148,6 @@ func TestHandleError_TableWritesNothing(t *testing.T) {
 
 	if stdout.Len() != 0 {
 		t.Errorf("stdout = %q, want empty", stdout.String())
-	}
-}
-
-func TestPrintTable_NonTTY(t *testing.T) {
-	t.Parallel()
-
-	var buf bytes.Buffer
-
-	headers := []string{"NAME", "STATUS"}
-	rows := [][]string{{"foo", "OK"}, {"bar", "ERROR"}}
-
-	if err := PrintTable(&buf, false, headers, rows); err != nil {
-		t.Fatalf("PrintTable(isTTY=false) returned error: %v", err)
-	}
-
-	out := buf.String()
-	if !strings.Contains(out, "NAME") || !strings.Contains(out, "foo") {
-		t.Errorf("plain table output missing expected content: %q", out)
-	}
-
-	if strings.Contains(out, "\x1b") {
-		t.Errorf("plain table output carries escape sequences: %q", out)
-	}
-}
-
-func TestPrintTable_TTY(t *testing.T) {
-	t.Parallel()
-
-	var buf bytes.Buffer
-
-	if err := PrintTable(&buf, true, []string{"NAME", "STATUS"}, [][]string{{"foo", "OK"}}); err != nil {
-		t.Fatalf("PrintTable(isTTY=true) returned error: %v", err)
-	}
-
-	if !strings.Contains(buf.String(), "foo") {
-		t.Errorf("styled table output missing row content: %q", buf.String())
 	}
 }
 

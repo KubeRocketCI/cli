@@ -42,14 +42,9 @@ func HandleError(ios *iostreams.IOStreams, outputFormat string, err error) error
 	return cmdutil.HandleError(ios, outputFormat, SchemaVersion, err)
 }
 
-// PrintTable writes a styled table when isTTY, a plain tabwriter table
-// otherwise.
+// PrintTable is output.PrintTable.
 func PrintTable(w io.Writer, isTTY bool, headers []string, rows [][]string) error {
-	if isTTY {
-		return output.PrintStyledTable(w, headers, rows)
-	}
-
-	return output.PrintTable(w, headers, rows)
+	return output.PrintTable(w, isTTY, headers, rows)
 }
 
 // PageCount returns the number of pages of pageSize needed to hold total
