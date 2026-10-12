@@ -11,6 +11,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
+	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/discovery"
@@ -135,5 +136,5 @@ func renderTable(w io.Writer, isTTY bool, rows []portal.ProjectDeploymentRow) er
 		tableRows = append(tableRows, discovery.ExpandIngressRows(cells, discovery.IngressLines(r.IngressURLs, isTTY))...)
 	}
 
-	return discovery.PrintTable(w, isTTY, headers, tableRows)
+	return output.PrintTable(w, isTTY, headers, tableRows)
 }

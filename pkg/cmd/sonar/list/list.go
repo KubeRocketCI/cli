@@ -120,7 +120,7 @@ func renderTable(w io.Writer, isTTY bool, result *portal.SonarProjectList) error
 		rows = append(rows, []string{p.Key, p.Name, gate})
 	}
 
-	if err := render.PrintTable(w, isTTY, headers, rows); err != nil {
+	if err := output.PrintTable(w, isTTY, headers, rows); err != nil {
 		return err
 	}
 

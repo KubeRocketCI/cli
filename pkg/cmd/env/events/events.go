@@ -146,7 +146,7 @@ func renderTable(w io.Writer, isTTY bool, events []portal.EnvEvent) error {
 		rows = append(rows, eventRow(e, isTTY))
 	}
 
-	return discovery.PrintTable(w, isTTY, headers, rows)
+	return output.PrintTable(w, isTTY, headers, rows)
 }
 
 // eventRow passes every text cell through output.SingleLine. The Warning color

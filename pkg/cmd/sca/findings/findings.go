@@ -158,7 +158,7 @@ func renderTable(w io.Writer, isTTY bool, codebase string, result *portal.SCAFin
 		})
 	}
 
-	if err := render.PrintTable(w, isTTY, headers, rows); err != nil {
+	if err := output.PrintTable(w, isTTY, headers, rows); err != nil {
 		return err
 	}
 

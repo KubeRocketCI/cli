@@ -302,7 +302,7 @@ func renderProjects(w io.Writer, isTTY bool, projects []portal.EnvProject) error
 		rows = append(rows, discovery.ExpandIngressRows(cells, discovery.IngressLines(p.IngressURLs, isTTY))...)
 	}
 
-	return discovery.PrintTable(w, isTTY, headers, rows)
+	return output.PrintTable(w, isTTY, headers, rows)
 }
 
 // labelValue is one aligned "label: value" row in the detail block.

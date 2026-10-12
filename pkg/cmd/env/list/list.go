@@ -145,5 +145,5 @@ func renderTable(w io.Writer, isTTY bool, rows []portal.EnvSummary) error {
 		})
 	}
 
-	return discovery.PrintTable(w, isTTY, headers, tableRows)
+	return output.PrintTable(w, isTTY, headers, tableRows)
 }

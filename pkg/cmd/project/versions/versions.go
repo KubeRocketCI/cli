@@ -177,7 +177,7 @@ func renderStreamsTable(w io.Writer, isTTY bool, streams []portal.ProjectVersion
 		})
 	}
 
-	return discovery.PrintTable(w, isTTY, headers, rows)
+	return output.PrintTable(w, isTTY, headers, rows)
 }
 
 // renderVersionsTable prints one row per version, newest first, for the
@@ -199,5 +199,5 @@ func renderVersionsTable(w io.Writer, isTTY bool, streams []portal.ProjectVersio
 		}
 	}
 
-	return discovery.PrintTable(w, isTTY, headers, rows)
+	return output.PrintTable(w, isTTY, headers, rows)
 }
