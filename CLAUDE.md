@@ -18,14 +18,18 @@ Portal-only: CLI talks exclusively to the portal tRPC API (Bearer idToken). No d
 
 - `internal/portal/` — tRPC client, project/deployment services, config
 - `internal/auth/` — OIDC token provider (login, refresh, env-var override)
-- `internal/cmdutil/Factory` — lazy-init: IOStreams, Config, TokenProvider, PortalClient
+- `internal/cmdutil/Factory` — lazy-init: IOStreams, Config, TokenProvider, RestClient
 - `internal/cmdutil/validate.go` — shared validators
 - `internal/config/` — Viper-based config: flags > env vars > config file > defaults
+- `internal/output/` — terminal primitives (tables, detail lines, headings, styles); each takes an `io.Writer` and the TTY state. No `-o` knowledge.
+- `pkg/cmd/internal/render/` — the CLI output contract: `-o` names, validation and dispatch, the `{schemaVersion, data}` and error envelopes, the auth-error prefix. Every `-o` decision goes through it; the JSON and YAML encoders stay in `output`.
 - `pkg/cmd/<group>/<verb>/` — commands export `NewCmd<Verb>(f, runF)`. Follow existing as examples.
+
+depguard enforces the split: `output` imports neither `iostreams` nor `cmdutil`, `cmdutil` does not import `output`, `render` does not import `cmdutil`.
 
 ### Factory validation gate
 
-The Factory validates all required backend configuration before creating PortalClient:
+The Factory validates all required backend configuration before creating RestClient:
 `PortalURL`, `ClusterName`, `Namespace`. Commands never see invalid state.
 
 ### Single flag
