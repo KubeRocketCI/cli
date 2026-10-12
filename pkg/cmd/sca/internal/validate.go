@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
-	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
@@ -66,7 +65,7 @@ func ValidatePageBounds(page, pageSize int) error {
 // output format, Kubernetes-name codebase, non-empty --branch when supplied.
 // sca verbs take no --pr, so there is no scope-mutex step.
 func ValidateCodebaseCommand(cmd *cobra.Command, outputFormat, codebase, branch string) error {
-	if err := render.ValidateOutputFormat(outputFormat, output.FormatJSON, output.FormatTable); err != nil {
+	if err := render.ValidateOutputFormat(outputFormat, render.FormatJSON, render.FormatTable); err != nil {
 		return err
 	}
 

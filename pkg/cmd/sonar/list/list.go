@@ -51,7 +51,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
   # Scripting — failing-gate projects
   krci sonar list -o json | jq -r '.data.projects[] | select(.qualityGateStatus=="ERROR") | .key'`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := render.ValidateOutputFormat(opts.OutputFormat, output.FormatJSON, output.FormatTable); err != nil {
+			if err := render.ValidateOutputFormat(opts.OutputFormat, render.FormatJSON, render.FormatTable); err != nil {
 				return err
 			}
 

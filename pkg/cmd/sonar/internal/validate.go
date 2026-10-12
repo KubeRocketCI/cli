@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
-	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
@@ -41,7 +40,7 @@ func ValidateScopeMutex(pullRequest, branch string) error {
 // output format, Kubernetes-name project key, non-empty --pr / --branch when
 // supplied, mutual exclusion of the two scope flags.
 func ValidateProjectCommand(cmd *cobra.Command, outputFormat, project, pullRequest, branch string) error {
-	if err := render.ValidateOutputFormat(outputFormat, output.FormatJSON, output.FormatTable); err != nil {
+	if err := render.ValidateOutputFormat(outputFormat, render.FormatJSON, render.FormatTable); err != nil {
 		return err
 	}
 

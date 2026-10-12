@@ -38,14 +38,14 @@ func RenderBare(ios *iostreams.IOStreams, outputFormat string, data any, renderT
 func dispatch(
 	ios *iostreams.IOStreams, outputFormat string, renderTable TableRenderer, writeJSON func(io.Writer) error,
 ) error {
-	format := output.ResolveFormat(outputFormat)
+	format := ResolveFormat(outputFormat)
 
 	switch format {
-	case output.FormatJSON:
+	case FormatJSON:
 		return writeJSON(ios.Out)
-	case output.FormatTable:
+	case FormatTable:
 		return renderTable(ios.Out, ios.IsStdoutTTY())
 	default:
-		return unknownFormatError(format, output.FormatJSON, output.FormatTable)
+		return unknownFormatError(format, FormatJSON, FormatTable)
 	}
 }

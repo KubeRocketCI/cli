@@ -35,7 +35,7 @@ type TableRenderer = render.TableRenderer
 // ValidateOutputFormat is render.ValidateOutputFormat with "json" and "table"
 // allowed.
 func ValidateOutputFormat(format string) error {
-	return render.ValidateOutputFormat(format, output.FormatJSON, output.FormatTable)
+	return render.ValidateOutputFormat(format, render.FormatJSON, render.FormatTable)
 }
 
 // Render is render.Render.
@@ -51,7 +51,7 @@ func HandleError(ios *iostreams.IOStreams, outputFormat string, err error) error
 // PrintEmptyNote writes the note of an empty result to stderr. Under -o json
 // it writes nothing: the empty array is the answer.
 func PrintEmptyNote(ios *iostreams.IOStreams, outputFormat, note string) error {
-	if outputFormat == output.FormatJSON {
+	if outputFormat == render.FormatJSON {
 		return nil
 	}
 

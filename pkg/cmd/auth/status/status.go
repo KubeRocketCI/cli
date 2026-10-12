@@ -67,7 +67,7 @@ error.message on failure.`,
   krci auth status -o json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := validateOutputFormat(opts.OutputFormat); err != nil {
+			if err := render.ValidateOutputFormat(opts.OutputFormat, render.FormatJSON, render.FormatTable); err != nil {
 				return err
 			}
 
@@ -82,15 +82,6 @@ error.message on failure.`,
 	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "", "Output format: table, json (default: table)")
 
 	return cmd
-}
-
-func validateOutputFormat(format string) error {
-	switch format {
-	case "", output.FormatTable, output.FormatJSON:
-		return nil
-	default:
-		return fmt.Errorf("unknown output format: %s (use 'json' or 'table')", format)
-	}
 }
 
 func statusRun(ctx context.Context, opts *StatusOptions) error {
@@ -166,7 +157,7 @@ func (opts *StatusOptions) fail(err error) error {
 // printStatus prints the authenticated state. haveInfo is false when the token's
 // claims could not be read and the portal accepted the token.
 func (opts *StatusOptions) printStatus(info *auth.UserInfo, haveInfo bool) error {
-	if output.ResolveFormat(opts.OutputFormat) == output.FormatJSON {
+	if render.ResolveFormat(opts.OutputFormat) == render.FormatJSON {
 		return render.PrintEnvelope(opts.IO.Out, buildPayload(info))
 	}
 
