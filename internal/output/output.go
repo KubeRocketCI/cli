@@ -186,9 +186,19 @@ func RedText(s string) string { return redStyle.Render(s) }
 // BlueText returns s rendered in blue.
 func BlueText(s string) string { return blueStyle.Render(s) }
 
-// PrintStyledTable renders a lipgloss table with colored headers, alternating row colors, and no borders.
+// PrintTable writes a styled table when isTTY, a plain tabwriter table
+// otherwise.
+func PrintTable(w io.Writer, isTTY bool, headers []string, rows [][]string) error {
+	if isTTY {
+		return printStyledTable(w, headers, rows)
+	}
+
+	return printPlainTable(w, headers, rows)
+}
+
+// printStyledTable renders a lipgloss table with colored headers, alternating row colors, and no borders.
 // Uses lipgloss for ANSI-aware column width calculation.
-func PrintStyledTable(w io.Writer, headers []string, rows [][]string) error {
+func printStyledTable(w io.Writer, headers []string, rows [][]string) error {
 	t := table.New().
 		Border(lipgloss.HiddenBorder()).
 		StyleFunc(func(row, col int) lipgloss.Style {
@@ -210,8 +220,8 @@ func PrintStyledTable(w io.Writer, headers []string, rows [][]string) error {
 	return err
 }
 
-// PrintTable renders a plain-text table for piped or non-TTY output.
-func PrintTable(w io.Writer, headers []string, rows [][]string) error {
+// printPlainTable renders a plain-text table for piped or non-TTY output.
+func printPlainTable(w io.Writer, headers []string, rows [][]string) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 3, ' ', 0)
 
 	if _, err := fmt.Fprintln(tw, strings.Join(headers, "\t")); err != nil {
@@ -356,11 +366,8 @@ func RenderList[T any](
 		return PrintJSON(ios.Out, data)
 	case FormatTable:
 		headers, rows := toRows(isTTY)
-		if isTTY {
-			return PrintStyledTable(ios.Out, headers, rows)
-		}
 
-		return PrintTable(ios.Out, headers, rows)
+		return PrintTable(ios.Out, isTTY, headers, rows)
 	default:
 		return fmt.Errorf("unknown output format: %s (use 'json' or 'table')", format)
 	}

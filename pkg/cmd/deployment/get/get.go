@@ -154,14 +154,7 @@ func printStageSection(w io.Writer, stages []portal.Stage, styled bool) error {
 	headers := []string{"ORDER", "ENV", "DEPLOY MODE", "PROMOTE GATES", "NAMESPACE", "STATUS"}
 	rows := stageRows(stages, styled)
 
-	var err error
-	if styled {
-		err = output.PrintStyledTable(w, headers, rows)
-	} else {
-		err = output.PrintTable(w, headers, rows)
-	}
-
-	if err != nil {
+	if err := output.PrintTable(w, styled, headers, rows); err != nil {
 		return err
 	}
 

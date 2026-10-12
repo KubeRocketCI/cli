@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -283,5 +284,42 @@ func TestTruncate(t *testing.T) {
 		if got := Truncate(tc.in, tc.width); got != tc.want {
 			t.Errorf("%s: Truncate = %q, want %q", name, got, tc.want)
 		}
+	}
+}
+
+func TestPrintTable_Plain(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+
+	headers := []string{"NAME", "STATUS"}
+	rows := [][]string{{"foo", "OK"}, {"bar", "ERROR"}}
+
+	if err := PrintTable(&buf, false, headers, rows); err != nil {
+		t.Fatalf("PrintTable(isTTY=false) returned error: %v", err)
+	}
+
+	want := "NAME   STATUS\nfoo    OK\nbar    ERROR\n"
+	if got := buf.String(); got != want {
+		t.Errorf("PrintTable(isTTY=false) = %q, want %q", got, want)
+	}
+}
+
+func TestPrintTable_Styled(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+
+	if err := PrintTable(&buf, true, []string{"NAME", "STATUS"}, [][]string{{"foo", "OK"}}); err != nil {
+		t.Fatalf("PrintTable(isTTY=true) returned error: %v", err)
+	}
+
+	// The hidden border pads every row and adds a border line above and below.
+	// Colour codes are stripped: CLICOLOR_FORCE makes lipgloss emit them even
+	// into a buffer.
+	sgr := regexp.MustCompile("\x1b\\[[0-9;]*m")
+	want := "                 \n  NAME   STATUS  \n                 \n  foo    OK      \n                 \n"
+	if got := sgr.ReplaceAllString(buf.String(), ""); got != want {
+		t.Errorf("PrintTable(isTTY=true) = %q, want %q", got, want)
 	}
 }
