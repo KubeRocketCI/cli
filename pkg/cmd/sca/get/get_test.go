@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
 	"github.com/KubeRocketCI/cli/pkg/cmd/sca/internal/scatestutil"
@@ -149,11 +150,11 @@ func TestPrintDetail_HappyPath(t *testing.T) {
 
 func TestFormatters(t *testing.T) {
 	t.Parallel()
-	if formatActive(true, false) != yesLabel {
-		t.Error("formatActive true")
+	if l := activeLine(true); l.Value != yesLabel || l.Styled != output.GreenText(yesLabel) {
+		t.Errorf("activeLine(true) = %+v", l)
 	}
-	if formatActive(false, true) != noLabel {
-		t.Error("formatActive false")
+	if l := activeLine(false); l.Value != noLabel || l.Styled != "" {
+		t.Errorf("activeLine(false) = %+v", l)
 	}
 	if formatTimestamp(0, "") != dashPad {
 		t.Error("formatTimestamp zero")
@@ -166,28 +167,22 @@ func TestFormatters(t *testing.T) {
 func TestSeverityRow(t *testing.T) {
 	t.Parallel()
 
-	// Plain (non-styled) renders just label + numeric value.
-	p := severityRow("Critical", "CRITICAL", 3, false)
-	if p.label != "Critical" || p.value != "3" || p.display != "" {
-		t.Errorf("plain severityRow: %+v", p)
+	// count>0: Value is the count, Styled is "<count> <badge>".
+	p := severityRow("Critical", "CRITICAL", 3)
+	want := "3 " + output.SCASeverityColor("CRITICAL")
+	if p.Label != "Critical" || p.Value != "3" || p.Styled != want {
+		t.Errorf("severityRow = %+v, want Styled %q", p, want)
 	}
 
-	// Styled + count>0 attaches a coloured badge in display; the numeric value
-	// must stay as the leading token so the JSON layer keeps using it.
-	p = severityRow("Critical", "CRITICAL", 3, true)
-	if !strings.HasPrefix(p.display, "3 ") {
-		t.Errorf("styled display must start with count, got %q", p.display)
+	// count==0 must not attach a badge (0 counts stay neutral).
+	p = severityRow("Critical", "CRITICAL", 0)
+	if p.Styled != "" {
+		t.Errorf("zero count must not render a badge, got %q", p.Styled)
 	}
 
-	// Styled but count==0 must not attach a badge (0 counts stay neutral).
-	p = severityRow("Critical", "CRITICAL", 0, true)
-	if p.display != "" {
-		t.Errorf("zero count must not render a badge, got %q", p.display)
-	}
-
-	// Empty canonical severity is a no-op on display.
-	p = severityRow("Other", "", 5, true)
-	if p.display != "" {
-		t.Errorf("empty canonical must not render a badge, got %q", p.display)
+	// Empty canonical severity is a no-op on Styled.
+	p = severityRow("Other", "", 5)
+	if p.Styled != "" {
+		t.Errorf("empty canonical must not render a badge, got %q", p.Styled)
 	}
 }
