@@ -60,18 +60,6 @@ func PrintEmptyNote(ios *iostreams.IOStreams, outputFormat, note string) error {
 	return err
 }
 
-// PrintSectionHeading writes a section heading: lipgloss-styled when isTTY,
-// "<text>:" otherwise.
-func PrintSectionHeading(w io.Writer, isTTY bool, text string) error {
-	if isTTY {
-		_, err := fmt.Fprintln(w, output.HeaderStyle.Render(text))
-		return err
-	}
-
-	_, err := fmt.Fprintln(w, text+":")
-	return err
-}
-
 // PrintSection prints a blank line, the heading "<title> (<number of lines>)"
 // and the lines. It prints nothing when there are no lines.
 func PrintSection(w io.Writer, isTTY bool, title string, lines []string) error {
@@ -83,7 +71,7 @@ func PrintSection(w io.Writer, isTTY bool, title string, lines []string) error {
 		return err
 	}
 
-	if err := PrintSectionHeading(w, isTTY, fmt.Sprintf("%s (%d)", title, len(lines))); err != nil {
+	if err := output.PrintHeading(w, isTTY, fmt.Sprintf("%s (%d)", title, len(lines))); err != nil {
 		return err
 	}
 

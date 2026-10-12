@@ -237,6 +237,19 @@ func printPlainTable(w io.Writer, headers []string, rows [][]string) error {
 	return tw.Flush()
 }
 
+// PrintHeading writes a section heading: HeaderStyle when isTTY, "<text>:"
+// otherwise.
+func PrintHeading(w io.Writer, isTTY bool, text string) error {
+	if isTTY {
+		_, err := fmt.Fprintln(w, HeaderStyle.Render(text))
+		return err
+	}
+
+	_, err := fmt.Fprintln(w, text+":")
+
+	return err
+}
+
 // PrintJSON encodes v as indented JSON to w.
 func PrintJSON(w io.Writer, v any) error {
 	enc := json.NewEncoder(w)

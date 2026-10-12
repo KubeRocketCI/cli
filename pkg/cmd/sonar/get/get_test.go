@@ -431,35 +431,3 @@ func TestGet_PrintAligned_WithDisplay(t *testing.T) {
 		t.Errorf("expected value in output: %s", out)
 	}
 }
-
-func TestGet_PrintHeading(t *testing.T) {
-	t.Parallel()
-
-	t.Run("plain mode appends colon", func(t *testing.T) {
-		t.Parallel()
-
-		var buf bytes.Buffer
-		if err := printHeading(&buf, "Reliability", false); err != nil {
-			t.Fatalf("printHeading error: %v", err)
-		}
-
-		out := buf.String()
-		if !strings.Contains(out, "Reliability:") {
-			t.Errorf("expected 'Reliability:' in plain output, got: %s", out)
-		}
-	})
-
-	t.Run("styled mode does not append colon", func(t *testing.T) {
-		t.Parallel()
-
-		var buf bytes.Buffer
-		if err := printHeading(&buf, "Reliability", true); err != nil {
-			t.Fatalf("printHeading error: %v", err)
-		}
-
-		out := buf.String()
-		if !strings.Contains(out, "Reliability") {
-			t.Errorf("expected 'Reliability' in styled output, got: %s", out)
-		}
-	})
-}

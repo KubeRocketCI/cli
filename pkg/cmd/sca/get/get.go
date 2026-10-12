@@ -140,7 +140,7 @@ func printDetail(w io.Writer, codebase, requestedBranch string, d *portal.SCAPro
 		return err
 	}
 
-	if err := printHeading(w, "Vulnerabilities", styled); err != nil {
+	if err := output.PrintHeading(w, styled, "Vulnerabilities"); err != nil {
 		return err
 	}
 
@@ -160,7 +160,7 @@ func printDetail(w io.Writer, codebase, requestedBranch string, d *portal.SCAPro
 		return err
 	}
 
-	if err := printHeading(w, "Components", styled); err != nil {
+	if err := output.PrintHeading(w, styled, "Components"); err != nil {
 		return err
 	}
 
@@ -215,7 +215,7 @@ func formatRelativeTimestamp(ms int64) string {
 	return output.RelativeTime(time.UnixMilli(ms))
 }
 
-// printAligned / printHeading mirror the sonar helpers verbatim so the two
+// printAligned mirrors the sonar helper verbatim so the two
 // groups render with the same visual rhythm.
 var scaLabelStyle = output.LabelStyle.UnsetWidth()
 
@@ -246,14 +246,4 @@ func printAligned(w io.Writer, pairs []kvPair, indent string, styled bool) error
 	}
 
 	return nil
-}
-
-func printHeading(w io.Writer, title string, styled bool) error {
-	if styled {
-		_, err := fmt.Fprintln(w, output.HeaderStyle.Render(title))
-		return err
-	}
-
-	_, err := fmt.Fprintln(w, title+":")
-	return err
 }

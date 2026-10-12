@@ -119,7 +119,7 @@ func renderDetail(w io.Writer, isTTY bool, d *portal.EnvDetail) error {
 		return err
 	}
 
-	if err := discovery.PrintSectionHeading(w, isTTY, "Infrastructure"); err != nil {
+	if err := output.PrintHeading(w, isTTY, "Infrastructure"); err != nil {
 		return err
 	}
 
@@ -239,7 +239,7 @@ func maxLabelWidth(groups ...[]labelValue) int {
 }
 
 func renderQualityGates(w io.Writer, isTTY bool, gates []portal.QualityGateDetail) error {
-	if err := discovery.PrintSectionHeading(w, isTTY, fmt.Sprintf("Quality Gates (%d)", len(gates))); err != nil {
+	if err := output.PrintHeading(w, isTTY, fmt.Sprintf("Quality Gates (%d)", len(gates))); err != nil {
 		return err
 	}
 
@@ -279,7 +279,7 @@ func formatQualityGateLine(g portal.QualityGateDetail) string {
 }
 
 func renderProjects(w io.Writer, isTTY bool, projects []portal.EnvProject) error {
-	if err := discovery.PrintSectionHeading(w, isTTY, fmt.Sprintf("Projects (%d)", len(projects))); err != nil {
+	if err := output.PrintHeading(w, isTTY, fmt.Sprintf("Projects (%d)", len(projects))); err != nil {
 		return err
 	}
 
