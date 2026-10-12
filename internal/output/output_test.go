@@ -13,6 +13,10 @@ import (
 	"github.com/KubeRocketCI/cli/internal/portal"
 )
 
+// sgr matches the colour codes lipgloss emits into a buffer when CLICOLOR_FORCE
+// is set; tests strip them before comparing bytes.
+var sgr = regexp.MustCompile("\x1b\\[[0-9;]*m")
+
 func TestPrintJSONEnvelope(t *testing.T) {
 	t.Parallel()
 
@@ -315,9 +319,6 @@ func TestPrintTable_Styled(t *testing.T) {
 	}
 
 	// The hidden border pads every row and adds a border line above and below.
-	// Colour codes are stripped: CLICOLOR_FORCE makes lipgloss emit them even
-	// into a buffer.
-	sgr := regexp.MustCompile("\x1b\\[[0-9;]*m")
 	want := "                 \n  NAME   STATUS  \n                 \n  foo    OK      \n                 \n"
 	if got := sgr.ReplaceAllString(buf.String(), ""); got != want {
 		t.Errorf("PrintTable(isTTY=true) = %q, want %q", got, want)
@@ -347,6 +348,41 @@ func TestPrintHeading(t *testing.T) {
 
 			if got := buf.String(); got != tc.want {
 				t.Errorf("PrintHeading(isTTY=%v) = %q, want %q", tc.isTTY, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPrintDetailLines(t *testing.T) {
+	t.Parallel()
+
+	lines := []DetailLine{
+		{Label: "Name", Value: "foo"},
+		{Label: "Status", Value: "created", Styled: "[created-styled]"},
+	}
+
+	cases := []struct {
+		name  string
+		isTTY bool
+		want  string
+	}{
+		{"plain pads the label to 14 columns and ignores Styled", false,
+			"Name:         foo\nStatus:       created\n"},
+		{"styled pads through LabelStyle and prefers Styled", true,
+			"Name:          foo\nStatus:        [created-styled]\n"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var buf bytes.Buffer
+			if err := PrintDetailLines(&buf, tc.isTTY, lines); err != nil {
+				t.Fatalf("PrintDetailLines: %v", err)
+			}
+
+			if got := sgr.ReplaceAllString(buf.String(), ""); got != tc.want {
+				t.Errorf("PrintDetailLines(isTTY=%v) = %q, want %q", tc.isTTY, got, tc.want)
 			}
 		})
 	}

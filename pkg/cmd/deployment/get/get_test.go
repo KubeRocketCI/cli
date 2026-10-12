@@ -11,7 +11,7 @@ import (
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
 )
 
-func TestPrintPlainDeploymentDetail_Messages(t *testing.T) {
+func TestPrintDeploymentDetail_Messages(t *testing.T) {
 	t.Parallel()
 
 	d := &portal.DeploymentDetail{
@@ -27,8 +27,8 @@ func TestPrintPlainDeploymentDetail_Messages(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := printPlainDeploymentDetail(&buf, d); err != nil {
-		t.Fatalf("printPlainDeploymentDetail error: %v", err)
+	if err := printDeploymentDetail(&buf, false, d); err != nil {
+		t.Fatalf("printDeploymentDetail error: %v", err)
 	}
 
 	out := buf.String()
@@ -43,7 +43,7 @@ func TestPrintPlainDeploymentDetail_Messages(t *testing.T) {
 	}
 }
 
-func TestPrintPlainDeploymentDetail_NoMessages(t *testing.T) {
+func TestPrintDeploymentDetail_NoMessages(t *testing.T) {
 	t.Parallel()
 
 	d := &portal.DeploymentDetail{
@@ -58,8 +58,8 @@ func TestPrintPlainDeploymentDetail_NoMessages(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := printPlainDeploymentDetail(&buf, d); err != nil {
-		t.Fatalf("printPlainDeploymentDetail error: %v", err)
+	if err := printDeploymentDetail(&buf, false, d); err != nil {
+		t.Fatalf("printDeploymentDetail error: %v", err)
 	}
 
 	if strings.Contains(buf.String(), "Message") {
