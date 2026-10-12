@@ -63,7 +63,7 @@ func TestRenderRunInfo_DeploymentAndEnv(t *testing.T) {
 		t.Fatalf("RenderRunInfo: %v", err)
 	}
 
-	out := buf.String()
+	out := sgr.ReplaceAllString(buf.String(), "")
 	for _, want := range []string{`(?m)^Deployment:\s+demo$`, `(?m)^Env:\s+dev$`} {
 		if !regexp.MustCompile(want).MatchString(out) {
 			t.Errorf("no line matches %q in:\n%s", want, out)
@@ -97,7 +97,7 @@ Deployment:  demo
 Env:         dev
 Results:     VCS_TAG=1.0.0
 `
-	if got := buf.String(); got != want {
+	if got := sgr.ReplaceAllString(buf.String(), ""); got != want {
 		t.Errorf("got:\n%s\nwant:\n%s", got, want)
 	}
 }
@@ -117,8 +117,8 @@ func TestRenderNoTaskData(t *testing.T) {
 			t.Fatalf("RenderNoTaskData(%q): %v", reason, err)
 		}
 
-		if buf.String() != want {
-			t.Errorf("RenderNoTaskData(%q) = %q, want %q", reason, buf.String(), want)
+		if got := sgr.ReplaceAllString(buf.String(), ""); got != want {
+			t.Errorf("RenderNoTaskData(%q) = %q, want %q", reason, got, want)
 		}
 	}
 }

@@ -86,6 +86,8 @@ const (
 	baseCluster   = "in-cluster"
 	baseNamespace = "ns"
 
+	kindCDPipeline = "CDPipeline"
+
 	envDeployment = "my-pipeline"
 	envName       = "dev"
 	missingEnv    = "prod"
@@ -397,7 +399,7 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 	failedTaskRuns := at(http.MethodGet, pathTaskRuns, "taskruns-failed")
 
 	pipeline := at(http.MethodPost, pathGet, "env-cdpipeline")
-	pipeline.kind, pipeline.name = "CDPipeline", envDeployment
+	pipeline.kind, pipeline.name = kindCDPipeline, envDeployment
 
 	stages := list("Stage", "env-stages")
 	apps := list("Application", "env-applications")
@@ -413,9 +415,9 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 	streams.bodyContains = byProject
 	branches := list("CodebaseBranch", "project-branches")
 	branches.bodyContains = byProject
-	cdpipelines := list("CDPipeline", "deployment-cdpipelines")
+	cdpipelines := list(kindCDPipeline, "deployment-cdpipelines")
 	apiPipeline := at(http.MethodPost, pathGet, "deployment-api-pipeline")
-	apiPipeline.kind, apiPipeline.name = "CDPipeline", emptyDeployment
+	apiPipeline.kind, apiPipeline.name = kindCDPipeline, emptyDeployment
 	projectApps := list("Application", "project-applications")
 	projectApps.bodyContains = []string{`"labels":{"app.edp.epam.com/app-name":"` + projectName + `"}`}
 	project := []route{codebases, codebase, streams, branches, cdpipelines, apiPipeline, stages, projectApps}
@@ -560,11 +562,34 @@ func TestContract(t *testing.T) {
 }
 
 func runContractRow(t *testing.T, row contractRow) {
-	isolatedConfigDir(t)
-
 	tables, _ := fixtures(t)
 	routes, ok := tables[row.fixture]
 	require.True(t, ok, "unknown fixture %q", row.fixture)
+
+	res := runStub(t, routes, row.env, row.argv())
+
+	norm := strings.NewReplacer(
+		res.portalURL, "{{PORTAL}}",
+	)
+
+	assert.Equal(t, row.wantExit, res.code, "exit code; stderr = %q", res.stderr)
+	golden(t, row.goldenPath("stdout"), []byte(norm.Replace(res.stdout)))
+	golden(t, row.goldenPath("stderr"), []byte(norm.Replace(res.stderr)))
+}
+
+// stubResult is one CLI run against the stub portal.
+type stubResult struct {
+	code           int
+	stdout, stderr string
+	portalURL      string
+}
+
+// runStub serves routes from a stub portal and runs argv against it in an
+// isolated configuration: the base environment, then extra, with the Factory
+// clock at fixedNow. KRCI_PORTAL_URL in extra replaces the stub's URL.
+func runStub(t *testing.T, routes []route, extra map[string]string, argv []string) stubResult {
+	t.Helper()
+	isolatedConfigDir(t)
 
 	env := map[string]string{
 		"KRCI_CLUSTER_NAME":    baseCluster,
@@ -572,12 +597,12 @@ func runContractRow(t *testing.T, row contractRow) {
 		"KRCI_KEYRING_BACKEND": "file",
 		"KRCI_TOKEN":           envToken,
 	}
-	maps.Copy(env, row.env)
+	maps.Copy(env, extra)
 
 	srv := httptest.NewServer(portalStub(t, routes, env["KRCI_CLUSTER_NAME"], env["KRCI_TOKEN"]))
 	t.Cleanup(srv.Close)
 
-	if _, ok := row.env["KRCI_PORTAL_URL"]; !ok {
+	if _, ok := extra["KRCI_PORTAL_URL"]; !ok {
 		env["KRCI_PORTAL_URL"] = srv.URL
 	}
 
@@ -590,15 +615,9 @@ func runContractRow(t *testing.T, row contractRow) {
 	f := newFactory(&out, &errb)
 	f.Now = func() time.Time { return fixedNow }
 
-	code := runWith(context.Background(), row.argv(), f)
+	code := runWith(context.Background(), argv, f)
 
-	norm := strings.NewReplacer(
-		srv.URL, "{{PORTAL}}",
-	)
-
-	assert.Equal(t, row.wantExit, code, "exit code; stderr = %q", errb.String())
-	golden(t, row.goldenPath("stdout"), []byte(norm.Replace(out.String())))
-	golden(t, row.goldenPath("stderr"), []byte(norm.Replace(errb.String())))
+	return stubResult{code: code, stdout: out.String(), stderr: errb.String(), portalURL: srv.URL}
 }
 
 // Row goldens are unique. Every file under contractDir outside fixturesDir is

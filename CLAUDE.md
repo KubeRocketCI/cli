@@ -21,11 +21,12 @@ Portal-only: CLI talks exclusively to the portal tRPC API (Bearer idToken). No d
 - `internal/cmdutil/Factory` — lazy-init: IOStreams, Config, TokenProvider, RestClient
 - `internal/cmdutil/validate.go` — shared validators
 - `internal/config/` — Viper-based config: flags > env vars > config file > defaults
+- `internal/iostreams/` — process streams. `FromWriters` builds stdout and stderr as the terminal policy (`terminal.go`: what may reach a terminal) followed by one colour profile; `New` is the raw form for tests. Write styled text with `fmt`; `lipgloss.Fprint*` is banned.
 - `internal/output/` — terminal primitives (tables, detail lines, headings, styles); each takes an `io.Writer` and the TTY state. No `-o` knowledge.
 - `pkg/cmd/internal/render/` — the CLI output contract: `-o` names, validation and dispatch, the `{schemaVersion, data}` and error envelopes, the auth-error prefix. Every `-o` decision goes through it; the JSON and YAML encoders stay in `output`.
 - `pkg/cmd/<group>/<verb>/` — commands export `NewCmd<Verb>(f, runF)`. Follow existing as examples.
 
-depguard enforces the split: `output` imports neither `iostreams` nor `cmdutil`, `cmdutil` does not import `output`, `render` does not import `cmdutil`.
+depguard enforces the split: `output` imports neither `iostreams` nor `cmdutil`, `cmdutil` does not import `output`, `render` does not import `cmdutil`, `colorprofile` is imported only by `iostreams`.
 
 ### Factory validation gate
 

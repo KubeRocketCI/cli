@@ -60,6 +60,14 @@ linters:
           deny:
             - pkg: github.com/KubeRocketCI/cli/internal/cmdutil
               desc: the output contract does not depend on the Factory module
+        colorprofile:
+          list-mode: lax
+          files:
+            - $all
+            - "!${base-path}/internal/iostreams/**"
+          deny:
+            - pkg: github.com/charmbracelet/colorprofile
+              desc: the colour profile is applied once per process stream in internal/iostreams
         viper:
           list-mode: lax
           files:
@@ -85,6 +93,10 @@ linters:
           msg: >-
             writes through OutOrStderr, which SetOut binds to stdout (spf13/cobra#1708);
             write to f.IOStreams.ErrOut or cmd.ErrOrStderr()
+        - pattern: ^lipgloss\.(F|S)?Print(f|ln)?$
+          msg: >-
+            the process streams built in internal/iostreams apply the colour profile and the
+            terminal policy (internal/iostreams/terminal.go); write styled text with fmt
         - pattern: ^os\.Std(in|out|err)$
           pkg: ^os$
           msg: &stdstream >-

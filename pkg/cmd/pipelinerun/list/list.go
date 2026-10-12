@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/lipgloss/v2"
 	"github.com/spf13/cobra"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
@@ -178,7 +177,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 	}
 
 	if len(result.PipelineRuns) == 0 {
-		_, err = lipgloss.Fprintln(opts.IO.Out, output.DimStyle.Render("No pipeline runs found"))
+		_, err = fmt.Fprintln(opts.IO.Out, output.DimStyle.Render("No pipeline runs found"))
 
 		return err
 	}
@@ -205,7 +204,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 			return err
 		}
 
-		if _, err := lipgloss.Fprintln(opts.IO.Out, output.SectionStyle.Render(header)); err != nil {
+		if _, err := fmt.Fprintln(opts.IO.Out, output.SectionStyle.Render(header)); err != nil {
 			return err
 		}
 

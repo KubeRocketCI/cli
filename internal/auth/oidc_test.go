@@ -55,8 +55,8 @@ func TestOpenAuthURL(t *testing.T) {
 
 			assert.Equal(t, authURL, opened)
 			assert.Equal(t, tt.want, buf.String())
-			assert.Same(t, &buf, browser.Stdout)
-			assert.Same(t, &buf, browser.Stderr)
+			assert.Nil(t, browser.Stdout)
+			assert.Nil(t, browser.Stderr)
 		})
 	}
 }

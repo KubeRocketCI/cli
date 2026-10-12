@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"charm.land/lipgloss/v2"
 	"github.com/spf13/cobra"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
@@ -152,7 +151,7 @@ func fetchRun(
 	if opts.Wait {
 		if opts.IO.IsStdoutTTY() {
 			msg := fmt.Sprintf("waiting for pipeline run %s to finish (timeout %s)", opts.Name, opts.Timeout)
-			_, _ = lipgloss.Fprintln(opts.IO.ErrOut, output.DimStyle.Render(msg))
+			_, _ = fmt.Fprintln(opts.IO.ErrOut, output.DimStyle.Render(msg))
 		}
 
 		waitCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
@@ -225,7 +224,7 @@ func renderRun(opts *GetOptions, result *portal.PipelineRunListResult) error {
 
 		header := fmt.Sprintf("Logs: %s", run.Name)
 
-		if _, err := lipgloss.Fprintln(opts.IO.Out, output.SectionStyle.Render(header)); err != nil {
+		if _, err := fmt.Fprintln(opts.IO.Out, output.SectionStyle.Render(header)); err != nil {
 			return err
 		}
 

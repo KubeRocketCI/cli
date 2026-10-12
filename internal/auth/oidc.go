@@ -122,13 +122,14 @@ func (p *tokenProvider) login(ctx context.Context) (*UserInfo, error) {
 
 // openAuthURL writes the manual-visit instructions to w, then calls open.
 // An open failure is written to w and not returned.
-// Sets browser.Stdout and browser.Stderr to w.
+// browser.Stdout and browser.Stderr are nil: a writer that is not an *os.File
+// becomes a pipe, and a detached browser holding it blocks open until it exits.
 func openAuthURL(w io.Writer, authURL string, open func(string) error) {
 	_, _ = fmt.Fprintf(w, "Opening browser for authentication...\n")
 	_, _ = fmt.Fprintf(w, "If browser doesn't open, visit:\n  %s\n\n", authURL)
 
-	browser.Stdout = w
-	browser.Stderr = w
+	browser.Stdout = nil
+	browser.Stderr = nil
 
 	if err := open(authURL); err != nil {
 		_, _ = fmt.Fprintf(w, "Warning: could not open browser: %v\n", err)

@@ -2,6 +2,7 @@ package output
 
 import (
 	"bytes"
+	"encoding/json"
 	"regexp"
 	"strings"
 	"testing"
@@ -10,8 +11,8 @@ import (
 	"github.com/KubeRocketCI/cli/internal/portal"
 )
 
-// sgr matches the colour codes lipgloss emits into a buffer when CLICOLOR_FORCE
-// is set; tests strip them before comparing bytes.
+// sgr matches the SGR sequences Style.Render emits; tests strip them before
+// comparing bytes.
 var sgr = regexp.MustCompile("\x1b\\[[0-9;]*m")
 
 func TestSonarGateStatusColor_PassthroughWhenUnknown(t *testing.T) {
@@ -376,5 +377,41 @@ func TestOrDash(t *testing.T) {
 
 	if got := OrDash("x"); got != "x" {
 		t.Errorf("OrDash(\"x\") = %q, want %q", got, "x")
+	}
+}
+
+func TestPrintJSON_EscapesC1AndDEL(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	if err := PrintJSON(&buf, map[string]string{"m": "a\u009bb\x7fc\x1bdé"}); err != nil {
+		t.Fatalf("PrintJSON: %v", err)
+	}
+
+	want := "{\n  \"m\": \"a\\u009bb\\u007fc\\u001bdé\"\n}\n"
+	if got := buf.String(); got != want {
+		t.Errorf("PrintJSON = %q, want %q", got, want)
+	}
+
+	var back map[string]string
+	if err := json.Unmarshal(buf.Bytes(), &back); err != nil || back["m"] != "a\u009bb\x7fc\x1bdé" {
+		t.Errorf("round trip = %q, %v", back["m"], err)
+	}
+}
+
+func TestPrintJSON_PlainBytesUnchanged(t *testing.T) {
+	t.Parallel()
+
+	var got, want bytes.Buffer
+	if err := PrintJSON(&got, []string{"plain", "текст"}); err != nil {
+		t.Fatalf("PrintJSON: %v", err)
+	}
+
+	enc := json.NewEncoder(&want)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode([]string{"plain", "текст"})
+
+	if got.String() != want.String() {
+		t.Errorf("PrintJSON = %q, want %q", got.String(), want.String())
 	}
 }
