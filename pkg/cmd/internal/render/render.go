@@ -24,12 +24,31 @@ type TableRenderer func(w io.Writer, isTTY bool) error
 // Render dispatches on the `-o` flag. "json" emits the `{schemaVersion, data}`
 // envelope, "table" and the empty default call renderTable, any other value is
 // an unknown-format error.
-func Render[T any](ios *iostreams.IOStreams, outputFormat string, data T, renderTable TableRenderer) error {
+func Render(ios *iostreams.IOStreams, outputFormat string, data any, renderTable TableRenderer) error {
+	return dispatch(ios, outputFormat, renderTable, func(w io.Writer) error {
+		return output.PrintJSONEnvelope(w, SchemaVersion, data)
+	})
+}
+
+// RenderBare is Render with "json" emitting data as is, without the envelope.
+// Use it only for the bare verbs listed in docs/json-schemas.md; new verbs use
+// Render.
+func RenderBare(ios *iostreams.IOStreams, outputFormat string, data any, renderTable TableRenderer) error {
+	return dispatch(ios, outputFormat, renderTable, func(w io.Writer) error {
+		return output.PrintJSON(w, data)
+	})
+}
+
+// dispatch resolves the `-o` value and calls writeJSON or renderTable with
+// stdout.
+func dispatch(
+	ios *iostreams.IOStreams, outputFormat string, renderTable TableRenderer, writeJSON func(io.Writer) error,
+) error {
 	format := output.ResolveFormat(outputFormat)
 
 	switch format {
 	case output.FormatJSON:
-		return output.PrintJSONEnvelope(ios.Out, SchemaVersion, data)
+		return writeJSON(ios.Out)
 	case output.FormatTable:
 		return renderTable(ios.Out, ios.IsStdoutTTY())
 	default:

@@ -4,6 +4,7 @@ package list
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -14,6 +15,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 // maxInlineApps is the maximum number of applications shown inline before truncating.
@@ -81,7 +83,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		return cmdutil.HandleAuthError(err)
 	}
 
-	return output.RenderList(opts.IO, opts.OutputFormat, deployments, func(isTTY bool) ([]string, [][]string) {
+	return render.RenderBare(opts.IO, opts.OutputFormat, deployments, func(w io.Writer, isTTY bool) error {
 		headers := []string{"NAME", "APPLICATIONS", "ENVS", "STATUS"}
 		rows := make([][]string, 0, len(deployments))
 
@@ -99,7 +101,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 			})
 		}
 
-		return headers, rows
+		return output.PrintTable(w, isTTY, headers, rows)
 	})
 }
 

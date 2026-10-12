@@ -3,6 +3,7 @@ package list
 
 import (
 	"context"
+	"io"
 
 	"github.com/spf13/cobra"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 // ListOptions holds all inputs for the project list command.
@@ -76,7 +78,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		return cmdutil.HandleAuthError(err)
 	}
 
-	return output.RenderList(opts.IO, opts.OutputFormat, projects, func(isTTY bool) ([]string, [][]string) {
+	return render.RenderBare(opts.IO, opts.OutputFormat, projects, func(w io.Writer, isTTY bool) error {
 		headers := []string{"NAME", "TYPE", "LANGUAGE", "BUILD TOOL", "STATUS"}
 		rows := make([][]string, 0, len(projects))
 
@@ -89,6 +91,6 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 			rows = append(rows, []string{p.Name, p.Type, p.Language, p.BuildTool, status})
 		}
 
-		return headers, rows
+		return output.PrintTable(w, isTTY, headers, rows)
 	})
 }
