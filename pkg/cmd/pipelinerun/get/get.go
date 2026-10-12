@@ -88,7 +88,7 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 	cmd.Flags().BoolVar(&opts.IncludeReason, "reason", false, pipelinerun.ReasonFlagUsage)
 	cmd.Flags().BoolVar(&opts.Wait, "wait", false, "Wait until the run finishes; exit 1 unless it succeeded")
 	cmd.Flags().DurationVar(&opts.Timeout, "timeout", defaultWaitTimeout, "Maximum time to wait with --wait")
-	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "", "Output format: table, json (default: table)")
+	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "", render.OutputFlagUsage)
 
 	return cmd
 }

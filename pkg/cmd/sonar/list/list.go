@@ -51,7 +51,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
   # Scripting — failing-gate projects
   krci sonar list -o json | jq -r '.data.projects[] | select(.qualityGateStatus=="ERROR") | .key'`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := render.ValidateOutputFormat(opts.OutputFormat, render.FormatJSON, render.FormatTable); err != nil {
+			if err := render.ValidateJSONOrTable(opts.OutputFormat); err != nil {
 				return err
 			}
 
@@ -76,7 +76,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		fmt.Sprintf("Page size (max %d)", sonarinternal.MaxPageSize))
 	cmd.Flags().StringVar(&opts.Search, "search", "", "Filter projects by partial name")
 	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "",
-		"Output format: table, json (default: table)")
+		render.OutputFlagUsage)
 
 	return cmd
 }

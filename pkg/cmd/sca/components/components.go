@@ -92,7 +92,7 @@ func NewCmdComponents(f *cmdutil.Factory, runF func(*ComponentsOptions) error) *
 	cmd.Flags().IntVar(&opts.PageSize, "page-size", defaultComponentsPageSize,
 		fmt.Sprintf("Page size (max %d)", scainternal.MaxPageSize))
 	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "",
-		"Output format: table, json (default: table)")
+		render.OutputFlagUsage)
 
 	return cmd
 }

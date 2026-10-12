@@ -97,7 +97,7 @@ func NewCmdFindings(f *cmdutil.Factory, runF func(*FindingsOptions) error) *cobr
 	cmd.Flags().StringVar(&opts.Source, "source", "",
 		"Filter by vulnerability data source (e.g. NVD, GITHUB, OSV)")
 	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "",
-		"Output format: table, json (default: table)")
+		render.OutputFlagUsage)
 
 	return cmd
 }

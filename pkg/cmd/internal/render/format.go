@@ -13,6 +13,9 @@ const (
 	FormatYAML  = "yaml"
 )
 
+// OutputFlagUsage is the `-o` help text of the verbs that accept json and table.
+const OutputFlagUsage = "Output format: table, json (default: table)"
+
 // ResolveFormat returns explicit, or FormatTable when it is empty.
 func ResolveFormat(explicit string) string {
 	if explicit != "" {
@@ -35,6 +38,11 @@ func ValidateOutputFormat(format string, allowed ...string) error {
 	}
 
 	return unknownFormatError(format, allowed...)
+}
+
+// ValidateJSONOrTable is ValidateOutputFormat with json and table allowed.
+func ValidateJSONOrTable(format string) error {
+	return ValidateOutputFormat(format, FormatJSON, FormatTable)
 }
 
 // unknownFormatError reads `unknown output format: xml (use 'json' or 'table')`

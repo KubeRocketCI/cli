@@ -158,7 +158,7 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*IssuesOptions) error) *cobra.Co
 	cmd.Flags().IntVar(&opts.PageSize, "page-size", defaultPageSize,
 		fmt.Sprintf("Page size (max %d)", sonarinternal.MaxPageSize))
 	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "",
-		"Output format: table, json (default: table)")
+		render.OutputFlagUsage)
 
 	return cmd
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/discovery"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 // ListOptions holds all inputs for `krci project deployments <project>`.
@@ -76,7 +77,7 @@ Rows are sorted by deployment ascending, then by Stage.spec.order ascending.`,
 	}
 
 	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "",
-		"Output format: table, json (default: table)")
+		render.OutputFlagUsage)
 
 	return cmd
 }

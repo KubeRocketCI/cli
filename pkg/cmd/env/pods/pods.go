@@ -19,6 +19,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/ptr"
 	envinternal "github.com/KubeRocketCI/cli/pkg/cmd/env/internal"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/discovery"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 // PodsOptions holds all inputs for `krci env pods <deployment> <env>`.
@@ -88,7 +89,7 @@ Limits:
 	}
 
 	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "",
-		"Output format: table, json (default: table)")
+		render.OutputFlagUsage)
 
 	return cmd
 }
