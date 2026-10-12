@@ -75,7 +75,7 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 	cmd.Flags().StringVar(&opts.Branch, "branch", "",
 		"SonarQube branch name (mutually exclusive with --pr)")
 	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "",
-		"Output format: table, json (default: table)")
+		render.OutputFlagUsage)
 
 	return cmd
 }

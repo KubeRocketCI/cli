@@ -103,7 +103,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVar(&opts.Env, "env", "", "Filter runs of one environment of --deployment")
 	cmd.Flags().BoolVar(&opts.IncludeLogs, "logs", false, pipelinerun.LogsFlagUsage)
 	cmd.Flags().BoolVar(&opts.IncludeReason, "reason", false, pipelinerun.ReasonFlagUsage)
-	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "", "Output format: table, json (default: table)")
+	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "", render.OutputFlagUsage)
 
 	return cmd
 }

@@ -65,7 +65,7 @@ func ValidatePageBounds(page, pageSize int) error {
 // output format, Kubernetes-name codebase, non-empty --branch when supplied.
 // sca verbs take no --pr, so there is no scope-mutex step.
 func ValidateCodebaseCommand(cmd *cobra.Command, outputFormat, codebase, branch string) error {
-	if err := render.ValidateOutputFormat(outputFormat, render.FormatJSON, render.FormatTable); err != nil {
+	if err := render.ValidateJSONOrTable(outputFormat); err != nil {
 		return err
 	}
 

@@ -35,7 +35,7 @@ type TableRenderer = render.TableRenderer
 // ValidateOutputFormat is render.ValidateOutputFormat with "json" and "table"
 // allowed.
 func ValidateOutputFormat(format string) error {
-	return render.ValidateOutputFormat(format, render.FormatJSON, render.FormatTable)
+	return render.ValidateJSONOrTable(format)
 }
 
 // Render is render.Render.

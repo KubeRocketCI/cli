@@ -67,7 +67,7 @@ error.message on failure.`,
   krci auth status -o json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := render.ValidateOutputFormat(opts.OutputFormat, render.FormatJSON, render.FormatTable); err != nil {
+			if err := render.ValidateJSONOrTable(opts.OutputFormat); err != nil {
 				return err
 			}
 
@@ -79,7 +79,7 @@ error.message on failure.`,
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "", "Output format: table, json (default: table)")
+	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "", render.OutputFlagUsage)
 
 	return cmd
 }

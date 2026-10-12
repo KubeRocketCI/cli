@@ -58,7 +58,7 @@ By default excludes inactive projects and child versions.`,
   # Scripting — every project with at least one CRITICAL finding
   krci sca list -o json | jq -r '.data.items[] | select(.metrics.critical>0) | .name'`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := render.ValidateOutputFormat(opts.OutputFormat, render.FormatJSON, render.FormatTable); err != nil {
+			if err := render.ValidateJSONOrTable(opts.OutputFormat); err != nil {
 				return err
 			}
 
@@ -81,7 +81,7 @@ By default excludes inactive projects and child versions.`,
 	cmd.Flags().BoolVar(&opts.IncludeInactive, "include-inactive", false, "Include inactive projects")
 	cmd.Flags().BoolVar(&opts.IncludeChildren, "include-children", false, "Include child (non-root) versions")
 	cmd.Flags().StringVarP(&opts.OutputFormat, "output", "o", "",
-		"Output format: table, json (default: table)")
+		render.OutputFlagUsage)
 
 	return cmd
 }

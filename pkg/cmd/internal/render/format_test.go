@@ -66,3 +66,18 @@ func TestResolveFormat(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateJSONOrTable(t *testing.T) {
+	t.Parallel()
+
+	for _, ok := range []string{"", "json", "table"} {
+		if err := render.ValidateJSONOrTable(ok); err != nil {
+			t.Errorf("ValidateJSONOrTable(%q) = %v, want nil", ok, err)
+		}
+	}
+
+	if err := render.ValidateJSONOrTable("yaml"); err == nil ||
+		err.Error() != "unknown output format: yaml (use 'json' or 'table')" {
+		t.Errorf("ValidateJSONOrTable(%q) = %v, want the json/table unknown-format error", "yaml", err)
+	}
+}
