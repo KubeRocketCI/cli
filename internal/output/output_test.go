@@ -323,3 +323,31 @@ func TestPrintTable_Styled(t *testing.T) {
 		t.Errorf("PrintTable(isTTY=true) = %q, want %q", got, want)
 	}
 }
+
+func TestPrintHeading(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		isTTY bool
+		want  string
+	}{
+		{"plain appends a colon", false, "Reliability:\n"},
+		{"styled uses HeaderStyle", true, HeaderStyle.Render("Reliability") + "\n"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var buf bytes.Buffer
+			if err := PrintHeading(&buf, tc.isTTY, "Reliability"); err != nil {
+				t.Fatalf("PrintHeading: %v", err)
+			}
+
+			if got := buf.String(); got != tc.want {
+				t.Errorf("PrintHeading(isTTY=%v) = %q, want %q", tc.isTTY, got, tc.want)
+			}
+		})
+	}
+}

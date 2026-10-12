@@ -135,7 +135,7 @@ func printDetail(w io.Writer, d *portal.SonarProjectDetail, styled bool) error {
 			return err
 		}
 
-		if err := printHeading(w, section.title, styled); err != nil {
+		if err := output.PrintHeading(w, styled, section.title); err != nil {
 			return err
 		}
 
@@ -223,21 +223,6 @@ func printAligned(w io.Writer, pairs []kvPair, indent string, styled bool) error
 	}
 
 	return nil
-}
-
-// printHeading renders a section heading. Styled mode uses the shared
-// `output.HeaderStyle` (accent color + bold) so the look matches the top-of-
-// table styling elsewhere in the CLI. Plain mode appends ":" for readability
-// in piped output.
-func printHeading(w io.Writer, title string, styled bool) error {
-	if styled {
-		_, err := fmt.Fprintln(w, output.HeaderStyle.Render(title))
-		return err
-	}
-
-	_, err := fmt.Fprintln(w, title+":")
-
-	return err
 }
 
 type measureLine struct {
