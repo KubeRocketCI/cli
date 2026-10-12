@@ -186,7 +186,7 @@ func renderTable(w io.Writer, isTTY bool, project, pullRequest, branch string, r
 		"Issues for %s  (page %d/%d, %d total)\n\n",
 		project,
 		result.Paging.PageIndex,
-		render.PageCount(result.Paging.Total, result.Paging.PageSize),
+		output.PageCount(result.Paging.Total, result.Paging.PageSize),
 		result.Paging.Total,
 	); err != nil {
 		return err

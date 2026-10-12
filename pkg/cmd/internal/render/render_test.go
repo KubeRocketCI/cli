@@ -150,39 +150,3 @@ func TestHandleError_TableWritesNothing(t *testing.T) {
 		t.Errorf("stdout = %q, want empty", stdout.String())
 	}
 }
-
-func TestPageCount(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		total, pageSize, want int
-	}{
-		{0, 50, 1},
-		{1, 50, 1},
-		{50, 50, 1},
-		{51, 50, 2},
-		{100, 25, 4},
-		{101, 25, 5},
-		{0, 0, 1},
-		{100, 0, 1},
-		{100, -5, 1},
-	}
-
-	for _, tc := range cases {
-		if got := PageCount(tc.total, tc.pageSize); got != tc.want {
-			t.Errorf("PageCount(%d,%d) = %d, want %d", tc.total, tc.pageSize, got, tc.want)
-		}
-	}
-}
-
-func TestOrDash(t *testing.T) {
-	t.Parallel()
-
-	if got := OrDash(""); got != "-" {
-		t.Errorf("OrDash(\"\") = %q, want %q", got, "-")
-	}
-
-	if got := OrDash("x"); got != "x" {
-		t.Errorf("OrDash(\"x\") = %q, want %q", got, "x")
-	}
-}

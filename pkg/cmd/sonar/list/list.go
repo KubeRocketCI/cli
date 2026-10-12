@@ -138,7 +138,7 @@ func renderTable(w io.Writer, isTTY bool, result *portal.SonarProjectList) error
 // "beyond last page" rather than the misleading "page 999 of 1", and a
 // single-result page reads "1 project" (not "1 projects").
 func pageFooter(paging portal.SonarPaging) string {
-	totalPages := render.PageCount(paging.Total, paging.PageSize)
+	totalPages := output.PageCount(paging.Total, paging.PageSize)
 
 	if paging.Total == 0 {
 		return fmt.Sprintf("no projects (page-size %d)", paging.PageSize)

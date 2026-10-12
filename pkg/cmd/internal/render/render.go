@@ -1,6 +1,6 @@
 // Package render holds the output dispatch shared by the verb groups: the
-// `{schemaVersion, data}` JSON envelope, table output, error-envelope
-// plumbing, output-format validation, and paging arithmetic.
+// `{schemaVersion, data}` JSON envelope, the table callback, error-envelope
+// plumbing, and output-format validation.
 // Importable only from packages below pkg/cmd/.
 package render
 
@@ -40,24 +40,4 @@ func Render[T any](ios *iostreams.IOStreams, outputFormat string, data T, render
 // HandleError is cmdutil.HandleError with SchemaVersion.
 func HandleError(ios *iostreams.IOStreams, outputFormat string, err error) error {
 	return cmdutil.HandleError(ios, outputFormat, SchemaVersion, err)
-}
-
-// PageCount returns the number of pages of pageSize needed to hold total
-// items. The result is at least 1, also for a non-positive pageSize.
-func PageCount(total, pageSize int) int {
-	if pageSize <= 0 {
-		return 1
-	}
-
-	n := total / pageSize
-	if total%pageSize != 0 {
-		n++
-	}
-
-	return max(n, 1)
-}
-
-// OrDash returns s, or "-" when s is empty.
-func OrDash(s string) string {
-	return output.OrDash(s)
 }
