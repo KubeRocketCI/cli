@@ -123,10 +123,10 @@ linters:
         path-except: ^internal/(token|auth)/
         text: io\.Writer passed in by the caller
       # Baseline: internal/output imports internal/portal. Delete when the
-      # pipeline-run renderers and the status colors move out of internal/output.
+      # status colors move out of internal/output.
       - linters:
           - depguard
-        path: ^internal/output/(output|pipelinerun)(_test)?\.go$
+        path: ^internal/output/output(_test)?\.go$
         text: "'github\\.com/KubeRocketCI/cli/internal/portal'"
     paths:
       - third_party$

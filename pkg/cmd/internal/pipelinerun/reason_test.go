@@ -1,4 +1,4 @@
-package output
+package pipelinerun
 
 import (
 	"bytes"
@@ -6,8 +6,32 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 )
+
+// sgr matches the SGR sequences Style.Render emits; tests strip them before
+// comparing bytes.
+var sgr = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+func TestStatusColor(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]output.Cell{
+		portal.StatusSucceeded: output.Green(portal.StatusSucceeded),
+		portal.StatusFailed:    output.Red(portal.StatusFailed),
+		portal.StatusCancelled: output.Red(portal.StatusCancelled),
+		portal.StatusTimeout:   output.Red(portal.StatusTimeout),
+		portal.StatusRunning:   output.Blue(portal.StatusRunning),
+		"odd\nstate":           output.Text("odd\nstate"),
+	}
+
+	for status, want := range cases {
+		if got := StatusColor(status); got != want {
+			t.Errorf("StatusColor(%q) = %#v, want %#v", status, got, want)
+		}
+	}
+}
 
 func TestRenderRunInfo_Results(t *testing.T) {
 	t.Parallel()

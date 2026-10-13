@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
+	"github.com/KubeRocketCI/cli/pkg/cmd/internal/pipelinerun"
 )
 
 // liveRunsHandler serves items as the live runs and an empty Tekton Results
@@ -130,7 +130,7 @@ func TestList_ReasonOnARunningRun(t *testing.T) {
 	t.Parallel()
 
 	var note bytes.Buffer
-	if err := output.RenderNoTaskData(&note, portal.TasksRunNotFinished); err != nil {
+	if err := pipelinerun.RenderNoTaskData(&note, portal.TasksRunNotFinished); err != nil {
 		t.Fatal(err)
 	}
 

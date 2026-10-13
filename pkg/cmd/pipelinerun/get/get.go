@@ -204,33 +204,21 @@ func renderRun(opts *GetOptions, result *portal.PipelineRunListResult) error {
 	// --reason: full diagnosis view (shows task tree even for succeeded runs).
 	if opts.IncludeReason {
 		if len(result.Tasks) > 0 {
-			return output.RenderReason(opts.IO.Out, result)
+			return pipelinerun.RenderReason(opts.IO.Out, result)
 		}
 
-		if err := output.RenderNoTaskData(opts.IO.Out, result.TasksUnavailable); err != nil {
+		if err := pipelinerun.RenderNoTaskData(opts.IO.Out, result.TasksUnavailable); err != nil {
 			return err
 		}
 	}
 
 	// Default / --logs: pipeline info + optional logs.
-	if err := output.RenderRunInfo(opts.IO.Out, run); err != nil {
+	if err := pipelinerun.RenderRunInfo(opts.IO.Out, run); err != nil {
 		return err
 	}
 
 	if result.Logs != "" {
-		if _, err := fmt.Fprintln(opts.IO.Out); err != nil {
-			return err
-		}
-
-		header := output.SingleLine(fmt.Sprintf("Logs: %s", run.Name))
-
-		if _, err := fmt.Fprintln(opts.IO.Out, output.SectionStyle.Render(header)); err != nil {
-			return err
-		}
-
-		if _, err := fmt.Fprintln(opts.IO.Out, result.Logs); err != nil {
-			return err
-		}
+		return pipelinerun.RenderLogs(opts.IO.Out, output.SingleLine(fmt.Sprintf("Logs: %s", run.Name)), result.Logs)
 	}
 
 	return nil
