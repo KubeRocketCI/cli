@@ -73,7 +73,7 @@ krci auth status
 User:         user@example.com
 Name:         User Name
 Status:       Authenticated
-Expires:      22 Apr 26 11:22 EEST (22h24m3s)
+Expires:      22 Apr 26 11:22 EEST (14m51s)
 Groups:       admin, developers, viewers
 ```
 
@@ -91,7 +91,13 @@ Groups:       admin, developers, viewers
 | `KRCI_TOKEN` or unreadable claims, portal URL invalid       | `1` | `invalid portal URL: <reason>`; see [Common messages](json-schemas.md#error-envelope) |
 | Config file holds a value of the wrong type (a YAML syntax error is only a warning) | `1` | `loading config: <cause>` |
 
-The stored session comes from `krci auth login` and is checked locally.
+The stored session comes from `krci auth login` and is checked locally. Its
+ID token is the bearer; within 30 s of the token's `exp` the CLI refreshes it.
+The CLI needs a new ID token from each refresh. An IdP may omit it (OIDC Core
+§12.2); the session then ends at the stored ID token's `exp`: commands fail
+with `token refresh failed: refresh response has no id_token…` and
+`auth status` reports `session expired`. A failed refresh is final for the
+running command; the next command tries again.
 `KRCI_TOKEN`, and a stored token whose claims cannot be read, are checked with
 one call to the portal through the configured portal URL, so the check needs
 the same configuration as every portal command: portal URL, cluster name, and
@@ -130,8 +136,9 @@ krci auth status -o json
 ```
 
 `groups` is always an array (`[]` when the token carries no groups);
-`expiresAt` is RFC3339 in UTC, `null` when the token has no expiry; `user`
-and `name` are omitted when the stored token's claims cannot be read.
+`expiresAt` is the ID token's `exp`, or the access-token expiry when the ID
+token has none; RFC3339 in UTC, `null` when neither is set. `user` and `name`
+are omitted when the stored token's claims cannot be read.
 
 Once flags and arguments are accepted, a failure exits `1` and writes the
 error envelope to stdout, so a script can branch on either signal:
@@ -141,12 +148,6 @@ error envelope to stdout, so a script can branch on either signal:
   "schemaVersion": "1",
   "error": { "message": "not authenticated: run 'krci auth login'" }
 }
-```
-
-```bash
-# Scripting — proceed only with a session that lasts another hour
-krci auth status -o json |
-  jq -e '.data.expiresAt | fromdateiso8601 > (now + 3600)' >/dev/null || krci auth login
 ```
 
 ## `auth logout`

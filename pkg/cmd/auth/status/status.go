@@ -47,7 +47,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show authentication status",
-		Long: `Show the signed-in user, the session expiry, and the user's groups.
+		Long: `Show the signed-in user, the ID token's expiry, and the user's groups.
 
 Exits 1 when no session is stored or it is not bound to the configured
 portal URL, or the session has expired, so the command works as a shell
@@ -211,7 +211,7 @@ func (opts *StatusOptions) printStatus(info *auth.UserInfo, haveInfo bool) error
 }
 
 // buildPayload shapes the JSON data block. Groups is always an array and
-// expiresAt is RFC3339 in UTC, null when the token carries no expiry.
+// expiresAt is RFC3339 in UTC, null when info.ExpiresAt is zero.
 func buildPayload(info *auth.UserInfo) StatusPayload {
 	p := StatusPayload{
 		Authenticated: true,

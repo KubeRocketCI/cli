@@ -184,6 +184,7 @@ func TestGetToken(t *testing.T) {
 				tok: &token.StoredToken{
 					AccessToken:  "expired",
 					RefreshToken: "", // no refresh token
+					IDToken:      fakeJWT(fmt.Sprintf(`{"exp":%d}`, time.Now().Add(-time.Minute).Unix())),
 					ExpiresAt:    time.Now().Add(-time.Minute),
 					PortalURL:    portalA,
 				},
@@ -417,6 +418,63 @@ func newRefreshIDP(t *testing.T) *httptest.Server {
 func newCountingRefreshIDP(t *testing.T, accept string, delay time.Duration) (*httptest.Server, *atomic.Int32) {
 	t.Helper()
 
+	return startRefreshIDP(t, accept, delay, defaultTokenResponse())
+}
+
+// defaultTokenResponse is the refresh response of the fake IdP. Its ID token
+// has no exp, so the refreshed ExpiresAt is the access-token expiry.
+func defaultTokenResponse() map[string]any {
+	return map[string]any{
+		"access_token":  "new-access",
+		"token_type":    "Bearer",
+		"refresh_token": "new-refresh",
+		"expires_in":    3600,
+		"id_token":      fakeJWT(`{"email":"user@example.com"}`),
+	}
+}
+
+// noIDTokenResponse is defaultTokenResponse without an id_token.
+func noIDTokenResponse() map[string]any {
+	response := defaultTokenResponse()
+	delete(response, "id_token")
+
+	return response
+}
+
+// getTokenConcurrently calls tp.GetToken from n goroutines released together.
+func getTokenConcurrently(ctx context.Context, tp *tokenProvider, n int) ([]string, []error) {
+	var (
+		wg     sync.WaitGroup
+		start  = make(chan struct{})
+		tokens = make([]string, n)
+		errs   = make([]error, n)
+	)
+
+	for i := range n {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			<-start
+
+			tokens[i], errs[i] = tp.GetToken(ctx)
+		}()
+	}
+
+	close(start)
+	wg.Wait()
+
+	return tokens, errs
+}
+
+// startRefreshIDP is newCountingRefreshIDP that answers a granted refresh with
+// response.
+func startRefreshIDP(
+	t *testing.T, accept string, delay time.Duration, response map[string]any,
+) (*httptest.Server, *atomic.Int32) {
+	t.Helper()
+
 	var (
 		idp   *httptest.Server
 		calls atomic.Int32
@@ -443,13 +501,7 @@ func newCountingRefreshIDP(t *testing.T, accept string, delay time.Duration) (*h
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"access_token":  "new-access",
-			"token_type":    "Bearer",
-			"refresh_token": "new-refresh",
-			"expires_in":    3600,
-			"id_token":      fakeJWT(`{"email":"user@example.com"}`),
-		})
+		_ = json.NewEncoder(w).Encode(response)
 	})
 
 	idp = httptest.NewTLSServer(mux)
@@ -587,29 +639,7 @@ func TestGetTokenConcurrentCallersShareOneRefresh(t *testing.T) {
 	store := &mockStore{tok: refreshableStoredToken(idp.URL, -time.Minute)}
 
 	tp := NewTokenProvider(store, &config.Config{PortalURL: portalA}, io.Discard)
-	ctx := oidc.ClientContext(t.Context(), idp.Client())
-
-	var (
-		wg     sync.WaitGroup
-		start  = make(chan struct{})
-		tokens = make([]string, callers)
-		errs   = make([]error, callers)
-	)
-
-	for i := range callers {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-
-			<-start
-
-			tokens[i], errs[i] = tp.GetToken(ctx)
-		}()
-	}
-
-	close(start)
-	wg.Wait()
+	tokens, errs := getTokenConcurrently(oidc.ClientContext(t.Context(), idp.Client()), tp, callers)
 
 	for i := range callers {
 		require.NoError(t, errs[i], "caller %d", i)
@@ -674,23 +704,115 @@ func TestLoginAndLogoutForgetResolvedToken(t *testing.T) {
 	assert.Nil(t, tp.current)
 }
 
-func TestRefreshUsesResolvedRefreshTokenWhenStoreIsStale(t *testing.T) {
+func TestRefreshUsesUnsavedRefreshToken(t *testing.T) {
 	t.Parallel()
 
 	idp, calls := newCountingRefreshIDP(t, "rotated-refresh", 0)
 
 	// The previous refresh rotated the refresh token, and its Save failed.
-	resolved := refreshableStoredToken(idp.URL, -time.Minute)
-	resolved.RefreshToken = "rotated-refresh"
+	unsaved := refreshableStoredToken(idp.URL, -time.Minute)
+	unsaved.RefreshToken = "rotated-refresh"
 
 	store := &mockStore{tok: refreshableStoredToken(idp.URL, -time.Minute)}
 	tp := NewTokenProvider(store, &config.Config{PortalURL: portalA}, io.Discard)
-	tp.current = resolved
+	tp.unsaved = unsaved
 
 	refreshed, err := tp.resolveStoredToken(oidc.ClientContext(t.Context(), idp.Client()))
 	require.NoError(t, err)
 	assert.Equal(t, "new-access", refreshed.AccessToken)
 	assert.Equal(t, int32(1), calls.Load(), "token requests to the IdP")
+	assert.Nil(t, tp.unsaved, "a successful Save clears unsaved")
+}
+
+func TestRefreshPrefersStoreOverSavedCurrent(t *testing.T) {
+	t.Parallel()
+
+	idp, calls := newCountingRefreshIDP(t, oldRefreshToken, 0)
+
+	// The in-memory token's refresh token was saved and has since been rotated by another process.
+	resolved := refreshableStoredToken(idp.URL, -time.Minute)
+	resolved.RefreshToken = "superseded-refresh"
+
+	store := &mockStore{tok: refreshableStoredToken(idp.URL, -time.Minute)}
+	tp := NewTokenProvider(store, &config.Config{PortalURL: portalA}, io.Discard)
+	tp.current = resolved
+
+	_, err := tp.resolveStoredToken(oidc.ClientContext(t.Context(), idp.Client()))
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), calls.Load(), "token requests to the IdP")
+}
+
+func TestAdoptingStoredTokenClearsUnsaved(t *testing.T) {
+	t.Parallel()
+
+	fresh := &token.StoredToken{IDToken: "fresh", ExpiresAt: time.Now().Add(time.Hour), PortalURL: portalA}
+	tp := NewTokenProvider(&mockStore{tok: fresh}, &config.Config{PortalURL: portalA}, io.Discard)
+	tp.unsaved = refreshableStoredToken("https://idp.example.com", -time.Minute)
+
+	tok, err := tp.GetToken(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, "fresh", tok)
+	assert.Nil(t, tp.unsaved)
+}
+
+func TestRefreshFailureIsRemembered(t *testing.T) {
+	t.Parallel()
+
+	expiredIDToken, _ := idTokenExpiring(-time.Minute)
+
+	tests := []struct {
+		name     string
+		accept   string
+		response map[string]any
+		// wantCalls is one refresh attempt: oauth2 retries a failed token
+		// request once with the other client auth style.
+		wantCalls int32
+	}{
+		{name: "no id_token", accept: oldRefreshToken, response: noIDTokenResponse(), wantCalls: 1},
+		{name: "invalid_grant", accept: "other-refresh", response: defaultTokenResponse(), wantCalls: 2},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			const callers = 8
+
+			idp, calls := startRefreshIDP(t, tt.accept, 0, tt.response)
+			stored := refreshableStoredToken(idp.URL, -time.Minute)
+			stored.IDToken = expiredIDToken
+
+			tp := NewTokenProvider(&mockStore{tok: stored}, &config.Config{PortalURL: portalA}, io.Discard)
+			_, errs := getTokenConcurrently(oidc.ClientContext(t.Context(), idp.Client()), tp, callers)
+
+			for i := range callers {
+				require.ErrorIs(t, errs[i], ErrRefreshFailed, "caller %d", i)
+				assert.Equal(t, errs[0].Error(), errs[i].Error(), "caller %d", i)
+			}
+
+			assert.Equal(t, tt.wantCalls, calls.Load(), "token requests to the IdP")
+		})
+	}
+}
+
+func TestLoginAndLogoutForgetRefreshFailure(t *testing.T) {
+	t.Parallel()
+
+	store := &mockStore{}
+	tp := NewTokenProvider(store, &config.Config{PortalURL: portalA}, io.Discard)
+
+	tp.refreshErr = ErrRefreshFailed
+	require.NoError(t, tp.Logout())
+
+	_, err := tp.GetToken(t.Context())
+	require.ErrorIs(t, err, ErrNotAuthenticated)
+
+	// No issuer is configured, so Login fails.
+	tp.refreshErr = ErrRefreshFailed
+	tp.unsaved = refreshableStoredToken("https://idp.example.com", -time.Minute)
+	require.Error(t, tp.Login(t.Context()))
+	assert.Nil(t, tp.refreshErr)
+	assert.Nil(t, tp.unsaved)
 }
 
 func TestUserInfoUsesTheRefreshedTokenWhenSaveFails(t *testing.T) {
@@ -704,6 +826,8 @@ func TestUserInfoUsesTheRefreshedTokenWhenSaveFails(t *testing.T) {
 	_, err := tp.GetToken(oidc.ClientContext(t.Context(), idp.Client()))
 	require.NoError(t, err)
 
+	assert.Same(t, tp.current, tp.unsaved, "a failed Save keeps the result in unsaved")
+
 	info, err := tp.UserInfo()
 	require.NoError(t, err)
 	assert.Equal(t, "user@example.com", info.Email)
@@ -716,7 +840,7 @@ func TestRefreshCallsIdPInsideExpiryMargin(t *testing.T) {
 	idp, calls := newCountingRefreshIDP(t, oldRefreshToken, 0)
 
 	stored := refreshableStoredToken(idp.URL, 20*time.Second)
-	require.False(t, stored.Valid(), "the CLI must treat the token as expiring")
+	require.False(t, usable(stored), "the CLI must treat the token as expiring")
 	require.True(t, (&oauth2.Token{AccessToken: stored.AccessToken, Expiry: stored.ExpiresAt}).Valid(),
 		"oauth2 must still treat the token as valid")
 
@@ -750,4 +874,324 @@ func TestGetTokenWithoutExpirySkipsRefresh(t *testing.T) {
 	}
 
 	assert.Zero(t, calls.Load(), "token requests to the IdP")
+}
+
+func TestRefreshWithoutIDToken(t *testing.T) {
+	t.Parallel()
+
+	expiredIDToken, expiredAt := idTokenExpiring(-time.Minute)
+
+	tests := []struct {
+		name     string
+		storedID string
+		wantErr  string
+	}{
+		{
+			name: "stored ID token expired", storedID: expiredIDToken,
+			wantErr: "refresh response has no id_token and the stored one expired at " +
+				expiredAt.UTC().Format(time.RFC3339),
+		},
+		{
+			name:    "no ID token stored",
+			wantErr: "refresh response has no id_token; the CLI needs a new ID token from each refresh",
+		},
+		{name: "stored ID token without exp", storedID: fakeJWT(`{"email":"old@example.com"}`)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			idp, calls := startRefreshIDP(t, oldRefreshToken, 0, noIDTokenResponse())
+			stored := refreshableStoredToken(idp.URL, -time.Minute)
+			stored.IDToken = tt.storedID
+			store := &mockStore{tok: stored}
+
+			tp := NewTokenProvider(store, &config.Config{PortalURL: portalA}, io.Discard)
+
+			refreshed, err := tp.resolveStoredToken(oidc.ClientContext(t.Context(), idp.Client()))
+			assert.Equal(t, int32(1), calls.Load(), "token requests to the IdP")
+			assert.Equal(t, "new-refresh", store.tok.RefreshToken, "the rotated refresh token is saved")
+			assert.Equal(t, tt.storedID, store.tok.IDToken, "the stored ID token is kept")
+
+			if tt.wantErr != "" {
+				require.ErrorIs(t, err, ErrRefreshFailed)
+				require.EqualError(t, err, "token refresh failed: "+tt.wantErr)
+				assert.Nil(t, tp.current)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.True(t, usable(refreshed), "ExpiresAt = %s", refreshed.ExpiresAt)
+		})
+	}
+}
+
+// idTokenExpiring returns a test ID token that expires after in, and its exp
+// truncated to the second.
+func idTokenExpiring(in time.Duration) (string, time.Time) {
+	exp := time.Now().Add(in).Truncate(time.Second)
+
+	return fakeJWT(fmt.Sprintf(`{"email":"user@example.com","exp":%d}`, exp.Unix())), exp
+}
+
+func TestBearerExpiry(t *testing.T) {
+	t.Parallel()
+
+	access := time.Now().Add(time.Hour).Truncate(time.Second)
+	withExp, idExp := idTokenExpiring(10 * time.Minute)
+
+	assert.True(t, bearerExpiry(&token.StoredToken{IDToken: withExp, ExpiresAt: access}).Equal(idExp), "ID token exp")
+	assert.Equal(t, access, bearerExpiry(&token.StoredToken{
+		IDToken: fakeJWT(`{"email":"user@example.com"}`), ExpiresAt: access,
+	}), "no exp")
+	assert.Equal(t, access, bearerExpiry(&token.StoredToken{IDToken: "opaque", ExpiresAt: access}), "not a JWT")
+}
+
+func TestUsable(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		tok  *token.StoredToken
+		want bool
+	}{
+		{"nil", nil, false},
+		{"no ID token", &token.StoredToken{ExpiresAt: time.Now().Add(time.Hour)}, false},
+		{"future", &token.StoredToken{IDToken: "opaque", ExpiresAt: time.Now().Add(time.Hour)}, true},
+		{"outside the margin", &token.StoredToken{IDToken: "opaque", ExpiresAt: time.Now().Add(31 * time.Second)}, true},
+		{"inside the margin", &token.StoredToken{IDToken: "opaque", ExpiresAt: time.Now().Add(29 * time.Second)}, false},
+		{"expired", &token.StoredToken{IDToken: "opaque", ExpiresAt: time.Now().Add(-time.Minute)}, false},
+		{"no expiry", &token.StoredToken{IDToken: "opaque"}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, usable(tt.tok))
+		})
+	}
+}
+
+func TestRefreshExpiresWithIDToken(t *testing.T) {
+	t.Parallel()
+
+	idToken, idExp := idTokenExpiring(10 * time.Minute)
+	response := defaultTokenResponse()
+	response["id_token"] = idToken
+
+	idp, _ := startRefreshIDP(t, oldRefreshToken, 0, response)
+	store := &mockStore{tok: refreshableStoredToken(idp.URL, -time.Minute)}
+	tp := NewTokenProvider(store, &config.Config{PortalURL: portalA}, io.Discard)
+
+	refreshed, err := tp.resolveStoredToken(oidc.ClientContext(t.Context(), idp.Client()))
+	require.NoError(t, err)
+
+	assert.True(t, bearerExpiry(refreshed).Equal(idExp), "bearer expiry = %s, want %s", bearerExpiry(refreshed), idExp)
+	assert.Equal(t, refreshed.IDToken, store.tok.IDToken, "the refreshed token is saved")
+}
+
+func TestGetTokenRefreshesWhenStoredIDTokenExpires(t *testing.T) {
+	t.Parallel()
+
+	idp, calls := newCountingRefreshIDP(t, oldRefreshToken, 0)
+
+	// ExpiresAt holds the access-token expiry; the ID token expires first.
+	stored := refreshableStoredToken(idp.URL, time.Hour)
+
+	var idExp time.Time
+	stored.IDToken, idExp = idTokenExpiring(20 * time.Second)
+	require.False(t, usable(&token.StoredToken{IDToken: "opaque", ExpiresAt: idExp}), "the ID token must be inside the margin")
+
+	store := &mockStore{tok: stored}
+	tp := NewTokenProvider(store, &config.Config{PortalURL: portalA}, io.Discard)
+
+	tok, err := tp.GetToken(oidc.ClientContext(t.Context(), idp.Client()))
+	require.NoError(t, err)
+	assert.NotEqual(t, stored.IDToken, tok)
+	assert.Equal(t, int32(1), calls.Load(), "token requests to the IdP")
+}
+
+func TestUserInfoShowsIDTokenExpiry(t *testing.T) {
+	t.Parallel()
+
+	idToken, idExp := idTokenExpiring(10 * time.Minute)
+	stored := &token.StoredToken{IDToken: idToken, ExpiresAt: time.Now().Add(time.Hour), PortalURL: portalA}
+
+	tp := NewTokenProvider(&mockStore{tok: stored}, &config.Config{PortalURL: portalA}, io.Discard)
+
+	info, err := tp.UserInfo()
+	require.NoError(t, err)
+	assert.True(t, info.ExpiresAt.Equal(idExp), "ExpiresAt = %s, want %s", info.ExpiresAt, idExp)
+}
+
+func TestRefreshRejectsExpiredIDToken(t *testing.T) {
+	t.Parallel()
+
+	response := defaultTokenResponse()
+
+	var expiredAt time.Time
+	response["id_token"], expiredAt = idTokenExpiring(-time.Minute)
+
+	idp, _ := startRefreshIDP(t, oldRefreshToken, 0, response)
+	store := &mockStore{tok: refreshableStoredToken(idp.URL, -time.Minute)}
+	tp := NewTokenProvider(store, &config.Config{PortalURL: portalA}, io.Discard)
+
+	_, err := tp.resolveStoredToken(oidc.ClientContext(t.Context(), idp.Client()))
+	require.ErrorIs(t, err, ErrRefreshFailed)
+	require.EqualError(t, err, "token refresh failed: refresh response id_token expired at "+
+		expiredAt.UTC().Format(time.RFC3339)+"; check the local clock")
+	assert.Equal(t, "new-refresh", store.tok.RefreshToken, "the rotated refresh token is saved")
+	assert.Nil(t, tp.current)
+}
+
+func TestRefreshAcceptsIDTokenInsideMargin(t *testing.T) {
+	t.Parallel()
+
+	response := defaultTokenResponse()
+
+	idToken, idExp := idTokenExpiring(20 * time.Second)
+	response["id_token"] = idToken
+	require.False(t, usable(&token.StoredToken{IDToken: "opaque", ExpiresAt: idExp}), "the ID token must be inside the margin")
+
+	idp, _ := startRefreshIDP(t, oldRefreshToken, 0, response)
+	store := &mockStore{tok: refreshableStoredToken(idp.URL, -time.Minute)}
+	tp := NewTokenProvider(store, &config.Config{PortalURL: portalA}, io.Discard)
+
+	refreshed, err := tp.resolveStoredToken(oidc.ClientContext(t.Context(), idp.Client()))
+	require.NoError(t, err)
+	assert.Equal(t, idToken, refreshed.IDToken)
+	assert.Equal(t, idToken, store.tok.IDToken, "the refreshed token is saved")
+}
+
+func TestGetTokenEmptyStoredIDToken(t *testing.T) {
+	t.Parallel()
+
+	t.Run("refreshable", func(t *testing.T) {
+		t.Parallel()
+
+		idp, calls := newCountingRefreshIDP(t, oldRefreshToken, 0)
+		stored := refreshableStoredToken(idp.URL, time.Hour)
+		stored.IDToken = ""
+
+		tp := NewTokenProvider(&mockStore{tok: stored}, &config.Config{PortalURL: portalA}, io.Discard)
+
+		tok, err := tp.GetToken(oidc.ClientContext(t.Context(), idp.Client()))
+		require.NoError(t, err)
+		assert.NotEmpty(t, tok)
+		assert.Equal(t, int32(1), calls.Load(), "token requests to the IdP")
+	})
+
+	t.Run("no refresh token", func(t *testing.T) {
+		t.Parallel()
+
+		stored := &token.StoredToken{ExpiresAt: time.Now().Add(time.Hour), PortalURL: portalA}
+		tp := NewTokenProvider(&mockStore{tok: stored}, &config.Config{PortalURL: portalA}, io.Discard)
+
+		_, err := tp.GetToken(t.Context())
+		require.ErrorIs(t, err, ErrNotAuthenticated)
+	})
+}
+
+func TestJWTExpiryOutOfRange(t *testing.T) {
+	t.Parallel()
+
+	for _, exp := range []string{"1e300", "9223372036854775808"} {
+		_, ok := jwtExpiry(fakeJWT(`{"exp":` + exp + `}`))
+		assert.False(t, ok, "exp %s", exp)
+	}
+
+	for _, exp := range []string{"9223372036854770000", "99999999999999", "253402300800"} {
+		_, ok := jwtExpiry(fakeJWT(`{"exp":` + exp + `}`))
+		assert.False(t, ok, "exp %s", exp)
+	}
+
+	for _, exp := range []int64{1500000000, 253402300799} {
+		got, ok := jwtExpiry(fakeJWT(fmt.Sprintf(`{"exp":%d}`, exp)))
+		require.True(t, ok, "exp %d", exp)
+		assert.Equal(t, exp, got.Unix())
+	}
+}
+
+func TestGetTokenUsesValidIDTokenAfterAccessTokenExpires(t *testing.T) {
+	t.Parallel()
+
+	idp, calls := newCountingRefreshIDP(t, oldRefreshToken, 0)
+	stored := refreshableStoredToken(idp.URL, -time.Minute)
+	stored.IDToken, _ = idTokenExpiring(10 * time.Minute)
+
+	tp := NewTokenProvider(&mockStore{tok: stored}, &config.Config{PortalURL: portalA}, io.Discard)
+
+	tok, err := tp.GetToken(oidc.ClientContext(t.Context(), idp.Client()))
+	require.NoError(t, err)
+	assert.Equal(t, stored.IDToken, tok)
+	assert.Zero(t, calls.Load(), "token requests to the IdP")
+}
+
+func TestGetTokenExpiredIDTokenWithoutRefreshToken(t *testing.T) {
+	t.Parallel()
+
+	stored := &token.StoredToken{ExpiresAt: time.Now().Add(time.Hour), PortalURL: portalA}
+	stored.IDToken, _ = idTokenExpiring(-time.Minute)
+
+	tp := NewTokenProvider(&mockStore{tok: stored}, &config.Config{PortalURL: portalA}, io.Discard)
+
+	_, err := tp.GetToken(t.Context())
+	require.ErrorIs(t, err, ErrTokenExpired)
+}
+
+func TestRefreshFailureWithDoneContextIsNotRemembered(t *testing.T) {
+	t.Parallel()
+
+	idp, calls := newCountingRefreshIDP(t, oldRefreshToken, 0)
+	tp := NewTokenProvider(&mockStore{tok: refreshableStoredToken(idp.URL, -time.Minute)},
+		&config.Config{PortalURL: portalA}, io.Discard)
+	live := oidc.ClientContext(t.Context(), idp.Client())
+
+	done, cancel := context.WithCancel(live)
+	cancel()
+
+	_, err := tp.GetToken(done)
+	require.ErrorIs(t, err, ErrRefreshFailed)
+	require.ErrorIs(t, err, context.Canceled)
+
+	_, err = tp.GetToken(live)
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), calls.Load(), "token requests to the IdP")
+}
+
+// reloadingStore serves tok on the first Load and then on every later Load,
+// like a store another process writes to after the first read.
+type reloadingStore struct {
+	mockStore
+	then   *token.StoredToken
+	loaded bool
+}
+
+func (s *reloadingStore) Load() (*token.StoredToken, error) {
+	if s.loaded {
+		return s.then, nil
+	}
+
+	s.loaded = true
+
+	return s.mockStore.Load()
+}
+
+func TestRefreshFailureAdoptsTokenSavedByAnotherProcess(t *testing.T) {
+	t.Parallel()
+
+	// The IdP rejects the stored refresh token: another process rotated it.
+	idp, _ := newCountingRefreshIDP(t, "other-refresh", 0)
+	fresh := &token.StoredToken{IDToken: "fresh", ExpiresAt: time.Now().Add(time.Hour), PortalURL: portalA}
+	store := &reloadingStore{mockStore: mockStore{tok: refreshableStoredToken(idp.URL, -time.Minute)}, then: fresh}
+
+	tp := NewTokenProvider(store, &config.Config{PortalURL: portalA}, io.Discard)
+
+	tok, err := tp.GetToken(oidc.ClientContext(t.Context(), idp.Client()))
+	require.NoError(t, err)
+	assert.Equal(t, "fresh", tok)
+	assert.NoError(t, tp.refreshErr)
 }
