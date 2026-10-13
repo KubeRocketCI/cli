@@ -108,7 +108,7 @@ func renderTable(w io.Writer, isTTY bool, project string, g *portal.SonarGate) e
 
 	displayStatus := output.SingleLine(string(status))
 	if isTTY {
-		displayStatus = output.SonarGateStatusColor(status).Render(true)
+		displayStatus = sonarinternal.GateStatusColor(status).Render(true)
 	}
 
 	if _, err := fmt.Fprintf(w, "Quality Gate: %s  (%s)\n\n", displayStatus, project); err != nil {
@@ -132,7 +132,7 @@ func renderTable(w io.Writer, isTTY bool, project string, g *portal.SonarGate) e
 	for _, c := range g.ProjectStatus.Conditions {
 		rows = append(rows, append(
 			output.Texts(c.MetricKey, c.Comparator, c.ErrorThreshold, c.ActualValue),
-			output.SonarGateStatusColor(c.Status)))
+			sonarinternal.GateStatusColor(c.Status)))
 	}
 
 	return output.PrintTable(w, isTTY, headers, rows)

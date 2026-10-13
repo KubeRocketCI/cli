@@ -44,6 +44,28 @@ func TestFormatRisk(t *testing.T) {
 	}
 }
 
+func TestSeverityColor(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]output.Cell{
+		"CRITICAL":     output.Red("CRITICAL"),
+		"critical":     output.Red("critical"),
+		"HIGH":         output.Yellow("HIGH"),
+		"MEDIUM":       output.Blue("MEDIUM"),
+		"LOW":          output.Gray("LOW"),
+		"INFO":         output.Gray("INFO"),
+		"UNASSIGNED":   output.Gray("UNASSIGNED"),
+		"BOGUS\x1b[2J": output.Text("BOGUS\x1b[2J"),
+		"":             {},
+	}
+
+	for severity, want := range cases {
+		if got := SeverityColor(severity); got != want {
+			t.Errorf("SeverityColor(%q) = %#v, want %#v", severity, got, want)
+		}
+	}
+}
+
 func TestFormatVulnCounts(t *testing.T) {
 	t.Parallel()
 	if got := FormatVulnCounts(nil); got != output.Text("0/0/0/0") {

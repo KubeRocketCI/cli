@@ -110,7 +110,7 @@ func printDetail(w io.Writer, d *portal.SonarProjectDetail, styled bool) error {
 		{Label: "Visibility", Value: cmp.Or(d.Visibility, "—")},
 		{Label: "Last run", Value: formatLastRun(d.LastAnalysisDate)},
 		{Label: "Revision", Value: cmp.Or(d.Revision, "—")},
-		{Label: "Quality Gate", Value: string(gate), Styled: output.SonarGateStatusColor(gate)},
+		{Label: "Quality Gate", Value: string(gate), Styled: sonarinternal.GateStatusColor(gate)},
 	}
 
 	if err := output.PrintAligned(w, styled, header, "", 0); err != nil {

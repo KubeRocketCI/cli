@@ -1,5 +1,6 @@
 // Package sonarinternal holds helpers shared by `krci sonar` verbs
-// (validation, enum sets). Importable only from packages below pkg/cmd/sonar/.
+// (validation, enum sets, the gate status color). Importable only from
+// packages below pkg/cmd/sonar/.
 package sonarinternal
 
 import (

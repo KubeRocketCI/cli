@@ -146,7 +146,7 @@ func renderTable(w io.Writer, isTTY bool, codebase string, result *portal.SCAFin
 			output.Text(f.Component.Version),
 			output.Text(vulnID),
 			output.Text(f.Vulnerability.Source),
-			output.SCASeverityColor(f.Vulnerability.Severity),
+			scainternal.SeverityColor(f.Vulnerability.Severity),
 			output.Text(formatCVSS(f.Vulnerability.CvssV3BaseScore, f.Vulnerability.CvssV2BaseScore)),
 			output.Text(f.Analysis.State),
 			output.Text(scainternal.BoolYesNo(f.Analysis.IsSuppressed)),

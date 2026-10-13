@@ -169,7 +169,7 @@ func printDetail(w io.Writer, codebase, requestedBranch string, d *portal.SCAPro
 func severityRow(label, canonical string, count int) output.DetailLine {
 	p := output.DetailLine{Label: label, Value: fmt.Sprintf("%d", count)}
 	if count > 0 && canonical != "" {
-		p.Styled = output.Concat(output.Text(p.Value+" "), output.SCASeverityColor(canonical))
+		p.Styled = output.Concat(output.Text(p.Value+" "), scainternal.SeverityColor(canonical))
 	}
 	return p
 }

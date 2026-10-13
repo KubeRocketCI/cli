@@ -113,7 +113,7 @@ func renderTable(w io.Writer, isTTY bool, result *portal.SonarProjectList) error
 			status = portal.QualityGateNone
 		}
 
-		rows = append(rows, append(output.Texts(p.Key, p.Name), output.SonarGateStatusColor(status)))
+		rows = append(rows, append(output.Texts(p.Key, p.Name), sonarinternal.GateStatusColor(status)))
 	}
 
 	if err := output.PrintTable(w, isTTY, headers, rows); err != nil {
