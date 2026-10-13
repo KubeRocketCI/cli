@@ -1,6 +1,7 @@
 package portal
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -41,6 +42,42 @@ func TestFilterAndSortStages_NoMatchIsEmpty(t *testing.T) {
 		assert.NotNil(t, got, name)
 		assert.Empty(t, got, name)
 	}
+}
+
+// Stages of equal order keep the portal's list order: deployment get and the
+// ENVS column of deployment list print the same order on every run.
+func TestStageOrder_EqualOrderKeepsListOrder(t *testing.T) {
+	t.Parallel()
+
+	// Above 12: sort.Slice is an insertion sort, so stable, up to 12 elements.
+	const n = 50
+
+	items := make([]k8sItem, 0, n)
+	want := make([]string, 0, n)
+
+	for i := range n {
+		name := fmt.Sprintf("env-%02d", n-i)
+		spec := map[string]any{"cdPipeline": "demo", "name": name, "order": int64(i % 2)}
+		items = append(items, k8sItem{Spec: &spec})
+	}
+
+	for _, order := range []int{0, 1} {
+		for i := order; i < n; i += 2 {
+			want = append(want, fmt.Sprintf("env-%02d", n-i))
+		}
+	}
+
+	names := func(stages []Stage) []string {
+		out := make([]string, 0, len(stages))
+		for _, s := range stages {
+			out = append(out, s.Name)
+		}
+
+		return out
+	}
+
+	assert.Equal(t, want, names(filterAndSortStages(items, "demo")))
+	assert.Equal(t, want, orderedStageNames(groupStagesByPipeline(items)["demo"]))
 }
 
 func TestExtractQualityGates_NoGatesIsEmpty(t *testing.T) {

@@ -893,9 +893,9 @@ Rules:
 
 - One entry per `CDPipeline`, in the order the Portal returns them; no
   deployments is `[]`.
-- `stages[]` holds the environment names in promotion order (`spec.order`),
-  `[]` for a deployment without environments. `applications` is `null` when the
-  deployment lists none.
+- `stages[]` holds the environment names in promotion order (`spec.order`,
+  equal orders in the portal's list order), `[]` for a deployment without
+  environments. `applications` is `null` when the deployment lists none.
 - Always present: `name`, `namespace`, `applications`, `stages`, `status`,
   `available`. `description` and `detailedMessage` are omitted when empty;
   `detailedMessage` is set by the operator on a failure.
@@ -936,7 +936,8 @@ Bare object, no envelope.
 
 Rules:
 
-- `stages[]` is sorted by `order`; `[]` for a deployment without environments.
+- `stages[]` is sorted by `order`, equal orders in the portal's list order; `[]`
+  for a deployment without environments.
 - Stage `qualityGates[]` is always an array (`[]` when none).
 - Always present on a stage: `name`, `order`, `triggerType`, `qualityGates`,
   `namespace`, `status`, `available`. `clusterName`, `description`, and

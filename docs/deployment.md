@@ -23,13 +23,13 @@ krci deployment list
 ```
 NAME            APPLICATIONS                                                         ENVS       STATUS
 my-pipeline     payments-api, payments-ui, payments-db +1 more                       dev        created
-orders          orders-api, orders-ui, orders-queue +4 more                          dev, qa    created
+orders          orders-api, orders-ui, orders-queue +4 more                          dev → qa   created
 shared-infra    cert-manager, ingress-nginx, external-dns                            dev        created
 ```
 
 Columns:
 - **APPLICATIONS** — truncated after three items with a `+N more` suffix
-- **ENVS** — comma-separated list of stages (e.g. `dev, qa, prod`)
+- **ENVS** — stage names in promotion order, joined with ` → ` (e.g. `dev → qa → prod`)
 - **STATUS** — the CDPipeline status as reported by the operator
 
 ## `deployment get`
