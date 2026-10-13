@@ -25,6 +25,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/portal"
+	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/internal/token"
 )
 
@@ -89,7 +90,7 @@ func TestFactoryLazyFuncs_ReadConfigAtCallTime(t *testing.T) {
 	t.Parallel()
 
 	f := newTestFactory()
-	tokenProvider, restClient := f.TokenProvider, f.RestClient
+	tokenProvider, restClient, services := f.TokenProvider, f.RestClient, f.Services
 	cause := errors.New("resolver set after New")
 
 	f.SetConfigResolver(func() (*config.Config, error) { return nil, cause })
@@ -98,6 +99,9 @@ func TestFactoryLazyFuncs_ReadConfigAtCallTime(t *testing.T) {
 	require.ErrorIs(t, err, cause)
 
 	_, err = restClient()
+	require.ErrorIs(t, err, cause)
+
+	_, err = services()
 	require.ErrorIs(t, err, cause)
 }
 
@@ -319,6 +323,73 @@ func TestFactoryRestClient_RefusesCrossHostRedirect(t *testing.T) {
 	_, err = client.ConfigGetWithResponse(t.Context())
 	require.ErrorIs(t, err, portal.ErrRedirectRefused)
 	assert.Zero(t, hits.Load(), "redirect target was requested")
+}
+
+func TestFactoryServices_Memoized(t *testing.T) {
+	t.Parallel()
+
+	for name, portalURL := range map[string]string{
+		"success":    "https://portal.example.com",
+		"gate error": "http://portal.example.com",
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newGatedFactory(portalURL)
+			restClient := f.RestClient
+
+			var calls atomic.Int32
+
+			f.RestClient = func() (*restapi.ClientWithResponses, error) {
+				calls.Add(1)
+
+				return restClient()
+			}
+
+			first, firstErr := f.Services()
+			second, secondErr := f.Services()
+
+			assert.Same(t, first, second)
+			assert.Equal(t, firstErr, secondErr)
+			assert.Equal(t, int32(1), calls.Load())
+		})
+	}
+}
+
+func TestFactoryServices_PassesTheGate(t *testing.T) {
+	t.Parallel()
+
+	for _, portalURL := range []string{"", "http://portal.example.com"} {
+		t.Run(portalURL, func(t *testing.T) {
+			t.Parallel()
+
+			_, restErr := newGatedFactory(portalURL).RestClient()
+			require.Error(t, restErr)
+
+			services, err := newGatedFactory(portalURL).Services()
+			require.EqualError(t, err, restErr.Error())
+			assert.Nil(t, services)
+		})
+	}
+}
+
+func TestFactoryServices_VerifySessionReachesPortal(t *testing.T) {
+	t.Parallel()
+
+	var gotPath, gotAuth string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath, gotAuth = r.URL.Path, r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	services, err := newGatedFactory(srv.URL).Services()
+	require.NoError(t, err)
+
+	require.NoError(t, services.VerifySession(t.Context()))
+	assert.Equal(t, "/rest/v1/config", gotPath)
+	assert.Equal(t, "Bearer test-token", gotAuth)
 }
 
 // TestNew_SetsEveryFuncField: every exported func field of a Factory built by

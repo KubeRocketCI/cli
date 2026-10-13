@@ -2,6 +2,7 @@ package portal
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -319,3 +320,22 @@ func TestVerifySession(t *testing.T) {
 		})
 	}
 }
+
+func TestVerifySession_TransportError(t *testing.T) {
+	t.Parallel()
+
+	cause := errors.New("dial refused")
+
+	client, err := restapi.NewClientWithResponses("http://portal.invalid/rest",
+		restapi.WithHTTPClient(failingDoer{err: cause}))
+	require.NoError(t, err)
+
+	err = VerifySession(context.Background(), client)
+	require.ErrorIs(t, err, cause)
+	assert.ErrorContains(t, err, "requesting cluster config: ")
+}
+
+// failingDoer fails every request with err.
+type failingDoer struct{ err error }
+
+func (d failingDoer) Do(*http.Request) (*http.Response, error) { return nil, d.err }
