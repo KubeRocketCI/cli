@@ -141,7 +141,7 @@ func eventsRun(ctx context.Context, opts *EventsOptions) error {
 
 func renderTable(w io.Writer, isTTY bool, events []portal.EnvEvent) error {
 	headers := []string{"FIRST_SEEN", "LAST_SEEN", "TYPE", "REASON", "OBJECT", "COUNT", "MESSAGE"}
-	rows := make([][]string, 0, len(events))
+	rows := make([][]output.Cell, 0, len(events))
 
 	for _, e := range events {
 		rows = append(rows, eventRow(e, isTTY))
@@ -150,25 +150,28 @@ func renderTable(w io.Writer, isTTY bool, events []portal.EnvEvent) error {
 	return output.PrintTable(w, isTTY, headers, rows)
 }
 
-// eventRow passes every text cell through output.SingleLine. The Warning color
-// and the MESSAGE truncation apply on a TTY only.
-func eventRow(e portal.EnvEvent, isTTY bool) []string {
-	eventType, msg := output.SingleLine(e.Type), output.SingleLine(e.Message)
+// eventRow passes every free-text cell through output.SingleLine. A Warning
+// type is yellow; the MESSAGE truncation applies on a TTY only.
+func eventRow(e portal.EnvEvent, isTTY bool) []output.Cell {
+	msg := output.SingleLine(e.Message)
 	if isTTY {
 		msg = output.Truncate(msg, output.MaxMessageLen)
-
-		if e.Type == portal.EventTypeWarning {
-			eventType = output.YellowText(eventType)
-		}
 	}
 
-	return []string{
-		discovery.OptTimeCell(e.FirstSeen),
-		discovery.OptTimeCell(e.LastSeen),
+	typ := output.SingleLine(e.Type)
+
+	eventType := output.Text(typ)
+	if e.Type == portal.EventTypeWarning {
+		eventType = output.Yellow(typ)
+	}
+
+	return []output.Cell{
+		output.Text(discovery.OptTimeCell(e.FirstSeen)),
+		output.Text(discovery.OptTimeCell(e.LastSeen)),
 		eventType,
-		output.SingleLine(e.Reason),
-		output.SingleLine(e.InvolvedObject.Kind + "/" + e.InvolvedObject.Name),
-		strconv.Itoa(e.Count),
-		msg,
+		output.Text(output.SingleLine(e.Reason)),
+		output.Text(output.SingleLine(e.InvolvedObject.Kind + "/" + e.InvolvedObject.Name)),
+		output.Text(strconv.Itoa(e.Count)),
+		output.Text(msg),
 	}
 }

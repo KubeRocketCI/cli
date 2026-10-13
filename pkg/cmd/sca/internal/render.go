@@ -79,16 +79,15 @@ func FormatRisk(r float32) string {
 	return fmt.Sprintf("%.1f", r)
 }
 
-// FormatVulnCounts renders the C/H/M/L vulnerability counts column. When isTTY
-// is true and there is at least one critical or high finding, the string is
-// highlighted yellow so it visually pops in interactive listings.
-func FormatVulnCounts(m *portal.SCAMetrics, isTTY bool) string {
+// FormatVulnCounts renders the C/H/M/L vulnerability counts column. The styled
+// form is yellow when critical+high > 0.
+func FormatVulnCounts(m *portal.SCAMetrics) output.Cell {
 	if m == nil {
-		return "0/0/0/0"
+		return output.Text("0/0/0/0")
 	}
 	s := fmt.Sprintf("%d/%d/%d/%d", m.Critical, m.High, m.Medium, m.Low)
-	if isTTY && m.Critical+m.High > 0 {
-		return output.YellowText(s)
+	if m.Critical+m.High > 0 {
+		return output.Yellow(s)
 	}
-	return s
+	return output.Text(s)
 }

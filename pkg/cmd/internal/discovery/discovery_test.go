@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/KubeRocketCI/cli/internal/output"
+	"github.com/KubeRocketCI/cli/internal/ptr"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
 )
 
@@ -50,7 +51,7 @@ func TestShortDigestCell(t *testing.T) {
 func TestIngressLines_Empty(t *testing.T) {
 	t.Parallel()
 
-	if got := IngressLines(nil, false); got != nil {
+	if got := IngressLines(nil); got != nil {
 		t.Errorf("IngressLines(nil) = %v, want nil", got)
 	}
 }
@@ -59,18 +60,22 @@ func TestIngressLines_Multiple(t *testing.T) {
 	t.Parallel()
 
 	urls := []string{"https://foo.example.com", "https://bar.example.com/admin"}
-	got := IngressLines(urls, false)
+	got := IngressLines(urls)
 
 	if len(got) != 2 {
 		t.Fatalf("IngressLines len = %d, want 2", len(got))
 	}
 
-	if got[0] != "foo.example.com" {
-		t.Errorf("IngressLines[0] = %q, want foo.example.com", got[0])
+	if got[0].Render(false) != "foo.example.com" {
+		t.Errorf("IngressLines[0] = %q, want foo.example.com", got[0].Render(false))
 	}
 
-	if got[1] != "bar.example.com" {
-		t.Errorf("IngressLines[1] = %q, want bar.example.com", got[1])
+	if got[1].Render(false) != "bar.example.com" {
+		t.Errorf("IngressLines[1] = %q, want bar.example.com", got[1].Render(false))
+	}
+
+	if got[0].Render(true) != output.Hyperlink("foo.example.com", urls[0]).Render(true) {
+		t.Errorf("IngressLines[0] styled = %q, want a link to %s", got[0].Render(true), urls[0])
 	}
 }
 
@@ -78,32 +83,33 @@ func TestIngressLines_Truncates(t *testing.T) {
 	t.Parallel()
 
 	long := "https://" + strings.Repeat("a", 80) + ".example.com"
-	got := IngressLines([]string{long}, false)
+	got := IngressLines([]string{long})
 
 	if len(got) != 1 {
 		t.Fatalf("IngressLines len = %d, want 1", len(got))
 	}
 
-	if len(got[0]) > MaxIngressHostLen {
-		t.Errorf("hostname not truncated to MaxIngressHostLen: len=%d, host=%q", len(got[0]), got[0])
+	host := got[0].Render(false)
+	if len(host) > MaxIngressHostLen {
+		t.Errorf("hostname not truncated to MaxIngressHostLen: len=%d, host=%q", len(host), host)
 	}
 
-	if !strings.HasSuffix(got[0], "...") {
-		t.Errorf("expected truncated host to end with ..., got %q", got[0])
+	if !strings.HasSuffix(host, "...") {
+		t.Errorf("expected truncated host to end with ..., got %q", host)
 	}
 }
 
 func TestExpandIngressRows_NoIngress(t *testing.T) {
 	t.Parallel()
 
-	cells := []string{"foo", "healthy", "1.0"}
+	cells := output.Texts("foo", "healthy", "1.0")
 	rows := ExpandIngressRows(cells, nil)
 
 	if len(rows) != 1 {
 		t.Fatalf("expected 1 row, got %d", len(rows))
 	}
 
-	if rows[0][len(cells)] != "-" {
+	if rows[0][len(cells)] != output.Text("-") {
 		t.Errorf("INGRESS cell = %q, want '-'", rows[0][len(cells)])
 	}
 }
@@ -111,8 +117,8 @@ func TestExpandIngressRows_NoIngress(t *testing.T) {
 func TestExpandIngressRows_Multiple(t *testing.T) {
 	t.Parallel()
 
-	cells := []string{"foo", "healthy", "1.0"}
-	ingresses := []string{"a.example.com", "b.example.com", "c.example.com"}
+	cells := output.Texts("foo", "healthy", "1.0")
+	ingresses := output.Texts("a.example.com", "b.example.com", "c.example.com")
 	rows := ExpandIngressRows(cells, ingresses)
 
 	if len(rows) != 3 {
@@ -129,7 +135,7 @@ func TestExpandIngressRows_Multiple(t *testing.T) {
 	// Subsequent rows blank out non-INGRESS columns.
 	for r := range rows[1:] {
 		for i := range cells {
-			if rows[r+1][i] != "" {
+			if !rows[r+1][i].IsZero() {
 				t.Errorf("rows[%d][%d] = %q, want '' (continuation row)", r+1, i, rows[r+1][i])
 			}
 		}
@@ -165,12 +171,33 @@ func TestColorForArgoStatus_Passthrough(t *testing.T) {
 	t.Parallel()
 
 	// Unknown / empty values pass through unstyled.
-	if got := ColorForArgoStatus(""); got != "" {
-		t.Errorf("ColorForArgoStatus('') = %q, want ''", got)
+	if got := ColorForArgoStatus(""); got != output.Text("") {
+		t.Errorf("ColorForArgoStatus('') = %#v, want ''", got)
 	}
 
-	if got := ColorForArgoStatus("unknown"); got != "unknown" {
-		t.Errorf("ColorForArgoStatus(unknown) = %q, want unknown", got)
+	if got := ColorForArgoStatus("unknown"); got != output.Text("unknown") {
+		t.Errorf("ColorForArgoStatus(unknown) = %#v, want unknown", got)
+	}
+}
+
+// OptStatusCell keeps the whitespace of an unknown status in both forms.
+func TestOptStatusCell(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		in   *string
+		want output.Cell
+	}{
+		"nil":     {nil, output.Text("-")},
+		"empty":   {ptr.To(""), output.Text("-")},
+		"healthy": {ptr.To("Healthy"), output.Green("Healthy")},
+		"unknown": {ptr.To("unknown  status"), output.Text("unknown  status")},
+	}
+
+	for name, tc := range cases {
+		if got := OptStatusCell(tc.in); got != tc.want {
+			t.Errorf("%s: OptStatusCell = %#v, want %#v", name, got, tc.want)
+		}
 	}
 }
 

@@ -219,8 +219,15 @@ var styledST = strings.ReplaceAll(styled, "\x07", "\x1b\\")
 func TestFromWriters_KeepsOutputStyles(t *testing.T) {
 	t.Parallel()
 
-	in := output.Hyperlink("t", "https://h/p?q=1") + output.GreenText("g") + output.HeaderStyle.Render("h") +
-		output.LabelStyle.Render("l") + output.DimStyle.Render("d")
+	in := output.Hyperlink("t", "https://h/p?q=1").Render(true) + output.Hyperlink("t", "https://h/p?q=1#f").Render(true) +
+		output.HeaderStyle.Render("h") +
+		output.LabelStyle.Render("l") + output.DimStyle.Render("d") +
+		output.EvenRowStyle.Render("e") + output.OddRowStyle.Render("o")
+	for _, c := range []output.Cell{
+		output.Green("g"), output.Yellow("y"), output.Red("r"), output.Blue("b"), output.Gray("x"),
+	} {
+		in += c.Render(true)
+	}
 	want := strings.ReplaceAll(in, "\x07", "\x1b\\")
 
 	var out bytes.Buffer

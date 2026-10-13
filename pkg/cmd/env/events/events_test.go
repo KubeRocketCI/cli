@@ -196,21 +196,27 @@ func TestEventRow(t *testing.T) {
 	fullMessage := "Readiness probe failed: ^[]0;title^G" + strings.TrimSpace(long)
 
 	piped := eventRow(warning, false)
-	if want := []string{"Jan 02 03:04", "Jan 02 03:10", portal.EventTypeWarning, "Unhealthy^[[2J", "Pod/foo", "3", fullMessage}; !slices.Equal(piped, want) {
-		t.Errorf("piped row = %q, want %q", piped, want)
+	want := []output.Cell{
+		output.Text("Jan 02 03:04"), output.Text("Jan 02 03:10"), output.Yellow(portal.EventTypeWarning),
+		output.Text("Unhealthy^[[2J"), output.Text("Pod/foo"), output.Text("3"), output.Text(fullMessage),
+	}
+
+	if !slices.Equal(piped, want) {
+		t.Errorf("piped row = %#v, want %#v", piped, want)
 	}
 
 	tty := eventRow(warning, true)
-	if tty[2] != output.YellowText(portal.EventTypeWarning) {
-		t.Errorf("a Warning is yellow on a TTY, got %q", tty[2])
+	if tty[2] != output.Yellow(portal.EventTypeWarning) {
+		t.Errorf("a Warning is yellow, got %#v", tty[2])
 	}
 
-	if tty[6] != output.Truncate(fullMessage, output.MaxMessageLen) || utf8.RuneCountInString(tty[6]) != output.MaxMessageLen {
-		t.Errorf("the message is truncated on a TTY, got %q", tty[6])
+	msg := tty[6].Render(true)
+	if msg != output.Truncate(fullMessage, output.MaxMessageLen) || utf8.RuneCountInString(msg) != output.MaxMessageLen {
+		t.Errorf("the message is truncated on a TTY, got %q", msg)
 	}
 
 	normal := eventRow(portal.EnvEvent{Type: "Normal", Reason: "Pulled"}, true)
-	if normal[0] != output.EmptyCell || normal[1] != output.EmptyCell || normal[2] != "Normal" {
-		t.Errorf("a Normal event without a time = %q", normal)
+	if normal[0] != output.Text(output.EmptyCell) || normal[1] != output.Text(output.EmptyCell) || normal[2] != output.Text("Normal") {
+		t.Errorf("a Normal event without a time = %#v", normal)
 	}
 }

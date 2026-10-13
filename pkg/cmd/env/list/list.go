@@ -128,22 +128,16 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 
 func renderTable(w io.Writer, isTTY bool, rows []portal.EnvSummary) error {
 	headers := []string{"DEPLOYMENT", "ENV", "CLUSTER", "NAMESPACE", "TRIGGER", "STATUS"}
-	tableRows := make([][]string, 0, len(rows))
+	tableRows := make([][]output.Cell, 0, len(rows))
 
 	for _, r := range rows {
-		status := r.Status
-		if isTTY {
-			status = output.StatusColor(r.Status)
-		}
-
-		tableRows = append(tableRows, []string{
+		tableRows = append(tableRows, append(output.Texts(
 			r.Deployment,
 			r.Env,
 			r.Cluster,
 			r.Namespace,
 			r.TriggerType,
-			status,
-		})
+		), output.StatusColor(r.Status)))
 	}
 
 	return output.PrintTable(w, isTTY, headers, tableRows)

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/KubeRocketCI/cli/internal/iostreams"
+	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 )
 
@@ -45,17 +46,15 @@ func TestFormatRisk(t *testing.T) {
 
 func TestFormatVulnCounts(t *testing.T) {
 	t.Parallel()
-	if got := FormatVulnCounts(nil, false); got != "0/0/0/0" {
-		t.Errorf("nil metrics = %q; want 0/0/0/0", got)
+	if got := FormatVulnCounts(nil); got != output.Text("0/0/0/0") {
+		t.Errorf("nil metrics = %#v; want 0/0/0/0", got)
 	}
 	m := &portal.SCAMetrics{Critical: 1, High: 2, Medium: 3, Low: 4}
-	if got := FormatVulnCounts(m, false); got != "1/2/3/4" {
-		t.Errorf("non-TTY = %q; want 1/2/3/4", got)
+	if got := FormatVulnCounts(m); got != output.Yellow("1/2/3/4") {
+		t.Errorf("critical+high > 0 = %#v; want yellow 1/2/3/4", got)
 	}
-	// TTY mode wraps in YellowText when critical+high > 0; just assert the
-	// digits remain present (we don't depend on the exact ANSI sequence).
-	if got := FormatVulnCounts(m, true); !strings.Contains(got, "1/2/3/4") {
-		t.Errorf("TTY render must still contain digits, got %q", got)
+	if got := FormatVulnCounts(&portal.SCAMetrics{Medium: 3}); got != output.Text("0/0/3/0") {
+		t.Errorf("no critical or high = %#v; want plain 0/0/3/0", got)
 	}
 }
 

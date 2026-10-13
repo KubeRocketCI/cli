@@ -80,15 +80,10 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 
 	return render.RenderBare(opts.IO, opts.OutputFormat, projects, func(w io.Writer, isTTY bool) error {
 		headers := []string{"NAME", "TYPE", "LANGUAGE", "BUILD TOOL", "STATUS"}
-		rows := make([][]string, 0, len(projects))
+		rows := make([][]output.Cell, 0, len(projects))
 
 		for _, p := range projects {
-			status := p.Status
-			if isTTY {
-				status = output.StatusColor(p.Status)
-			}
-
-			rows = append(rows, []string{p.Name, p.Type, p.Language, p.BuildTool, status})
+			rows = append(rows, append(output.Texts(p.Name, p.Type, p.Language, p.BuildTool), output.StatusColor(p.Status)))
 		}
 
 		return output.PrintTable(w, isTTY, headers, rows)

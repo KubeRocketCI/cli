@@ -85,19 +85,14 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 
 	return render.RenderBare(opts.IO, opts.OutputFormat, deployments, func(w io.Writer, isTTY bool) error {
 		headers := []string{"NAME", "APPLICATIONS", "ENVS", "STATUS"}
-		rows := make([][]string, 0, len(deployments))
+		rows := make([][]output.Cell, 0, len(deployments))
 
 		for _, d := range deployments {
-			status := d.Status
-			if isTTY {
-				status = output.StatusColor(d.Status)
-			}
-
-			rows = append(rows, []string{
-				d.Name,
-				formatApplications(d.Applications),
-				strings.Join(d.StageNames, " \u2192 "),
-				status,
+			rows = append(rows, []output.Cell{
+				output.Text(d.Name),
+				output.Text(formatApplications(d.Applications)),
+				output.Text(strings.Join(d.StageNames, " \u2192 ")),
+				output.StatusColor(d.Status),
 			})
 		}
 

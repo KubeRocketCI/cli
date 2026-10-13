@@ -13,26 +13,21 @@ import (
 // renderRow renders the shared pipeline-run row (NAME/STATUS/PROJECT/PR/
 // AUTHOR/TYPE/STARTED/DURATION) for `pipelinerun start` and `project build`:
 // -o json emits the schemaVersion envelope, -o table (default) colours
-// STATUS on a TTY via output.PipelineStatusColor.
+// STATUS via output.PipelineStatusColor.
 func renderRow(ios *iostreams.IOStreams, format string, result *portal.StartResult) error {
 	return render.Render(ios, format, result, func(w io.Writer, isTTY bool) error {
-		status := output.OrDash(result.Status)
-		if isTTY && result.Status != "" {
-			status = output.PipelineStatusColor(result.Status)
+		row := []output.Cell{
+			output.Text(output.OrDash(result.Name)),
+			output.PipelineStatusColor(output.OrDash(result.Status)),
+			output.Text(output.OrDash(result.Project)),
+			output.Text(output.OrDash(result.PR)),
+			output.Text(output.OrDash(result.Author)),
+			output.Text(output.OrDash(result.Type)),
+			output.Text(output.OrDash(result.Started)),
+			output.Text(output.OrDash(result.Duration)),
 		}
 
-		row := []string{
-			output.OrDash(result.Name),
-			status,
-			output.OrDash(result.Project),
-			output.OrDash(result.PR),
-			output.OrDash(result.Author),
-			output.OrDash(result.Type),
-			output.OrDash(result.Started),
-			output.OrDash(result.Duration),
-		}
-
-		return output.PrintTable(w, isTTY, Headers, [][]string{row})
+		return output.PrintTable(w, isTTY, Headers, [][]output.Cell{row})
 	})
 }
 

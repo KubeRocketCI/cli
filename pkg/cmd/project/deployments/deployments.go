@@ -121,20 +121,20 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 
 func renderTable(w io.Writer, isTTY bool, rows []portal.ProjectDeploymentRow) error {
 	headers := []string{"DEPLOYMENT", "ENV", "STATUS", "SYNC", "VERSION", "IMAGE_SHA", "CLUSTER", "NAMESPACE", "INGRESS"}
-	tableRows := make([][]string, 0, len(rows))
+	tableRows := make([][]output.Cell, 0, len(rows))
 
 	for _, r := range rows {
-		cells := []string{
-			r.Deployment,
-			r.Env,
-			discovery.OptStatusCell(r.Status, isTTY),
-			discovery.OptCell(r.Sync),
-			discovery.OptCell(r.Version),
-			discovery.ShortDigestCell(r.ImageDigest),
-			r.Cluster,
-			r.Namespace,
+		cells := []output.Cell{
+			output.Text(r.Deployment),
+			output.Text(r.Env),
+			discovery.OptStatusCell(r.Status),
+			output.Text(discovery.OptCell(r.Sync)),
+			output.Text(discovery.OptCell(r.Version)),
+			output.Text(discovery.ShortDigestCell(r.ImageDigest)),
+			output.Text(r.Cluster),
+			output.Text(r.Namespace),
 		}
-		tableRows = append(tableRows, discovery.ExpandIngressRows(cells, discovery.IngressLines(r.IngressURLs, isTTY))...)
+		tableRows = append(tableRows, discovery.ExpandIngressRows(cells, discovery.IngressLines(r.IngressURLs))...)
 	}
 
 	return output.PrintTable(w, isTTY, headers, tableRows)

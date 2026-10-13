@@ -130,18 +130,17 @@ func renderTable(
 	}
 
 	headers := []string{"COMPONENT", "CURRENT", "LATEST", "OUTDATED", "LICENSE", "RISK", "VULNS (C/H/M/L)"}
-	rows := make([][]string, 0, len(result.Items))
+	rows := make([][]output.Cell, 0, len(result.Items))
 
 	for _, c := range result.Items {
-		rows = append(rows, []string{
+		rows = append(rows, append(output.Texts(
 			c.Name,
 			c.Version,
 			scainternal.OrDash(c.LatestVersion),
 			scainternal.BoolYesNo(c.Outdated),
 			scainternal.OrDash(c.License),
 			scainternal.FormatRisk(c.RiskScore),
-			scainternal.FormatVulnCounts(c.Metrics, isTTY),
-		})
+		), scainternal.FormatVulnCounts(c.Metrics)))
 	}
 
 	if err := output.PrintTable(w, isTTY, headers, rows); err != nil {

@@ -169,7 +169,7 @@ func printDetail(w io.Writer, codebase, requestedBranch string, d *portal.SCAPro
 func severityRow(label, canonical string, count int) output.DetailLine {
 	p := output.DetailLine{Label: label, Value: fmt.Sprintf("%d", count)}
 	if count > 0 && canonical != "" {
-		p.Styled = fmt.Sprintf("%s %s", p.Value, output.SCASeverityColor(canonical))
+		p.Styled = output.Concat(output.Text(p.Value+" "), output.SCASeverityColor(canonical))
 	}
 	return p
 }
@@ -179,7 +179,7 @@ func severityRow(label, canonical string, count int) output.DetailLine {
 func activeLine(active bool) output.DetailLine {
 	l := output.DetailLine{Label: "Active", Value: scainternal.BoolYesNo(active)}
 	if active {
-		l.Styled = output.GreenText(l.Value)
+		l.Styled = output.Green(l.Value)
 	}
 	return l
 }

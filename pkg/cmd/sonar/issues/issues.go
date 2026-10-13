@@ -216,7 +216,7 @@ func renderTable(w io.Writer, isTTY bool, project, pullRequest, branch string, r
 	}
 
 	headers := []string{"KEY", "SEVERITY", "TYPE", "STATUS", "RULE", "COMPONENT", "LINE", "MESSAGE"}
-	rows := make([][]string, 0, len(result.Issues))
+	rows := make([][]output.Cell, 0, len(result.Issues))
 
 	for _, i := range result.Issues {
 		line := ""
@@ -231,7 +231,7 @@ func renderTable(w io.Writer, isTTY bool, project, pullRequest, branch string, r
 			msg = output.Truncate(i.Message, output.MaxMessageLen)
 		}
 
-		rows = append(rows, []string{
+		rows = append(rows, output.Texts(
 			i.Key,
 			i.Severity,
 			i.Type,
@@ -240,7 +240,7 @@ func renderTable(w io.Writer, isTTY bool, project, pullRequest, branch string, r
 			i.Component,
 			line,
 			msg,
-		})
+		))
 	}
 
 	return output.PrintTable(w, isTTY, headers, rows)

@@ -481,8 +481,8 @@ func TestStatus_RejectsUnknownOutputFormat(t *testing.T) {
 func TestStatus_Authenticated_Terminal(t *testing.T) {
 	t.Parallel()
 
-	green := output.GreenText("Authenticated")
-	yellow, _, _ := strings.Cut(output.YellowText("x"), "x")
+	green := output.Green("Authenticated").Render(true)
+	yellow, _, _ := strings.Cut(output.Yellow("x").Render(true), "x")
 
 	cases := map[string]struct {
 		expiresIn    time.Duration

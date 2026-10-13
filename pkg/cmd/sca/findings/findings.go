@@ -131,7 +131,7 @@ func renderTable(w io.Writer, isTTY bool, codebase string, result *portal.SCAFin
 	}
 
 	headers := []string{"COMPONENT", "VERSION", "VULN_ID", "SRC", "SEVERITY", "CVSS", "ANALYSIS", "SUPPRESSED"}
-	rows := make([][]string, 0, len(result.Items))
+	rows := make([][]output.Cell, 0, len(result.Items))
 
 	for _, f := range result.Items {
 		compName := f.Component.Name
@@ -141,20 +141,15 @@ func renderTable(w io.Writer, isTTY bool, codebase string, result *portal.SCAFin
 			vulnID = output.Truncate(vulnID, maxIDColumnWidth)
 		}
 
-		severity := f.Vulnerability.Severity
-		if isTTY {
-			severity = output.SCASeverityColor(f.Vulnerability.Severity)
-		}
-
-		rows = append(rows, []string{
-			compName,
-			f.Component.Version,
-			vulnID,
-			f.Vulnerability.Source,
-			severity,
-			formatCVSS(f.Vulnerability.CvssV3BaseScore, f.Vulnerability.CvssV2BaseScore),
-			f.Analysis.State,
-			scainternal.BoolYesNo(f.Analysis.IsSuppressed),
+		rows = append(rows, []output.Cell{
+			output.Text(compName),
+			output.Text(f.Component.Version),
+			output.Text(vulnID),
+			output.Text(f.Vulnerability.Source),
+			output.SCASeverityColor(f.Vulnerability.Severity),
+			output.Text(formatCVSS(f.Vulnerability.CvssV3BaseScore, f.Vulnerability.CvssV2BaseScore)),
+			output.Text(f.Analysis.State),
+			output.Text(scainternal.BoolYesNo(f.Analysis.IsSuppressed)),
 		})
 	}
 

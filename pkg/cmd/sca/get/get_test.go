@@ -150,10 +150,10 @@ func TestPrintDetail_HappyPath(t *testing.T) {
 
 func TestFormatters(t *testing.T) {
 	t.Parallel()
-	if l := activeLine(true); l.Value != yesLabel || l.Styled != output.GreenText(yesLabel) {
+	if l := activeLine(true); l.Value != yesLabel || l.Styled != output.Green(yesLabel) {
 		t.Errorf("activeLine(true) = %+v", l)
 	}
-	if l := activeLine(false); l.Value != noLabel || l.Styled != "" {
+	if l := activeLine(false); l.Value != noLabel || !l.Styled.IsZero() {
 		t.Errorf("activeLine(false) = %+v", l)
 	}
 	if formatTimestamp(0, "") != dashPad {
@@ -169,20 +169,20 @@ func TestSeverityRow(t *testing.T) {
 
 	// count>0: Value is the count, Styled is "<count> <badge>".
 	p := severityRow("Critical", "CRITICAL", 3)
-	want := "3 " + output.SCASeverityColor("CRITICAL")
+	want := output.Concat(output.Text("3 "), output.SCASeverityColor("CRITICAL"))
 	if p.Label != "Critical" || p.Value != "3" || p.Styled != want {
-		t.Errorf("severityRow = %+v, want Styled %q", p, want)
+		t.Errorf("severityRow = %+v, want Styled %+v", p, want)
 	}
 
 	// count==0 must not attach a badge (0 counts stay neutral).
 	p = severityRow("Critical", "CRITICAL", 0)
-	if p.Styled != "" {
-		t.Errorf("zero count must not render a badge, got %q", p.Styled)
+	if !p.Styled.IsZero() {
+		t.Errorf("zero count must not render a badge, got %+v", p.Styled)
 	}
 
 	// Empty canonical severity is a no-op on Styled.
 	p = severityRow("Other", "", 5)
-	if p.Styled != "" {
-		t.Errorf("empty canonical must not render a badge, got %q", p.Styled)
+	if !p.Styled.IsZero() {
+		t.Errorf("empty canonical must not render a badge, got %+v", p.Styled)
 	}
 }

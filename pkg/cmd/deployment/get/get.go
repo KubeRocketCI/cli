@@ -141,7 +141,7 @@ func printStageSection(w io.Writer, stages []portal.Stage, styled bool) error {
 	}
 
 	headers := []string{"ORDER", "ENV", "DEPLOY MODE", "PROMOTE GATES", "NAMESPACE", "STATUS"}
-	rows := stageRows(stages, styled)
+	rows := stageRows(stages)
 
 	if err := output.PrintTable(w, styled, headers, rows); err != nil {
 		return err
@@ -194,24 +194,18 @@ func printSectionHeading(w io.Writer, styled bool, text string) error {
 	return err
 }
 
-// stageRows builds table rows from stages. When styled is true, status is colorized.
-func stageRows(stages []portal.Stage, styled bool) [][]string {
-	rows := make([][]string, 0, len(stages))
+// stageRows builds table rows from stages, with a colorized status.
+func stageRows(stages []portal.Stage) [][]output.Cell {
+	rows := make([][]output.Cell, 0, len(stages))
 
 	for _, s := range stages {
-		status := s.Status
-		if styled {
-			status = output.StatusColor(s.Status)
-		}
-
-		rows = append(rows, []string{
+		rows = append(rows, append(output.Texts(
 			strconv.FormatInt(s.Order, 10),
 			s.Name,
 			s.TriggerType,
 			summarizeGates(s.QualityGates),
 			s.Namespace,
-			status,
-		})
+		), output.StatusColor(s.Status)))
 	}
 
 	return rows

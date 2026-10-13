@@ -29,9 +29,10 @@ succeed, which prints the run and then exits `1`. The bare verbs are
 a breaking change.
 
 Table output is for people. Cluster-supplied text stays on one row, and a
-control character in it is shown in caret notation (`^[` for ESC). On a
-terminal, an SGR colour or http(s) link sequence in cluster text passes as the
-CLI's own styling; every other escape sequence is shown in caret notation.
+control character or escape sequence in it is shown in caret notation (`^[`
+for ESC). Pipeline-run task logs keep their lines: on a terminal, their SGR
+colour and http(s) link sequences pass, and every other control character and
+escape sequence is dropped.
 JSON keeps the values and writes DEL and the C1 characters U+0080–U+009F as
 `\u` escapes.
 
