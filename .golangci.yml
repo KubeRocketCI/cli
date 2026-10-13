@@ -2,6 +2,10 @@
 version: "2"
 run:
   allow-parallel-runners: true
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  uniq-by-line: false
 linters:
   default: none
   enable:
@@ -86,9 +90,37 @@ linters:
           deny:
             - pkg: github.com/spf13/cobra
               desc: cobra is imported only by pkg/cmd and internal/cmdutil
+        # The restapi and config rules and the Factory field exclusions in forbidigo share the exempt
+        # paths (factory.go, cmdtest, root.go, login.go, tests); edit them together.
+        restapi:
+          list-mode: lax
+          files:
+            - $all
+            - "!$test"
+            - "!${base-path}/internal/portal/**"
+            - "!${base-path}/internal/cmdutil/factory.go"
+            - "!${base-path}/pkg/cmd/internal/cmdtest/**"
+          deny:
+            - pkg: github.com/KubeRocketCI/cli/internal/portal/restapi
+              desc: the generated client is imported only by internal/portal, the Factory, cmdtest and tests; commands get portal services from Factory.Services
+        config:
+          list-mode: lax
+          files:
+            - ${base-path}/pkg/cmd/**
+            - "!$test"
+            - "!${base-path}/pkg/cmd/root/root.go"
+            - "!${base-path}/pkg/cmd/auth/login/login.go"
+            - "!${base-path}/pkg/cmd/internal/cmdtest/**"
+          deny:
+            - pkg: github.com/KubeRocketCI/cli/internal/config
+              desc: under pkg/cmd only root.go (flags), login.go, cmdtest and tests import config; commands get portal services, scoped to the configured target, from Factory.Services
     forbidigo:
       analyze-types: true
       forbid:
+        - pattern: ^cmdutil\.Factory\.RestClient$
+          msg: commands get portal services from Factory.Services, not Factory.RestClient (tests and cmdtest excepted)
+        - pattern: ^cmdutil\.Factory\.Config$
+          msg: commands get portal services, scoped to the configured target, from Factory.Services; only login.go reads Factory.Config (tests and cmdtest excepted)
         - pattern: ^cobra\.Command\.(Print|Println|Printf|OutOrStderr)$
           msg: >-
             writes through OutOrStderr, which SetOut binds to stdout (spf13/cobra#1708);
@@ -122,6 +154,20 @@ linters:
           - forbidigo
         path-except: ^internal/(token|auth)/
         text: io\.Writer passed in by the caller
+      # The Factory field patterns apply to commands under pkg/cmd outside cmdtest and tests;
+      # login.go may read Factory.Config. text must match their msg.
+      - linters:
+          - forbidigo
+        path-except: ^pkg/cmd/
+        text: (not Factory\.RestClient|only login\.go reads Factory\.Config) \(tests and cmdtest excepted\)
+      - linters:
+          - forbidigo
+        path: (_test\.go$|^pkg/cmd/internal/cmdtest/)
+        text: (not Factory\.RestClient|only login\.go reads Factory\.Config) \(tests and cmdtest excepted\)
+      - linters:
+          - forbidigo
+        path: ^pkg/cmd/auth/login/login\.go$
+        text: only login\.go reads Factory\.Config \(tests and cmdtest excepted\)
     paths:
       - third_party$
       - builtin$
