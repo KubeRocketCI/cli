@@ -27,7 +27,7 @@ Portal-only: CLI talks exclusively to the portal tRPC API (Bearer idToken). No d
 - `pkg/cmd/internal/render/` — the CLI output contract: `-o` names, validation and dispatch, the `{schemaVersion, data}` and error envelopes, the auth-error prefix. Every `-o` decision goes through it; the JSON and YAML encoders stay in `output`.
 - `pkg/cmd/<group>/<verb>/` — commands export `NewCmd<Verb>(f, runF)`. Follow existing as examples.
 
-depguard (rules in `.golangci.yml`) enforces the split: `output` imports none of `portal`, `iostreams`, `cmdutil`; `portal` imports neither `output` nor `iostreams`; `cmdutil` does not import `output`; `render` does not import `cmdutil`; `colorprofile` is imported only by `iostreams`.
+depguard and forbidigo (rules in `.golangci.yml`) enforce the module boundaries; each rule's `desc` or `msg` states its boundary. Commands get portal services, scoped to the configured target, from `Factory.Services`; they neither import `restapi` or `internal/config` nor read `Factory.RestClient` or `Factory.Config`. Exceptions: `root.go` imports config only to register its flags; `login.go` reads `Factory.Config` and calls the portal config endpoints. Tests and `cmdtest` are exempt from these rules.
 
 ### Factory validation gate
 
