@@ -38,6 +38,9 @@ Columns:
 krci deployment get my-pipeline
 ```
 
+`<name>` must be a DNS-1123 name (lowercase alphanumerics + hyphens, no dots,
+≤ 253 chars). Invalid input fails with exit `1` before contacting the Portal.
+
 ```
 Name:         my-pipeline
 Namespace:    edp-delivery
