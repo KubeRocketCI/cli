@@ -1,9 +1,10 @@
 package portal
 
 import (
+	"cmp"
 	"context"
 	"fmt"
-	"sort"
+	"slices"
 
 	"golang.org/x/sync/errgroup"
 
@@ -293,9 +294,7 @@ func groupStagesByPipeline(items []k8sItem) map[string][]Stage {
 }
 
 func orderedStageNames(stages []Stage) []string {
-	sort.Slice(stages, func(i, j int) bool {
-		return stages[i].Order < stages[j].Order
-	})
+	sortStagesByOrder(stages)
 
 	names := make([]string, 0, len(stages))
 	for _, s := range stages {
@@ -303,6 +302,11 @@ func orderedStageNames(stages []Stage) []string {
 	}
 
 	return names
+}
+
+// sortStagesByOrder sorts stages by spec.order; equal orders keep the list order.
+func sortStagesByOrder(stages []Stage) {
+	slices.SortStableFunc(stages, func(a, b Stage) int { return cmp.Compare(a.Order, b.Order) })
 }
 
 func filterAndSortStages(items []k8sItem, pipelineName string) []Stage {
@@ -317,9 +321,7 @@ func filterAndSortStages(items []k8sItem, pipelineName string) []Stage {
 		stages = append(stages, mapStage(item))
 	}
 
-	sort.Slice(stages, func(i, j int) bool {
-		return stages[i].Order < stages[j].Order
-	})
+	sortStagesByOrder(stages)
 
 	return stages
 }
