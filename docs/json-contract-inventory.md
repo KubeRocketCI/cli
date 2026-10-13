@@ -252,3 +252,4 @@ Schema: [json-schemas.md](json-schemas.md#krci-env-list)
 |---|---|---|---|---|
 | stages | `krci env list -o json` | 0 | envelope | empty |
 | unauthorized | `krci env list -o json` | 1 | error envelope | `Error: authentication required: listing stages: unauthorized: please run 'krci auth login'` |
+| insecure-portal-url | `KRCI_PORTAL_URL=http://portal.example.com krci env list -o json` | 1 | error envelope | `Error: invalid portal URL: must use https, or http on localhost or a loopback IP: http://portal.example.com` |

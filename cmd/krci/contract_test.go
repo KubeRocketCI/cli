@@ -67,9 +67,10 @@ const (
 	cmdDeploymentGet      = "deployment get"
 	cmdEnvList            = "env list"
 
-	nameUnauthorized  = "unauthorized"
-	nameUnknownFormat = "unknown-format"
-	nameNotFound      = "not-found"
+	nameUnauthorized      = "unauthorized"
+	nameUnknownFormat     = "unknown-format"
+	nameNotFound          = "not-found"
+	nameInsecurePortalURL = "insecure-portal-url"
 
 	nameDeploymentNotFound = "deployment-not-found"
 	nameEnvNotFound        = "env-not-found"
@@ -217,7 +218,7 @@ var contractRows = []contractRow{
 	{cmd: cmdAuthStatus, format: formatJSON, fixture: "none", env: map[string]string{"KRCI_PORTAL_URL": ""},
 		wantExit: 1, name: "portal-url-unset"},
 	{cmd: cmdAuthStatus, format: formatJSON, fixture: "none",
-		env: map[string]string{"KRCI_PORTAL_URL": "http://portal.example.com"}, wantExit: 1, name: "insecure-portal-url"},
+		env: map[string]string{"KRCI_PORTAL_URL": "http://portal.example.com"}, wantExit: 1, name: nameInsecurePortalURL},
 
 	{cmd: cmdSonarList, format: formatJSON, fixture: "sonar", name: "projects"},
 	{cmd: cmdSonarList, format: formatJSON, fixture: "sonar-401", wantExit: 1, name: nameUnauthorized},
@@ -259,7 +260,7 @@ var contractRows = []contractRow{
 	{cmd: cmdProjectList, format: formatJSON, fixture: "codebase-401", wantExit: 1, name: nameUnauthorized},
 	{cmd: cmdProjectList, format: formatUnknown, fixture: "project", wantExit: 1, name: nameUnknownFormat},
 	{cmd: cmdProjectList, format: formatJSON, fixture: "none",
-		env: map[string]string{"KRCI_PORTAL_URL": "http://portal.example.com"}, wantExit: 1, name: "insecure-portal-url"},
+		env: map[string]string{"KRCI_PORTAL_URL": "http://portal.example.com"}, wantExit: 1, name: nameInsecurePortalURL},
 	{cmd: cmdProjectGet, args: []string{projectName}, format: formatJSON, fixture: "project", name: "detail"},
 	{cmd: cmdProjectGet, args: []string{projectName}, format: formatJSON, fixture: "codebase-404", wantExit: 1,
 		name: nameNotFound},
@@ -292,6 +293,8 @@ var contractRows = []contractRow{
 
 	{cmd: cmdEnvList, format: formatJSON, fixture: "env", name: "stages"},
 	{cmd: cmdEnvList, format: formatJSON, fixture: "stages-401", wantExit: 1, name: nameUnauthorized},
+	{cmd: cmdEnvList, format: formatJSON, fixture: "none",
+		env: map[string]string{"KRCI_PORTAL_URL": "http://portal.example.com"}, wantExit: 1, name: nameInsecurePortalURL},
 }
 
 // route answers one request. kind and name match resourceConfig.kind and name

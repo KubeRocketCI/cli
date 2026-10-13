@@ -8,19 +8,16 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
-	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 // ListOptions holds all inputs for the project list command.
 type ListOptions struct {
 	IO           *iostreams.IOStreams
-	RestClient   func() (*restapi.ClientWithResponses, error)
-	Config       func() (*config.Config, error)
+	Services     func() (*portal.Services, error)
 	OutputFormat string
 }
 
@@ -28,9 +25,8 @@ type ListOptions struct {
 // runF is the business logic function; pass nil to use the default listRun.
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
-		IO:         f.IOStreams,
-		RestClient: f.RestClient,
-		Config:     f.Config,
+		IO:       f.IOStreams,
+		Services: f.Services,
 	}
 
 	cmd := &cobra.Command{
@@ -61,17 +57,12 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 }
 
 func listRun(ctx context.Context, opts *ListOptions) error {
-	cfg, err := opts.Config()
+	services, err := opts.Services()
 	if err != nil {
 		return err
 	}
 
-	client, err := opts.RestClient()
-	if err != nil {
-		return err
-	}
-
-	svc := portal.NewProjectService(client, cfg.ClusterName, cfg.Namespace)
+	svc := services.Project()
 
 	projects, err := svc.List(ctx)
 	if err != nil {

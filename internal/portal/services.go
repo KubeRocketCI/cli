@@ -73,3 +73,28 @@ func (s *Services) Sonar() *SonarService {
 func (s *Services) SCA() *SCAService {
 	return NewSCAService(s.client)
 }
+
+// Project returns the project service of the target.
+func (s *Services) Project() *ProjectService {
+	return NewProjectService(s.client, s.target.Cluster, s.target.Namespace)
+}
+
+// ProjectVersions returns the project versions service of the target.
+func (s *Services) ProjectVersions() *ProjectVersionsService {
+	return NewProjectVersionsService(s.client, s.target.Cluster, s.target.Namespace)
+}
+
+// DeploymentByProject returns the per-project deployments service of the target.
+func (s *Services) DeploymentByProject() *DeploymentByProjectService {
+	return NewDeploymentByProjectService(s.client, s.target.Cluster, s.target.Namespace)
+}
+
+// Deployment returns the deployment service of the target.
+func (s *Services) Deployment() *DeploymentService {
+	return NewDeploymentService(s.client, s.target.Cluster, s.target.Namespace)
+}
+
+// Env returns the environment service of the target.
+func (s *Services) Env() *EnvService {
+	return NewEnvService(s.client, s.target.Cluster, s.target.Namespace)
+}

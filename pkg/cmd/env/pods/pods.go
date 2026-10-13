@@ -11,11 +11,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
-	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/internal/ptr"
 	envinternal "github.com/KubeRocketCI/cli/pkg/cmd/env/internal"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/discovery"
@@ -25,8 +23,7 @@ import (
 // PodsOptions holds all inputs for `krci env pods <deployment> <env>`.
 type PodsOptions struct {
 	IO           *iostreams.IOStreams
-	RestClient   func() (*restapi.ClientWithResponses, error)
-	Config       func() (*config.Config, error)
+	Services     func() (*portal.Services, error)
 	Deployment   string
 	Env          string
 	OutputFormat string
@@ -36,9 +33,8 @@ type PodsOptions struct {
 // runF is the business-logic function; pass nil to use the default podsRun.
 func NewCmdPods(f *cmdutil.Factory, runF func(*PodsOptions) error) *cobra.Command {
 	opts := &PodsOptions{
-		IO:         f.IOStreams,
-		RestClient: f.RestClient,
-		Config:     f.Config,
+		IO:       f.IOStreams,
+		Services: f.Services,
 	}
 
 	cmd := &cobra.Command{
@@ -95,17 +91,12 @@ Limits:
 }
 
 func podsRun(ctx context.Context, opts *PodsOptions) error {
-	cfg, err := opts.Config()
+	services, err := opts.Services()
 	if err != nil {
 		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
-	client, err := opts.RestClient()
-	if err != nil {
-		return render.HandleError(opts.IO, opts.OutputFormat, err)
-	}
-
-	svc := portal.NewEnvService(client, cfg.ClusterName, cfg.Namespace)
+	svc := services.Env()
 
 	payload, err := svc.Pods(ctx, opts.Deployment, opts.Env)
 	if err != nil {
