@@ -63,3 +63,13 @@ func (s *Services) VerifySession(ctx context.Context) error {
 
 	return checkResponse(resp.StatusCode(), resp.Body)
 }
+
+// Sonar returns the SonarQube service.
+func (s *Services) Sonar() *SonarService {
+	return NewSonarService(s.client)
+}
+
+// SCA returns the Dependency-Track service.
+func (s *Services) SCA() *SCAService {
+	return NewSCAService(s.client)
+}

@@ -14,7 +14,6 @@ import (
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 	scainternal "github.com/KubeRocketCI/cli/pkg/cmd/sca/internal"
 )
@@ -22,7 +21,7 @@ import (
 // GetOptions holds all inputs for `krci sca get <codebase>`.
 type GetOptions struct {
 	IO           *iostreams.IOStreams
-	RestClient   func() (*restapi.ClientWithResponses, error)
+	Services     func() (*portal.Services, error)
 	Codebase     string
 	Branch       string
 	OutputFormat string
@@ -31,8 +30,8 @@ type GetOptions struct {
 // NewCmdGet returns the "sca get" cobra.Command.
 func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command {
 	opts := &GetOptions{
-		IO:         f.IOStreams,
-		RestClient: f.RestClient,
+		IO:       f.IOStreams,
+		Services: f.Services,
 	}
 
 	cmd := &cobra.Command{
@@ -73,12 +72,12 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 }
 
 func getRun(ctx context.Context, opts *GetOptions) error {
-	client, err := opts.RestClient()
+	services, err := opts.Services()
 	if err != nil {
 		return scainternal.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
-	detail, err := portal.NewSCAService(client).Get(ctx, opts.Codebase, opts.Branch)
+	detail, err := services.SCA().Get(ctx, opts.Codebase, opts.Branch)
 	if err != nil {
 		return scainternal.HandleError(opts.IO, opts.OutputFormat, err)
 	}

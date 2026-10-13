@@ -13,7 +13,6 @@ import (
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 	sonarinternal "github.com/KubeRocketCI/cli/pkg/cmd/sonar/internal"
 )
@@ -27,7 +26,7 @@ const (
 // IssuesOptions holds all inputs for `krci sonar issues <project>`.
 type IssuesOptions struct {
 	IO           *iostreams.IOStreams
-	RestClient   func() (*restapi.ClientWithResponses, error)
+	Services     func() (*portal.Services, error)
 	Project      string
 	PullRequest  string
 	Branch       string
@@ -53,8 +52,8 @@ func (o *IssuesOptions) Normalized() portal.SonarIssuesParams { return o.normali
 // NewCmdIssues returns the "sonar issues" cobra.Command.
 func NewCmdIssues(f *cmdutil.Factory, runF func(*IssuesOptions) error) *cobra.Command {
 	opts := &IssuesOptions{
-		IO:         f.IOStreams,
-		RestClient: f.RestClient,
+		IO:       f.IOStreams,
+		Services: f.Services,
 	}
 
 	cmd := &cobra.Command{
@@ -164,12 +163,12 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*IssuesOptions) error) *cobra.Co
 }
 
 func issuesRun(ctx context.Context, opts *IssuesOptions) error {
-	client, err := opts.RestClient()
+	services, err := opts.Services()
 	if err != nil {
 		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
-	svc := portal.NewSonarService(client)
+	svc := services.Sonar()
 
 	result, err := svc.Issues(ctx, opts.normalized)
 	if err != nil {

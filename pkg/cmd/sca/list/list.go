@@ -13,7 +13,6 @@ import (
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 	scainternal "github.com/KubeRocketCI/cli/pkg/cmd/sca/internal"
 )
@@ -24,7 +23,7 @@ const defaultListPageSize = 25
 // ListOptions holds all inputs for `krci sca list`.
 type ListOptions struct {
 	IO              *iostreams.IOStreams
-	RestClient      func() (*restapi.ClientWithResponses, error)
+	Services        func() (*portal.Services, error)
 	Page            int
 	PageSize        int
 	Search          string
@@ -36,8 +35,8 @@ type ListOptions struct {
 // NewCmdList returns the "sca list" cobra.Command.
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
-		IO:         f.IOStreams,
-		RestClient: f.RestClient,
+		IO:       f.IOStreams,
+		Services: f.Services,
 	}
 
 	cmd := &cobra.Command{
@@ -87,12 +86,12 @@ By default excludes inactive projects and child versions.`,
 }
 
 func listRun(ctx context.Context, opts *ListOptions) error {
-	client, err := opts.RestClient()
+	services, err := opts.Services()
 	if err != nil {
 		return scainternal.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
-	result, err := portal.NewSCAService(client).List(ctx, portal.SCAListParams{
+	result, err := services.SCA().List(ctx, portal.SCAListParams{
 		Page:            opts.Page,
 		PageSize:        opts.PageSize,
 		Search:          opts.Search,
