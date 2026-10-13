@@ -152,6 +152,9 @@ func TestStoreLoadCorruptedAutoCleanup(t *testing.T) {
 	assert.True(t, os.IsNotExist(err), "corrupted token file was not removed")
 }
 
+// errDecryptFailed wraps ErrInvalidCiphertext, so Load removes the file on it.
+var errDecryptFailed = fmt.Errorf("%w: decrypt failed", ErrInvalidCiphertext)
+
 // stubEncryptor fails every Decrypt with decryptErr, after running onDecrypt.
 type stubEncryptor struct {
 	decryptErr error
@@ -177,17 +180,60 @@ func TestStoreLoadUndecryptableWarning(t *testing.T) {
 	require.NoError(t, os.WriteFile(path, []byte("ciphertext"), 0600))
 
 	var buf bytes.Buffer
-	store := NewEncryptedStore(path, &stubEncryptor{decryptErr: errors.New("decrypt failed")}, &buf)
+	store := NewEncryptedStore(path, &stubEncryptor{decryptErr: errDecryptFailed}, &buf)
 
 	_, err := store.Load()
 	require.ErrorIs(t, err, ErrNoToken)
 
-	want := fmt.Sprintf("Warning: removing undecryptable token file (%s): decrypt failed\n"+
-		"  Run 'krci auth login' to re-authenticate.\n", path)
+	want := fmt.Sprintf("Warning: removing undecryptable token file (%s): %v\n"+
+		"  Run 'krci auth login' to re-authenticate.\n", path, errDecryptFailed)
 	assert.Equal(t, want, buf.String())
 
 	_, statErr := os.Stat(path)
 	assert.True(t, os.IsNotExist(statErr), "undecryptable token file was not removed")
+}
+
+func TestStoreLoadKeyErrorKeepsFile(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "tokens.enc")
+	require.NoError(t, os.WriteFile(path, []byte("ciphertext"), 0600))
+
+	cause := errors.New("getting encryption key: reading key file: permission denied")
+
+	var buf bytes.Buffer
+	store := NewEncryptedStore(path, &stubEncryptor{decryptErr: cause}, &buf)
+
+	_, err := store.Load()
+	require.ErrorIs(t, err, cause)
+	require.NotErrorIs(t, err, ErrNoToken)
+	assert.EqualError(t, err, "decrypting token: "+cause.Error())
+	assert.Empty(t, buf.String())
+
+	data, readErr := os.ReadFile(path)
+	require.NoError(t, readErr, "token file was removed on a key failure")
+	assert.Equal(t, []byte("ciphertext"), data)
+}
+
+func TestStoreLoadMalformedKeyFileKeepsFile(t *testing.T) {
+	t.Setenv("KRCI_KEYRING_BACKEND", "file")
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".keyfile"), []byte("not-base64!"), 0600))
+
+	path := filepath.Join(dir, "tokens.enc")
+	require.NoError(t, os.WriteFile(path, bytes.Repeat([]byte("x"), 64), 0600))
+
+	var buf bytes.Buffer
+	store := NewEncryptedStore(path, NewAESEncryptor("krci-test", dir, &buf), &buf)
+
+	_, err := store.Load()
+	require.ErrorContains(t, err, "decrypting token: getting encryption key: decoding key: ")
+	require.NotErrorIs(t, err, ErrNoToken)
+	assert.Empty(t, buf.String())
+
+	_, statErr := os.Stat(path)
+	assert.NoError(t, statErr, "token file was removed on a key failure")
 }
 
 func TestStoreLoadRemoveFailureWarning(t *testing.T) {
@@ -198,7 +244,7 @@ func TestStoreLoadRemoveFailureWarning(t *testing.T) {
 
 	// Replaces the file with a non-empty directory after it was read, so the removal fails.
 	enc := &stubEncryptor{
-		decryptErr: errors.New("decrypt failed"),
+		decryptErr: errDecryptFailed,
 		onDecrypt: func() {
 			require.NoError(t, os.Remove(path))
 			require.NoError(t, os.Mkdir(path, 0700))
@@ -215,9 +261,9 @@ func TestStoreLoadRemoveFailureWarning(t *testing.T) {
 	removeErr := os.Remove(path)
 	require.Error(t, removeErr)
 
-	want := fmt.Sprintf("Warning: removing undecryptable token file (%s): decrypt failed\n"+
+	want := fmt.Sprintf("Warning: removing undecryptable token file (%s): %v\n"+
 		"  Run 'krci auth login' to re-authenticate.\n"+
-		"Warning: could not remove corrupted file: %v\n", path, removeErr)
+		"Warning: could not remove corrupted file: %v\n", path, errDecryptFailed, removeErr)
 	assert.Equal(t, want, buf.String())
 }
 
@@ -251,7 +297,7 @@ func TestStoreLoadConcurrentCorruptFileWarnsOnce(t *testing.T) {
 
 	// The delay keeps every unserialised caller inside Decrypt until all of them have read the file.
 	enc := &stubEncryptor{
-		decryptErr: errors.New("decrypt failed"),
+		decryptErr: errDecryptFailed,
 		onDecrypt:  func() { time.Sleep(20 * time.Millisecond) },
 	}
 
@@ -302,7 +348,7 @@ func TestStoreSaveWaitsForInFlightLoad(t *testing.T) {
 	)
 
 	enc := &stubEncryptor{
-		decryptErr: errors.New("decrypt failed"),
+		decryptErr: errDecryptFailed,
 		onDecrypt: func() {
 			close(entered)
 			<-release
