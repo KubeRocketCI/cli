@@ -39,7 +39,8 @@ func NewFactory() *cmdutil.Factory {
 
 // NewPortalFactory returns NewFactory with a RestClient that talks to a mock
 // portal served by handler, and the buffer stdout is written to. Use it to
-// drive a verb's own run function.
+// drive a verb's own run function. Services is built from that RestClient and
+// the NewFactory config resolver.
 func NewPortalFactory(t *testing.T, handler http.Handler) (*cmdutil.Factory, *bytes.Buffer) {
 	t.Helper()
 

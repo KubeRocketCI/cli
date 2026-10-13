@@ -10,11 +10,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
-	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/discovery"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
@@ -22,8 +20,7 @@ import (
 // ListOptions holds all inputs for `krci project versions <project>`.
 type ListOptions struct {
 	IO           *iostreams.IOStreams
-	RestClient   func() (*restapi.ClientWithResponses, error)
-	Config       func() (*config.Config, error)
+	Services     func() (*portal.Services, error)
 	Project      string
 	Branch       string
 	OutputFormat string
@@ -33,9 +30,8 @@ type ListOptions struct {
 // runF is the business-logic function; pass nil to use the default run.
 func NewCmdVersions(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
-		IO:         f.IOStreams,
-		RestClient: f.RestClient,
-		Config:     f.Config,
+		IO:       f.IOStreams,
+		Services: f.Services,
 	}
 
 	cmd := &cobra.Command{
@@ -97,17 +93,12 @@ newest first.`,
 }
 
 func listRun(ctx context.Context, opts *ListOptions) error {
-	cfg, err := opts.Config()
+	services, err := opts.Services()
 	if err != nil {
 		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
-	client, err := opts.RestClient()
-	if err != nil {
-		return render.HandleError(opts.IO, opts.OutputFormat, err)
-	}
-
-	svc := portal.NewProjectVersionsService(client, cfg.ClusterName, cfg.Namespace)
+	svc := services.ProjectVersions()
 
 	streams, err := svc.List(ctx, opts.Project, opts.Branch)
 	if err != nil {

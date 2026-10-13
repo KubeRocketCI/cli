@@ -12,19 +12,16 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
-	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 // GetOptions holds all inputs for the deployment get command.
 type GetOptions struct {
 	IO           *iostreams.IOStreams
-	RestClient   func() (*restapi.ClientWithResponses, error)
-	Config       func() (*config.Config, error)
+	Services     func() (*portal.Services, error)
 	Name         string
 	OutputFormat string
 }
@@ -33,9 +30,8 @@ type GetOptions struct {
 // runF is the business logic function; pass nil to use the default getRun.
 func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command {
 	opts := &GetOptions{
-		IO:         f.IOStreams,
-		RestClient: f.RestClient,
-		Config:     f.Config,
+		IO:       f.IOStreams,
+		Services: f.Services,
 	}
 
 	cmd := &cobra.Command{
@@ -64,17 +60,12 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 }
 
 func getRun(ctx context.Context, opts *GetOptions) error {
-	cfg, err := opts.Config()
+	services, err := opts.Services()
 	if err != nil {
 		return err
 	}
 
-	client, err := opts.RestClient()
-	if err != nil {
-		return err
-	}
-
-	svc := portal.NewDeploymentService(client, cfg.ClusterName, cfg.Namespace)
+	svc := services.Deployment()
 
 	detail, err := svc.Get(ctx, opts.Name)
 	if err != nil {

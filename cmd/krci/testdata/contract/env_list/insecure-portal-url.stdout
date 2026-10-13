@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "1",
+  "error": {
+    "message": "invalid portal URL: must use https, or http on localhost or a loopback IP: http://portal.example.com"
+  }
+}

@@ -392,6 +392,34 @@ func TestFactoryServices_VerifySessionReachesPortal(t *testing.T) {
 	assert.Equal(t, "Bearer test-token", gotAuth)
 }
 
+func TestFactoryServices_TargetFromConfig(t *testing.T) {
+	t.Parallel()
+
+	var cluster, namespace atomic.Value
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			ClusterName string `json:"clusterName"`
+			Namespace   string `json:"namespace"`
+		}
+
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		cluster.Store(body.ClusterName)
+		namespace.Store(body.Namespace)
+
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	t.Cleanup(srv.Close)
+
+	services, err := newGatedFactory(srv.URL).Services()
+	require.NoError(t, err)
+
+	_, err = services.Project().List(t.Context())
+	require.ErrorIs(t, err, portal.ErrUnauthorized)
+	assert.Equal(t, "c", cluster.Load())
+	assert.Equal(t, "ns", namespace.Load())
+}
+
 // TestNew_SetsEveryFuncField: every exported func field of a Factory built by
 // New is non-nil.
 func TestNew_SetsEveryFuncField(t *testing.T) {
