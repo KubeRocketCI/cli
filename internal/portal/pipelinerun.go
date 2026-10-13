@@ -86,19 +86,6 @@ var pipelineRunResourceConfig = restapi.K8sListJSONBody{
 	},
 }
 
-// Option configures service constructors.
-type Option func(*options)
-
-type options struct {
-	now func() time.Time
-}
-
-// WithNow sets the clock that measures the duration of runs still in progress.
-// Default: time.Now. now must be non-nil.
-func WithNow(now func() time.Time) Option {
-	return func(o *options) { o.now = now }
-}
-
 // PipelineRunService provides access to pipeline run data via the portal's REST API.
 type PipelineRunService struct {
 	client      *restapi.ClientWithResponses
@@ -112,10 +99,7 @@ type PipelineRunService struct {
 func NewPipelineRunService(
 	client *restapi.ClientWithResponses, portalURL, clusterName, namespace string, opts ...Option,
 ) *PipelineRunService {
-	o := options{now: time.Now}
-	for _, opt := range opts {
-		opt(&o)
-	}
+	o := applyOptions(opts)
 
 	return &PipelineRunService{
 		client:      client,

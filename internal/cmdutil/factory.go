@@ -24,7 +24,8 @@ const DefaultHTTPTimeout = 45 * time.Second
 
 // Factory holds lazy-func dependencies shared across all CLI commands.
 // Config memoizes the first successful result and retries after a failure;
-// TokenProvider and RestClient memoize their first result, including an error.
+// TokenProvider, RestClient and Services memoize their first result, including
+// an error.
 // Commands copy the func values when NewCmdRoot builds the tree; reassigning a
 // field afterwards does not reach them. Set the config source through
 // SetConfigResolver.
@@ -33,6 +34,10 @@ type Factory struct {
 	Config        func() (*config.Config, error)
 	TokenProvider func() (auth.TokenProvider, error)
 	RestClient    func() (*restapi.ClientWithResponses, error)
+
+	// Services returns the portal services of the configured target over
+	// RestClient, so it passes the same configuration gate.
+	Services func() (*portal.Services, error)
 
 	// Now is the clock for running pipeline-run durations. Default: time.Now.
 	// Set it before the command is built.
@@ -44,9 +49,9 @@ type Factory struct {
 }
 
 // New creates a Factory over ios, which must be non-nil.
-// Config, TokenProvider, and RestClient resolve on first call, from a command's
-// run function after Cobra has parsed flags. Config reads from the resolver set
-// by SetConfigResolver and memoizes the first successful result.
+// Every func field except Now resolves on first call, from a command's run
+// function after Cobra has parsed flags. Config reads from the resolver set by
+// SetConfigResolver and memoizes the first successful result.
 func New(ios *iostreams.IOStreams) *Factory {
 	f := &Factory{
 		IOStreams: ios,
@@ -152,6 +157,36 @@ func New(ios *iostreams.IOStreams) *Factory {
 		})
 
 		return cachedRest, cachedRestErr
+	}
+
+	var (
+		onceServices      sync.Once
+		cachedServices    *portal.Services
+		cachedServicesErr error
+	)
+
+	f.Services = func() (*portal.Services, error) {
+		onceServices.Do(func() {
+			client, err := f.RestClient()
+			if err != nil {
+				cachedServicesErr = err
+				return
+			}
+
+			cfg, err := f.Config()
+			if err != nil {
+				cachedServicesErr = err
+				return
+			}
+
+			cachedServices = portal.NewServices(client, portal.Target{
+				PortalURL: cfg.PortalURL,
+				Cluster:   cfg.ClusterName,
+				Namespace: cfg.Namespace,
+			}, portal.WithNow(f.Now))
+		})
+
+		return cachedServices, cachedServicesErr
 	}
 
 	return f
