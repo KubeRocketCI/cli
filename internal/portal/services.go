@@ -2,6 +2,7 @@ package portal
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
@@ -51,9 +52,14 @@ func NewServices(client *restapi.ClientWithResponses, target Target, opts ...Opt
 	return &Services{client: client, target: target, now: o.now}
 }
 
-// VerifySession calls the authenticated config endpoint, so the portal
-// validates the client's bearer token. ErrUnauthorized means the portal
+// VerifySession calls the authenticated /rest/v1/config endpoint, so the
+// portal validates the client's bearer token. ErrUnauthorized means the portal
 // rejected the token.
 func (s *Services) VerifySession(ctx context.Context) error {
-	return VerifySession(ctx, s.client)
+	resp, err := s.client.ConfigGetWithResponse(ctx)
+	if err != nil {
+		return fmt.Errorf("requesting cluster config: %w", err)
+	}
+
+	return checkResponse(resp.StatusCode(), resp.Body)
 }
