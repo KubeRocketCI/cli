@@ -2,8 +2,11 @@ package portal
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -42,10 +45,20 @@ func TestFetchOIDCConfig(t *testing.T) {
 		{
 			name: "invalid JSON",
 			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
 				w.Write([]byte(`not json`))
 			},
 			wantErr:    true,
 			wantErrMsg: "parsing OIDC config",
+		},
+		{
+			name: "web page",
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.Write([]byte(`<!doctype html><html></html>`))
+			},
+			wantErr:    true,
+			wantErrMsg: `unexpected portal response: HTTP 200 with Content-Type "text/html; charset=utf-8", not JSON`,
 		},
 		{
 			name: "empty issuer URL",
@@ -129,10 +142,20 @@ func TestFetchClusterConfig(t *testing.T) {
 		{
 			name: "invalid JSON",
 			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
 				w.Write([]byte(`not json`))
 			},
 			wantErr:    true,
 			wantErrMsg: "parsing cluster config",
+		},
+		{
+			name: "web page",
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.Write([]byte(`<!doctype html><html></html>`))
+			},
+			wantErr:    true,
+			wantErrMsg: `unexpected portal response: HTTP 200 with Content-Type "text/html; charset=utf-8", not JSON`,
 		},
 	}
 
@@ -288,4 +311,26 @@ func TestRestURL(t *testing.T) {
 		restURL("https://portal.example.com", "/v1/config/oidc"))
 	assert.Equal(t, "https://portal.example.com/rest/v1/config",
 		restURL("https://portal.example.com", "/v1/config"))
+}
+
+func TestFetchConfig_BodyCap(t *testing.T) {
+	t.Parallel()
+
+	body := `{"pad":"` + strings.Repeat("x", maxConfigBodyBytes) + `"}`
+
+	for name, tc := range fetchers {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, body)
+			}))
+			t.Cleanup(srv.Close)
+
+			err := tc.fetch(t.Context(), srv.URL)
+			require.ErrorIs(t, err, ErrResponseTooLarge)
+			assert.ErrorContains(t, err, fmt.Sprintf("more than %d bytes", maxConfigBodyBytes))
+		})
+	}
 }

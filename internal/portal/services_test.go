@@ -49,8 +49,10 @@ func TestServices_VerifySession(t *testing.T) {
 		{name: "forbidden with malformed JSON", status: http.StatusForbidden, contentType: "application/json",
 			body: `{"error":`, wantErr: ErrPermissionDenied},
 		{name: "200 page instead of config", status: http.StatusOK, contentType: "text/html; charset=utf-8",
-			body: "<!doctype html><html></html>", wantErrMsg: "parsing cluster config: "},
-		{name: "200 without body", status: http.StatusOK, wantErrMsg: "parsing cluster config: "},
+			body: "<!doctype html><html></html>", wantErr: ErrUnexpectedResponse},
+		{name: "200 without body", status: http.StatusOK, wantErr: ErrUnexpectedResponse},
+		{name: "200 JSON without body", status: http.StatusOK, contentType: "application/json",
+			wantErrMsg: "parsing cluster config: "},
 		{name: "200 JSON null", status: http.StatusOK, contentType: "application/json", body: `null`,
 			wantErrMsg: "parsing cluster config: response lacks"},
 		{name: "200 empty JSON object", status: http.StatusOK, contentType: "application/json", body: `{}`,
@@ -79,7 +81,7 @@ func TestServices_VerifySession(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			client, err := restapi.NewClientWithResponses(srv.URL + "/rest")
+			client, err := NewRestClient(srv.URL+"/rest", 5*time.Second)
 			require.NoError(t, err)
 
 			err = NewServices(client, Target{}).VerifySession(t.Context())
@@ -219,7 +221,7 @@ func TestServices_Accessors(t *testing.T) {
 			}))
 			t.Cleanup(srv.Close)
 
-			client, err := restapi.NewClientWithResponses(srv.URL + "/rest")
+			client, err := NewRestClient(srv.URL+"/rest", 5*time.Second)
 			require.NoError(t, err)
 
 			require.ErrorIs(t, tt.call(t.Context(), NewServices(client, target)), ErrUnauthorized)

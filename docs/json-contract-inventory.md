@@ -230,6 +230,8 @@ Schema: [json-schemas.md](json-schemas.md#krci-deployment-list)
 |---|---|---|---|---|
 | deployments | `krci deployment list -o json` | 0 | bare | empty |
 | unauthorized | `krci deployment list -o json` | 1 | empty | `Error: authentication required: unauthorized: please run 'krci auth login'` |
+| unauthorized-plain-body | `krci deployment list -o json` | 1 | empty | `Error: authentication required: unauthorized: please run 'krci auth login'` |
+| page-not-json | `krci deployment list -o json` | 1 | empty | `Error: listing cdpipelines: unexpected portal response: HTTP 200 with Content-Type "text/html; charset=utf-8", not JSON` |
 | unknown-format | `krci deployment list -o xml` | 1 | empty | `Error: unknown output format: xml (use 'json' or 'table')` |
 
 ## `krci deployment get`
@@ -240,6 +242,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-deployment-get-name)
 |---|---|---|---|---|
 | detail | `krci deployment get my-pipeline -o json` | 0 | bare | empty |
 | no-stages | `krci deployment get api-pipeline -o json` | 0 | bare | empty |
+| stages-page-not-json | `krci deployment get my-pipeline -o json` | 1 | empty | `Error: listing stages for cdpipeline "my-pipeline": unexpected portal response: HTTP 200 with Content-Type "text/html; charset=utf-8", not JSON` |
 | not-found | `krci deployment get my-pipeline -o json` | 1 | empty | `Error: deployment "my-pipeline" not found` |
 | unauthorized | `krci deployment get my-pipeline -o json` | 1 | empty | `Error: authentication required: unauthorized: please run 'krci auth login'` |
 | unknown-format | `krci deployment get my-pipeline -o xml` | 1 | empty | `Error: unknown output format: xml (use 'json' or 'table')` |

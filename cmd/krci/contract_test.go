@@ -280,10 +280,15 @@ var contractRows = []contractRow{
 
 	{cmd: cmdDeploymentList, format: formatJSON, fixture: "project", name: "deployments"},
 	{cmd: cmdDeploymentList, format: formatJSON, fixture: "cdpipelines-401", wantExit: 1, name: nameUnauthorized},
+	{cmd: cmdDeploymentList, format: formatJSON, fixture: "cdpipelines-401-plain", wantExit: 1,
+		name: "unauthorized-plain-body"},
+	{cmd: cmdDeploymentList, format: formatJSON, fixture: "cdpipelines-page", wantExit: 1, name: "page-not-json"},
 	{cmd: cmdDeploymentList, format: formatUnknown, fixture: "project", wantExit: 1, name: nameUnknownFormat},
 	{cmd: cmdDeploymentGet, args: []string{envDeployment}, format: formatJSON, fixture: "env", name: "detail"},
 	{cmd: cmdDeploymentGet, args: []string{emptyDeployment}, format: formatJSON, fixture: "project",
 		name: "no-stages"},
+	{cmd: cmdDeploymentGet, args: []string{envDeployment}, format: formatJSON, fixture: "stages-page", wantExit: 1,
+		name: "stages-page-not-json"},
 	{cmd: cmdDeploymentGet, args: []string{envDeployment}, format: formatJSON, fixture: "cdpipeline-404",
 		wantExit: 1, name: nameNotFound},
 	{cmd: cmdDeploymentGet, args: []string{envDeployment}, format: formatJSON, fixture: "cdpipeline-401",
@@ -302,13 +307,14 @@ var contractRows = []contractRow{
 // of the POST body or the namespace query, empty for an endpoint that names
 // none. query is a substring of the raw query. params, when set, is the exact
 // set of query parameters. bodyContains are substrings of the raw request
-// body. status 0 is 200. body is the response, served as JSON.
+// body. status 0 is 200. body is the response, served as contentType, empty
+// for JSON.
 type route struct {
 	method, path, kind, name, namespace, query string
 	params                                     url.Values
 	bodyContains                               []string
 	status                                     int
-	body                                       string
+	body, contentType                          string
 }
 
 // request is what a route matches besides the method, path and raw query.
@@ -351,6 +357,7 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 	}
 
 	unauthorized := file("unauthorized")
+	unauthorizedPlain := file("unauthorized-plain")
 	notFound := file("not-found")
 	fail := func(rt route, status int, body string) route {
 		rt.status, rt.body = status, body
@@ -358,6 +365,12 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 		return rt
 	}
 	deny := func(rt route) route { return fail(rt, http.StatusUnauthorized, unauthorized) }
+	// A proxy or SPA fallback answering 200 with a web page.
+	page := func(rt route) route {
+		rt.body, rt.contentType = "<!doctype html><html></html>", "text/html; charset=utf-8"
+
+		return rt
+	}
 	missing := func(rt route) route { return fail(rt, http.StatusNotFound, notFound) }
 	denyAll := func(rts []route) []route {
 		out := make([]route, 0, len(rts))
@@ -483,16 +496,20 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 		"codebase-401":         append(denyAll([]route{codebases, codebase}), project...),
 		"image-streams-401":    append([]route{deny(streams)}, project...),
 		"cdpipelines-401":      append([]route{deny(cdpipelines)}, project...),
-		"config":               {cfgRoute},
-		"none":                 {},
-		"config-401":           {deny(cfgRoute)},
-		"sonar":                sonar,
-		"sonar-401":            denyAll(sonar),
-		"sca":                  sca,
-		"sca-401":              denyAll(sca),
-		"sca-502":              {fail(scaList, http.StatusBadGateway, file("sca-bad-gateway"))},
-		"sca-503":              {fail(scaList, http.StatusServiceUnavailable, file("sca-unavailable"))},
-		"sca-504":              {fail(scaList, http.StatusGatewayTimeout, file("sca-gateway-timeout"))},
+		"cdpipelines-401-plain": append([]route{
+			fail(cdpipelines, http.StatusUnauthorized, unauthorizedPlain)}, project...),
+		"cdpipelines-page": append([]route{page(cdpipelines)}, project...),
+		"stages-page":      append([]route{page(stages)}, env...),
+		"config":           {cfgRoute},
+		"none":             {},
+		"config-401":       {deny(cfgRoute)},
+		"sonar":            sonar,
+		"sonar-401":        denyAll(sonar),
+		"sca":              sca,
+		"sca-401":          denyAll(sca),
+		"sca-502":          {fail(scaList, http.StatusBadGateway, file("sca-bad-gateway"))},
+		"sca-503":          {fail(scaList, http.StatusServiceUnavailable, file("sca-unavailable"))},
+		"sca-504":          {fail(scaList, http.StatusGatewayTimeout, file("sca-gateway-timeout"))},
 	}, files
 }
 
@@ -530,7 +547,7 @@ func portalStub(t *testing.T, routes []route, cluster, token string) http.Handle
 
 		for _, rt := range routes {
 			if rt.matches(r, req) {
-				w.Header().Set("Content-Type", "application/json")
+				w.Header().Set("Content-Type", cmp.Or(rt.contentType, "application/json"))
 				w.WriteHeader(cmp.Or(rt.status, http.StatusOK))
 				_, _ = io.WriteString(w, rt.body)
 

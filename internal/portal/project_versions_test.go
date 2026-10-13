@@ -6,8 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
-
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
+	"time"
 )
 
 type tagStub struct {
@@ -123,7 +122,7 @@ func newProjectVersionsServiceForTest(t *testing.T, rec *envTestRecorder) (*Proj
 
 	url, closer := newEnvTestServer(t, rec)
 
-	client, err := restapi.NewClientWithResponses(url + "/rest")
+	client, err := NewRestClient(url+"/rest", 5*time.Second)
 	if err != nil {
 		closer()
 		t.Fatalf("new client: %v", err)

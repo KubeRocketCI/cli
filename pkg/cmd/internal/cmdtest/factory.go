@@ -13,6 +13,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
 	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
+	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 )
 
@@ -52,7 +53,7 @@ func NewPortalFactory(t *testing.T, handler http.Handler) (*cmdutil.Factory, *by
 	f := NewFactory()
 	f.IOStreams.Out = out
 	f.RestClient = func() (*restapi.ClientWithResponses, error) {
-		return restapi.NewClientWithResponses(srv.URL)
+		return portal.NewRestClient(srv.URL, cmdutil.DefaultHTTPTimeout)
 	}
 
 	return f, out
