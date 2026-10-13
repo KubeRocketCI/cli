@@ -18,6 +18,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
 
 	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/token"
@@ -707,4 +708,46 @@ func TestUserInfoUsesTheRefreshedTokenWhenSaveFails(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "user@example.com", info.Email)
 	assert.True(t, info.ExpiresAt.After(time.Now().Add(time.Minute)), "ExpiresAt = %s", info.ExpiresAt)
+}
+
+func TestRefreshCallsIdPInsideExpiryMargin(t *testing.T) {
+	t.Parallel()
+
+	idp, calls := newCountingRefreshIDP(t, oldRefreshToken, 0)
+
+	stored := refreshableStoredToken(idp.URL, 20*time.Second)
+	require.False(t, stored.Valid(), "the CLI must treat the token as expiring")
+	require.True(t, (&oauth2.Token{AccessToken: stored.AccessToken, Expiry: stored.ExpiresAt}).Valid(),
+		"oauth2 must still treat the token as valid")
+
+	store := &mockStore{tok: stored}
+	tp := NewTokenProvider(store, &config.Config{PortalURL: portalA}, io.Discard)
+
+	refreshed, err := tp.resolveStoredToken(oidc.ClientContext(t.Context(), idp.Client()))
+	require.NoError(t, err)
+
+	assert.Equal(t, int32(1), calls.Load(), "token requests to the IdP")
+	assert.Equal(t, "new-access", refreshed.AccessToken)
+	assert.True(t, refreshed.ExpiresAt.After(time.Now().Add(time.Hour-time.Minute)), "ExpiresAt = %s", refreshed.ExpiresAt)
+	assert.Equal(t, "new-access", store.tok.AccessToken, "the refreshed token is saved")
+}
+
+func TestGetTokenWithoutExpirySkipsRefresh(t *testing.T) {
+	t.Parallel()
+
+	idp, calls := newCountingRefreshIDP(t, oldRefreshToken, 0)
+
+	stored := refreshableStoredToken(idp.URL, 0)
+	stored.ExpiresAt = time.Time{}
+
+	tp := NewTokenProvider(&mockStore{tok: stored}, &config.Config{PortalURL: portalA}, io.Discard)
+	ctx := oidc.ClientContext(t.Context(), idp.Client())
+
+	for range 3 {
+		tok, err := tp.GetToken(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, stored.IDToken, tok)
+	}
+
+	assert.Zero(t, calls.Load(), "token requests to the IdP")
 }

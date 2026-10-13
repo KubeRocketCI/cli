@@ -237,8 +237,8 @@ func (p *tokenProvider) loadStored() (*token.StoredToken, error) {
 	return stored, nil
 }
 
-// refresh uses the OIDC refresh_token grant to obtain new tokens.
-// oauth2.TokenSource handles the grant automatically.
+// refresh runs the OIDC refresh_token grant against the IdP. The token source
+// holds only the refresh token, which oauth2 never treats as valid.
 // The caller has already rejected a token not bound to the configured
 // portal, so the refreshed token is bound to the configured one.
 func (p *tokenProvider) refresh(ctx context.Context, stored *token.StoredToken) (*token.StoredToken, error) {
@@ -256,7 +256,7 @@ func (p *tokenProvider) refresh(ctx context.Context, stored *token.StoredToken) 
 		Endpoint: provider.Endpoint(),
 	}
 
-	src := oauthCfg.TokenSource(ctx, stored.ToOAuth2Token())
+	src := oauthCfg.TokenSource(ctx, &oauth2.Token{RefreshToken: stored.RefreshToken})
 	newTok, err := src.Token()
 	if err != nil {
 		return nil, err
