@@ -16,7 +16,6 @@ import (
 	"charm.land/lipgloss/v2/table"
 	"gopkg.in/yaml.v3"
 
-	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/internal/termseq"
 )
 
@@ -444,47 +443,6 @@ func PrintYAML(w io.Writer, v any) error {
 	}
 
 	return enc.Close()
-}
-
-// SCASeverityColor colorizes a Dep-Track vulnerability severity for TTY
-// rendering. An unknown severity is made printable on one row and left
-// unstyled, so a future value never breaks a renderer.
-//
-//	CRITICAL  → red         HIGH      → yellow
-//	MEDIUM    → blue        LOW       → gray
-//	INFO      → gray        UNASSIGNED→ gray
-func SCASeverityColor(severity string) Cell {
-	switch strings.ToUpper(severity) {
-	case "CRITICAL":
-		return Red(severity)
-	case "HIGH":
-		return Yellow(severity)
-	case "MEDIUM":
-		return Blue(severity)
-	case "LOW", "INFO", "UNASSIGNED":
-		return Gray(severity)
-	default:
-		return Text(severity)
-	}
-}
-
-// SonarGateStatusColor colorizes a SonarQube quality-gate / issue status value.
-// An unknown value is made printable on one row and left unstyled.
-func SonarGateStatusColor(status portal.QualityGateStatus) Cell {
-	s := string(status)
-
-	switch status {
-	case portal.QualityGateOK:
-		return Green(s)
-	case portal.QualityGateWarn:
-		return Yellow(s)
-	case portal.QualityGateError:
-		return Red(s)
-	case portal.QualityGateNone:
-		return Gray(s)
-	default:
-		return Text(s)
-	}
 }
 
 // DetailLine holds one label-value pair for resource detail rendering.

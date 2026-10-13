@@ -8,6 +8,7 @@ import (
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/cmdtest"
+	scainternal "github.com/KubeRocketCI/cli/pkg/cmd/sca/internal"
 	"github.com/KubeRocketCI/cli/pkg/cmd/sca/internal/scatestutil"
 )
 
@@ -169,7 +170,7 @@ func TestSeverityRow(t *testing.T) {
 
 	// count>0: Value is the count, Styled is "<count> <badge>".
 	p := severityRow("Critical", "CRITICAL", 3)
-	want := output.Concat(output.Text("3 "), output.SCASeverityColor("CRITICAL"))
+	want := output.Concat(output.Text("3 "), scainternal.SeverityColor("CRITICAL"))
 	if p.Label != "Critical" || p.Value != "3" || p.Styled != want {
 		t.Errorf("severityRow = %+v, want Styled %+v", p, want)
 	}

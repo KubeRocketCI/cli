@@ -3,6 +3,7 @@ package scainternal
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
@@ -77,6 +78,24 @@ func FormatRisk(r float32) string {
 		return EmptyPlaceholder
 	}
 	return fmt.Sprintf("%.1f", r)
+}
+
+// SeverityColor colors a Dep-Track vulnerability severity, matched
+// case-insensitively. An unknown severity is made printable on one row and left
+// unstyled.
+func SeverityColor(severity string) output.Cell {
+	switch strings.ToUpper(severity) {
+	case "CRITICAL":
+		return output.Red(severity)
+	case "HIGH":
+		return output.Yellow(severity)
+	case "MEDIUM":
+		return output.Blue(severity)
+	case "LOW", "INFO", "UNASSIGNED":
+		return output.Gray(severity)
+	default:
+		return output.Text(severity)
+	}
 }
 
 // FormatVulnCounts renders the C/H/M/L vulnerability counts column. The styled

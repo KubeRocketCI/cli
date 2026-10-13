@@ -23,11 +23,11 @@ Portal-only: CLI talks exclusively to the portal tRPC API (Bearer idToken). No d
 - `internal/config/` — Viper-based config: flags > env vars > config file > defaults
 - `internal/termseq/` — the terminal sequence policy: which SGR parameters and OSC 8 targets pass. Both the streams and the output primitives call it.
 - `internal/iostreams/` — process streams. `FromWriters` builds stdout and stderr as the terminal policy (`terminal.go`: what may reach a terminal) followed by one colour profile; `New` is the raw form for tests. Write styled text with `fmt`; `lipgloss.Fprint*` is banned.
-- `internal/output/` — terminal primitives (tables, detail lines, headings, styles); each takes an `io.Writer` and the TTY state. No `-o` knowledge.
+- `internal/output/` — terminal primitives (`Cell`, tables, detail lines, headings, styles); each takes an `io.Writer` and the TTY state. No `-o` knowledge. A `Cell`'s styled form is built only here; cluster text enters through `Text`, `Hyperlink` and the color constructors.
 - `pkg/cmd/internal/render/` — the CLI output contract: `-o` names, validation and dispatch, the `{schemaVersion, data}` and error envelopes, the auth-error prefix. Every `-o` decision goes through it; the JSON and YAML encoders stay in `output`.
 - `pkg/cmd/<group>/<verb>/` — commands export `NewCmd<Verb>(f, runF)`. Follow existing as examples.
 
-depguard enforces the split: `output` imports neither `iostreams` nor `cmdutil`, `cmdutil` does not import `output`, `render` does not import `cmdutil`, `colorprofile` is imported only by `iostreams`.
+depguard (rules in `.golangci.yml`) enforces the split: `output` imports none of `portal`, `iostreams`, `cmdutil`; `portal` imports neither `output` nor `iostreams`; `cmdutil` does not import `output`; `render` does not import `cmdutil`; `colorprofile` is imported only by `iostreams`.
 
 ### Factory validation gate
 

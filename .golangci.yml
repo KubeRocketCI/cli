@@ -122,12 +122,6 @@ linters:
           - forbidigo
         path-except: ^internal/(token|auth)/
         text: io\.Writer passed in by the caller
-      # Baseline: internal/output imports internal/portal. Delete when the
-      # status colors move out of internal/output.
-      - linters:
-          - depguard
-        path: ^internal/output/output(_test)?\.go$
-        text: "'github\\.com/KubeRocketCI/cli/internal/portal'"
     paths:
       - third_party$
       - builtin$

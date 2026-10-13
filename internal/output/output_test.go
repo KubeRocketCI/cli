@@ -9,45 +9,11 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
-
-	"github.com/KubeRocketCI/cli/internal/portal"
 )
 
 // sgr matches the SGR sequences Style.Render emits; tests strip them before
 // comparing bytes.
 var sgr = regexp.MustCompile(`\x1b\[[0-9;]*m`)
-
-func TestSonarGateStatusColor_PassthroughWhenUnknown(t *testing.T) {
-	t.Parallel()
-
-	// Unknown statuses must pass through without ANSI codes.
-	got := SonarGateStatusColor(portal.QualityGateStatus("UNKNOWN_STATUS"))
-	if got != Text("UNKNOWN_STATUS") {
-		t.Errorf("SonarGateStatusColor returned %q, want %q", got, "UNKNOWN_STATUS")
-	}
-}
-
-func TestSonarGateStatusColor_RecognizesKnownStatuses(t *testing.T) {
-	t.Parallel()
-
-	// For known statuses, the returned string should at least still contain the status text.
-	for _, s := range []portal.QualityGateStatus{portal.QualityGateOK, portal.QualityGateWarn, portal.QualityGateError, portal.QualityGateNone} {
-		got := SonarGateStatusColor(s).Render(true)
-		if !strings.Contains(got, string(s)) {
-			t.Errorf("SonarGateStatusColor(%q) returned %q, missing status text", s, got)
-		}
-	}
-}
-
-func TestSonarGateStatusColor_EmptyStatusReturnsEmpty(t *testing.T) {
-	t.Parallel()
-
-	// An empty QualityGateStatus hits the default branch and must return "".
-	got := SonarGateStatusColor(portal.QualityGateStatus("")).Render(true)
-	if got != "" {
-		t.Errorf("SonarGateStatusColor(%q) = %q, want %q", "", got, "")
-	}
-}
 
 func TestRelativeTime(t *testing.T) {
 	t.Parallel()
