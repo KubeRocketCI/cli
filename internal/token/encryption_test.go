@@ -2,6 +2,9 @@ package token
 
 import (
 	"bytes"
+	"io"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -76,9 +79,25 @@ func TestDecryptErrors(t *testing.T) {
 
 			enc := newTestEncryptor()
 			_, err := enc.Decrypt(tt.ciphertext(t))
-			require.Error(t, err)
+			require.ErrorIs(t, err, ErrInvalidCiphertext)
 		})
 	}
+}
+
+func TestDecryptKeyErrorIsNotInvalidCiphertext(t *testing.T) {
+	t.Setenv("KRCI_KEYRING_BACKEND", "file")
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".keyfile"), []byte("not-base64!"), 0o600))
+
+	enc := NewAESEncryptor("krci-test", dir, io.Discard)
+
+	_, err := enc.Decrypt(bytes.Repeat([]byte("x"), minCiphertextLen))
+	require.ErrorContains(t, err, "getting encryption key: decoding key: ")
+	assert.NotErrorIs(t, err, ErrInvalidCiphertext)
+
+	_, err = enc.Decrypt(bytes.Repeat([]byte("x"), minCiphertextLen-1))
+	require.ErrorIs(t, err, ErrInvalidCiphertext, "a short file fails before the key is loaded")
 }
 
 func TestEncryptProducesDifferentCiphertexts(t *testing.T) {

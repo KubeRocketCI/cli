@@ -12,7 +12,16 @@ import (
 	"sync"
 )
 
+// ErrInvalidCiphertext indicates data shorter than a nonce and tag, or data
+// that does not decrypt under a loaded key.
+var ErrInvalidCiphertext = errors.New("invalid ciphertext")
+
+// minCiphertextLen is the AES-GCM standard nonce (12 bytes) plus tag (16 bytes).
+const minCiphertextLen = 12 + 16
+
 // Encryptor encrypts and decrypts token data using AES-256-GCM.
+// Decrypt wraps ErrInvalidCiphertext only when the key loaded and the data
+// does not decrypt under it; a key failure does not wrap it.
 type Encryptor interface {
 	Encrypt(plaintext []byte) ([]byte, error)
 	Decrypt(ciphertext []byte) ([]byte, error)
@@ -82,23 +91,23 @@ func (e *aesEncryptor) Encrypt(plaintext []byte) ([]byte, error) {
 	return gcm.Seal(nonce, nonce, plaintext, nil), nil
 }
 
-// Decrypt reverses Encrypt. Expects nonce || ciphertext || tag.
+// Decrypt reverses Encrypt. Expects nonce || ciphertext || tag. Data too short
+// to hold a nonce and tag fails before the key is loaded.
 func (e *aesEncryptor) Decrypt(ciphertext []byte) ([]byte, error) {
+	if len(ciphertext) < minCiphertextLen {
+		return nil, fmt.Errorf("%w: ciphertext too short", ErrInvalidCiphertext)
+	}
+
 	gcm, err := e.gcm()
 	if err != nil {
 		return nil, err
-	}
-
-	minLen := gcm.NonceSize() + gcm.Overhead()
-	if len(ciphertext) < minLen {
-		return nil, errors.New("ciphertext too short")
 	}
 
 	nonce, encrypted := ciphertext[:gcm.NonceSize()], ciphertext[gcm.NonceSize():]
 
 	plaintext, err := gcm.Open(nil, nonce, encrypted, nil)
 	if err != nil {
-		return nil, fmt.Errorf("decrypting data: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidCiphertext, err)
 	}
 
 	return plaintext, nil

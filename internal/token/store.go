@@ -118,7 +118,9 @@ func (s *EncryptedFileStore) Save(tok *StoredToken) error {
 }
 
 // Load reads and decrypts the token from disk.
-// An undecryptable file is reported on the store's writer and removed; once removed, Load returns ErrNoToken silently.
+// A file that fails with ErrInvalidCiphertext is reported on the store's writer and removed; once removed, Load
+// returns ErrNoToken silently. Any other Decrypt failure, such as a key that cannot be loaded, keeps the file and
+// is returned.
 func (s *EncryptedFileStore) Load() (*StoredToken, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -134,7 +136,10 @@ func (s *EncryptedFileStore) Load() (*StoredToken, error) {
 
 	plaintext, err := s.encryptor.Decrypt(ciphertext)
 	if err != nil {
-		// Remove corrupted/undecryptable token file so user can re-authenticate cleanly.
+		if !errors.Is(err, ErrInvalidCiphertext) {
+			return nil, fmt.Errorf("decrypting token: %w", err)
+		}
+
 		_, _ = fmt.Fprintf(s.w, "Warning: removing undecryptable token file (%s): %v\n", s.path, err)
 		_, _ = fmt.Fprintf(s.w, "  Run 'krci auth login' to re-authenticate.\n")
 
