@@ -71,13 +71,13 @@ ci: lint test build ## Run full CI pipeline locally
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
-$(BIN_DIR)/golangci-lint: $(BIN_DIR)
-	GOBIN=$(PWD)/$(BIN_DIR) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+$(BIN_DIR)/golangci-lint: | $(BIN_DIR)
+	GOBIN=$(abspath $(BIN_DIR)) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 
-$(BIN_DIR)/goreleaser: $(BIN_DIR)
-	GOBIN=$(PWD)/$(BIN_DIR) go install github.com/goreleaser/goreleaser/v2@$(GORELEASER_VERSION)
+$(BIN_DIR)/goreleaser: | $(BIN_DIR)
+	GOBIN=$(abspath $(BIN_DIR)) go install github.com/goreleaser/goreleaser/v2@$(GORELEASER_VERSION)
 
-$(BIN_DIR)/oapi-codegen: $(BIN_DIR)
-	GOBIN=$(PWD)/$(BIN_DIR) go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@$(OAPICODEGEN_VERSION)
+$(BIN_DIR)/oapi-codegen: | $(BIN_DIR)
+	GOBIN=$(abspath $(BIN_DIR)) go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@$(OAPICODEGEN_VERSION)
 
 tools: $(BIN_DIR)/golangci-lint $(BIN_DIR)/goreleaser $(BIN_DIR)/oapi-codegen ## Install all development tools
