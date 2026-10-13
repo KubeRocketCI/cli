@@ -25,12 +25,13 @@ type Store interface {
 
 // StoredToken holds the persisted OAuth token data.
 type StoredToken struct {
-	AccessToken  string    `json:"access_token"`
-	RefreshToken string    `json:"refresh_token"`
-	IDToken      string    `json:"id_token"`
-	ExpiresAt    time.Time `json:"expires_at"`
-	IssuerURL    string    `json:"issuer_url"`
-	ClientID     string    `json:"client_id"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	IDToken      string `json:"id_token"`
+	// ExpiresAt is the access-token expiry.
+	ExpiresAt time.Time `json:"expires_at"`
+	IssuerURL string    `json:"issuer_url"`
+	ClientID  string    `json:"client_id"`
 	// PortalURL is the portal the token was bound to at login or refresh. Empty
 	// means unbound; the provider rejects unbound tokens.
 	PortalURL string `json:"portal_url,omitempty"`
@@ -49,12 +50,6 @@ func NewStoredToken(tok *oauth2.Token, issuerURL, clientID, portalURL string) *S
 		ClientID:     clientID,
 		PortalURL:    portalURL,
 	}
-}
-
-// Valid reports whether the access token has more than 30 s left. A zero
-// ExpiresAt means the token does not expire, as in oauth2.
-func (t *StoredToken) Valid() bool {
-	return t.ExpiresAt.IsZero() || time.Until(t.ExpiresAt) > 30*time.Second
 }
 
 // EncryptedFileStore persists tokens as AES-256-GCM encrypted JSON files.

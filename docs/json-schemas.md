@@ -980,7 +980,8 @@ Rules:
   | Config file holds a value of the wrong type           | `loading config: <cause>`                          |
 
 - `groups` is always an array (`[]` when none).
-- `expiresAt` is RFC3339 in UTC, `null` when the stored token has no expiry.
+- `expiresAt` is the ID token's `exp`, or the access-token expiry when the ID
+  token has none; RFC3339 in UTC, `null` when neither is set.
 - `user` and `name` are omitted when the token claims cannot be decoded; the
   session is still valid in that case.
 

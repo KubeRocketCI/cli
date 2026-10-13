@@ -423,28 +423,3 @@ func TestStoreClearNonExistent(t *testing.T) {
 	// Clear on non-existent file should not error.
 	require.NoError(t, store.Clear())
 }
-
-func TestStoredTokenValid(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name   string
-		expiry time.Time
-		want   bool
-	}{
-		{"future", time.Now().Add(time.Hour), true},
-		{"almost expired", time.Now().Add(31 * time.Second), true},
-		{"within buffer", time.Now().Add(29 * time.Second), false},
-		{"expired", time.Now().Add(-time.Minute), false},
-		{"no expiry", time.Time{}, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			tok := &StoredToken{ExpiresAt: tt.expiry}
-			assert.Equal(t, tt.want, tok.Valid())
-		})
-	}
-}
