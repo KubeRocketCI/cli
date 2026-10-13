@@ -7,25 +7,20 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
-	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/pipelinerun"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 type ListOptions struct {
 	IO            *iostreams.IOStreams
-	RestClient    func() (*restapi.ClientWithResponses, error)
-	Config        func() (*config.Config, error)
-	Now           func() time.Time
+	Services      func() (*portal.Services, error)
 	Project       string
 	PRNumber      int
 	Author        string
@@ -43,10 +38,8 @@ type ListOptions struct {
 // runF is the business logic function; pass nil to use the default listRun.
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
-		IO:         f.IOStreams,
-		RestClient: f.RestClient,
-		Config:     f.Config,
-		Now:        f.Now,
+		IO:       f.IOStreams,
+		Services: f.Services,
 	}
 
 	cmd := &cobra.Command{
@@ -134,18 +127,12 @@ func (opts *ListOptions) validate(statusSet, deploymentSet, envSet bool) error {
 }
 
 func listRun(ctx context.Context, opts *ListOptions) error {
-	cfg, err := opts.Config()
+	services, err := opts.Services()
 	if err != nil {
 		return err
 	}
 
-	client, err := opts.RestClient()
-	if err != nil {
-		return err
-	}
-
-	svc := portal.NewPipelineRunService(client, cfg.PortalURL, cfg.ClusterName, cfg.Namespace,
-		portal.WithNow(opts.Now))
+	svc := services.PipelineRun()
 
 	result, err := svc.List(ctx, portal.PipelineRunListOptions{
 		Filter: portal.PipelineRunFilter{
