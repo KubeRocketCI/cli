@@ -12,16 +12,23 @@ import (
 	"sync"
 )
 
-// ErrInvalidCiphertext indicates data shorter than a nonce and tag, or data
-// that does not decrypt under a loaded key.
-var ErrInvalidCiphertext = errors.New("invalid ciphertext")
+var (
+	// ErrInvalidCiphertext indicates data shorter than a nonce and tag, or data
+	// that does not decrypt under a loaded key.
+	ErrInvalidCiphertext = errors.New("invalid ciphertext")
+	// ErrKeyNotFound indicates no encryption key is stored.
+	ErrKeyNotFound = errors.New("encryption key not found")
+)
+
+const keyringUser = "encryption-key"
 
 // minCiphertextLen is the AES-GCM standard nonce (12 bytes) plus tag (16 bytes).
 const minCiphertextLen = 12 + 16
 
 // Encryptor encrypts and decrypts token data using AES-256-GCM.
-// Decrypt wraps ErrInvalidCiphertext only when the key loaded and the data
-// does not decrypt under it; a key failure does not wrap it.
+// Decrypt wraps ErrInvalidCiphertext only for data too short to decrypt or data
+// that does not decrypt under the loaded key, and ErrKeyNotFound only when no
+// key is stored. Decrypt does not create a key.
 type Encryptor interface {
 	Encrypt(plaintext []byte) ([]byte, error)
 	Decrypt(ciphertext []byte) ([]byte, error)
@@ -29,7 +36,6 @@ type Encryptor interface {
 
 type aesEncryptor struct {
 	keyringService string
-	keyringUser    string
 	configDir      string
 	w              io.Writer
 	mu             sync.Mutex
@@ -47,20 +53,22 @@ func NewAESEncryptor(keyringService, configDir string, w io.Writer) Encryptor {
 
 	return &aesEncryptor{
 		keyringService: keyringService,
-		keyringUser:    "encryption-key",
 		configDir:      configDir,
 		w:              w,
 	}
 }
 
+// keyLoader returns the encryption key: loadKey or getOrCreateKey.
+type keyLoader func(service, configDir string, w io.Writer) ([]byte, error)
+
 // gcm returns an initialized AES-256-GCM cipher, caching the key on first successful load.
 // Uses a mutex instead of sync.Once so transient key-loading failures can be retried.
-func (e *aesEncryptor) gcm() (cipher.AEAD, error) {
+func (e *aesEncryptor) gcm(load keyLoader) (cipher.AEAD, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	if e.key == nil {
-		key, err := getOrCreateKey(e.keyringService, e.keyringUser, e.configDir, e.w)
+		key, err := load(e.keyringService, e.configDir, e.w)
 		if err != nil {
 			return nil, fmt.Errorf("getting encryption key: %w", err)
 		}
@@ -77,7 +85,7 @@ func (e *aesEncryptor) gcm() (cipher.AEAD, error) {
 
 // Encrypt uses AES-256-GCM. Output: nonce (12 bytes) || ciphertext || GCM tag (16 bytes).
 func (e *aesEncryptor) Encrypt(plaintext []byte) ([]byte, error) {
-	gcm, err := e.gcm()
+	gcm, err := e.gcm(getOrCreateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +106,7 @@ func (e *aesEncryptor) Decrypt(ciphertext []byte) ([]byte, error) {
 		return nil, fmt.Errorf("%w: ciphertext too short", ErrInvalidCiphertext)
 	}
 
-	gcm, err := e.gcm()
+	gcm, err := e.gcm(loadKey)
 	if err != nil {
 		return nil, err
 	}

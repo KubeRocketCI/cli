@@ -150,7 +150,7 @@ Portal on `auth login`.
 | Path                         | Purpose                                     |
 |------------------------------|---------------------------------------------|
 | `~/.config/krci/config.yaml` | Portal URL and discovered metadata          |
-| `~/.config/krci/tokens.enc`  | AES-encrypted tokens; key lives in keyring  |
+| `~/.config/krci/tokens.enc`  | AES-encrypted tokens; key in the OS keyring or `~/.config/krci/.keyfile` |
 
 ## Build from source
 

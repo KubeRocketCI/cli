@@ -93,7 +93,7 @@ func TestDecryptKeyErrorIsNotInvalidCiphertext(t *testing.T) {
 	enc := NewAESEncryptor("krci-test", dir, io.Discard)
 
 	_, err := enc.Decrypt(bytes.Repeat([]byte("x"), minCiphertextLen))
-	require.ErrorContains(t, err, "getting encryption key: decoding key: ")
+	require.ErrorContains(t, err, "getting encryption key: key file "+filepath.Join(dir, ".keyfile")+": decoding key: ")
 	assert.NotErrorIs(t, err, ErrInvalidCiphertext)
 
 	_, err = enc.Decrypt(bytes.Repeat([]byte("x"), minCiphertextLen-1))
