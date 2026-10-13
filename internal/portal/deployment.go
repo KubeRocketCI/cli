@@ -257,16 +257,7 @@ func mapStage(item k8sItem) Stage {
 }
 
 func extractQualityGates(spec map[string]any) []QualityGate {
-	raw, ok := spec["qualityGates"]
-	if !ok {
-		return nil
-	}
-
-	items, ok := raw.([]any)
-	if !ok {
-		return nil
-	}
-
+	items := sliceVal(spec, "qualityGates")
 	gates := make([]QualityGate, 0, len(items))
 
 	for _, item := range items {
@@ -315,7 +306,7 @@ func orderedStageNames(stages []Stage) []string {
 }
 
 func filterAndSortStages(items []k8sItem, pipelineName string) []Stage {
-	var stages []Stage
+	stages := []Stage{}
 
 	for _, item := range items {
 		spec := ptr.Deref(item.Spec, nil)

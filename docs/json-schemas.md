@@ -936,9 +936,8 @@ Bare object, no envelope.
 
 Rules:
 
-- `stages[]` is sorted by `order`. It is `null`, not `[]`, for a deployment
-  without environments: guard `jq` paths with `.stages // []`.
-- Stage `qualityGates[]` is `null` when the stage spec has no `qualityGates`.
+- `stages[]` is sorted by `order`; `[]` for a deployment without environments.
+- Stage `qualityGates[]` is always an array (`[]` when none).
 - Always present on a stage: `name`, `order`, `triggerType`, `qualityGates`,
   `namespace`, `status`, `available`. `clusterName`, `description`, and
   `detailedMessage` are omitted when empty.

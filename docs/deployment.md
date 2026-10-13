@@ -119,5 +119,5 @@ resource carries `status.detailed_message` (`"status": "failed",
 Agent workflow — list namespaces for a pipeline:
 
 ```bash
-krci deployment get my-pipeline -o json | jq -r '(.stages // [])[].namespace'
+krci deployment get my-pipeline -o json | jq -r '.stages[].namespace'
 ```

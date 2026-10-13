@@ -7,5 +7,5 @@
   "description": "API pipeline",
   "status": "created",
   "available": true,
-  "stages": null
+  "stages": []
 }
