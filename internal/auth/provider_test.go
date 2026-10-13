@@ -10,6 +10,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -29,15 +31,21 @@ func fakeJWT(payload string) string {
 	return h + "." + p + "."
 }
 
-// mockStore implements token.Store for testing.
+// mockStore implements token.Store for testing. It is safe for concurrent use
+// and counts Load calls.
 type mockStore struct {
+	mu      sync.Mutex
 	tok     *token.StoredToken
 	loadErr error
 	saveErr error
 	cleared bool
+	loads   int
 }
 
 func (m *mockStore) Save(tok *token.StoredToken) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	if m.saveErr != nil {
 		return m.saveErr
 	}
@@ -46,6 +54,10 @@ func (m *mockStore) Save(tok *token.StoredToken) error {
 }
 
 func (m *mockStore) Load() (*token.StoredToken, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.loads++
 	if m.loadErr != nil {
 		return nil, m.loadErr
 	}
@@ -56,9 +68,19 @@ func (m *mockStore) Load() (*token.StoredToken, error) {
 }
 
 func (m *mockStore) Clear() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.tok = nil
 	m.cleared = true
 	return nil
+}
+
+func (m *mockStore) loadCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.loads
 }
 
 // TestGetTokenEnvVarTakesPrecedence cannot use t.Parallel because t.Setenv
@@ -192,6 +214,8 @@ func TestGetToken(t *testing.T) {
 const (
 	portalA = "https://portal-a.example.com"
 	portalB = "https://portal-b.example.com"
+
+	oldRefreshToken = "old-refresh"
 )
 
 func TestGetTokenPortalBinding(t *testing.T) {
@@ -222,7 +246,7 @@ func TestGetTokenPortalBinding(t *testing.T) {
 			// Non-HTTPS issuer: any refresh attempt fails with ErrRefreshFailed.
 			name: "expired and bound to another portal",
 			stored: &token.StoredToken{
-				RefreshToken: "old-refresh",
+				RefreshToken: oldRefreshToken,
 				ExpiresAt:    time.Now().Add(-time.Minute),
 				IssuerURL:    "http://idp.invalid",
 				ClientID:     "krci-cli",
@@ -376,11 +400,26 @@ func TestWriteLoginSummary(t *testing.T) {
 	}
 }
 
-// newRefreshIDP serves OIDC discovery and a refresh_token grant over TLS.
+// newRefreshIDP serves OIDC discovery and a refresh_token grant for
+// oldRefreshToken over TLS.
 func newRefreshIDP(t *testing.T) *httptest.Server {
 	t.Helper()
 
-	var idp *httptest.Server
+	idp, _ := newCountingRefreshIDP(t, oldRefreshToken, 0)
+
+	return idp
+}
+
+// newCountingRefreshIDP serves OIDC discovery and a refresh_token grant over
+// TLS. It counts token requests, holds each one for delay, and answers 400
+// invalid_grant to anything but a refresh_token grant for accept.
+func newCountingRefreshIDP(t *testing.T, accept string, delay time.Duration) (*httptest.Server, *atomic.Int32) {
+	t.Helper()
+
+	var (
+		idp   *httptest.Server
+		calls atomic.Int32
+	)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, _ *http.Request) {
@@ -392,7 +431,16 @@ func newRefreshIDP(t *testing.T) *httptest.Server {
 			"jwks_uri":               idp.URL + "/keys",
 		})
 	})
-	mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		time.Sleep(delay)
+
+		if r.PostFormValue("grant_type") != "refresh_token" || r.PostFormValue("refresh_token") != accept {
+			http.Error(w, `{"error":"invalid_grant"}`, http.StatusBadRequest)
+
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"access_token":  "new-access",
@@ -406,7 +454,7 @@ func newRefreshIDP(t *testing.T) *httptest.Server {
 	idp = httptest.NewTLSServer(mux)
 	t.Cleanup(idp.Close)
 
-	return idp
+	return idp, &calls
 }
 
 func TestRefreshPersistenceWarning(t *testing.T) {
@@ -435,7 +483,7 @@ func TestRefreshPersistenceWarning(t *testing.T) {
 			store := &mockStore{
 				tok: &token.StoredToken{
 					AccessToken:  "expired",
-					RefreshToken: "old-refresh",
+					RefreshToken: oldRefreshToken,
 					ExpiresAt:    time.Now().Add(-time.Minute),
 					IssuerURL:    idp.URL,
 					ClientID:     "krci-cli",
@@ -465,7 +513,7 @@ func TestRefreshRecordsPortalURL(t *testing.T) {
 	store := &mockStore{
 		tok: &token.StoredToken{
 			AccessToken:  "expired",
-			RefreshToken: "old-refresh",
+			RefreshToken: oldRefreshToken,
 			ExpiresAt:    time.Now().Add(-time.Minute),
 			IssuerURL:    idp.URL,
 			ClientID:     "krci-cli",
@@ -513,4 +561,150 @@ func TestValidateIssuerURL(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+// refreshableStoredToken returns a token bound to portalA with
+// oldRefreshToken whose access token expires in expiresIn.
+func refreshableStoredToken(issuerURL string, expiresIn time.Duration) *token.StoredToken {
+	return &token.StoredToken{
+		AccessToken:  "old-access",
+		RefreshToken: oldRefreshToken,
+		IDToken:      fakeJWT(`{"email":"old@example.com"}`),
+		ExpiresAt:    time.Now().Add(expiresIn),
+		IssuerURL:    issuerURL,
+		ClientID:     "krci-cli",
+		PortalURL:    portalA,
+	}
+}
+
+func TestGetTokenConcurrentCallersShareOneRefresh(t *testing.T) {
+	t.Parallel()
+
+	const callers = 8
+
+	idp, calls := newCountingRefreshIDP(t, oldRefreshToken, 50*time.Millisecond)
+	store := &mockStore{tok: refreshableStoredToken(idp.URL, -time.Minute)}
+
+	tp := NewTokenProvider(store, &config.Config{PortalURL: portalA}, io.Discard)
+	ctx := oidc.ClientContext(t.Context(), idp.Client())
+
+	var (
+		wg     sync.WaitGroup
+		start  = make(chan struct{})
+		tokens = make([]string, callers)
+		errs   = make([]error, callers)
+	)
+
+	for i := range callers {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			<-start
+
+			tokens[i], errs[i] = tp.GetToken(ctx)
+		}()
+	}
+
+	close(start)
+	wg.Wait()
+
+	for i := range callers {
+		require.NoError(t, errs[i], "caller %d", i)
+		assert.Equal(t, tokens[0], tokens[i], "caller %d", i)
+	}
+
+	assert.Equal(t, int32(1), calls.Load(), "token requests to the IdP")
+}
+
+func TestGetTokenLoadsStoreOnceWhileValid(t *testing.T) {
+	t.Parallel()
+
+	store := &mockStore{tok: &token.StoredToken{
+		IDToken: "id", ExpiresAt: time.Now().Add(time.Hour), PortalURL: portalA,
+	}}
+	tp := NewTokenProvider(store, &config.Config{PortalURL: portalA}, io.Discard)
+
+	for range 3 {
+		tok, err := tp.GetToken(t.Context())
+		require.NoError(t, err)
+		assert.Equal(t, "id", tok)
+	}
+
+	assert.Equal(t, 1, store.loadCount())
+}
+
+func TestGetTokenReloadsStoreWhenResolvedTokenExpires(t *testing.T) {
+	t.Parallel()
+
+	idp, calls := newCountingRefreshIDP(t, oldRefreshToken, 0)
+	fresh := &token.StoredToken{IDToken: "fresh", ExpiresAt: time.Now().Add(time.Hour), PortalURL: portalA}
+	store := &mockStore{tok: fresh}
+
+	tp := NewTokenProvider(store, &config.Config{PortalURL: portalA}, io.Discard)
+	tp.current = refreshableStoredToken(idp.URL, 10*time.Second)
+
+	tok, err := tp.GetToken(oidc.ClientContext(t.Context(), idp.Client()))
+	require.NoError(t, err)
+	assert.Equal(t, "fresh", tok, "a token another process saved is used")
+	assert.Zero(t, calls.Load(), "token requests to the IdP")
+}
+
+func TestLoginAndLogoutForgetResolvedToken(t *testing.T) {
+	t.Parallel()
+
+	store := &mockStore{tok: &token.StoredToken{
+		IDToken: "id", ExpiresAt: time.Now().Add(time.Hour), PortalURL: portalA,
+	}}
+	tp := NewTokenProvider(store, &config.Config{PortalURL: portalA}, io.Discard)
+
+	_, err := tp.GetToken(t.Context())
+	require.NoError(t, err)
+
+	require.NoError(t, tp.Logout())
+
+	_, err = tp.GetToken(t.Context())
+	require.ErrorIs(t, err, ErrNotAuthenticated)
+
+	// No issuer is configured, so Login fails.
+	tp.current = &token.StoredToken{IDToken: "id", ExpiresAt: time.Now().Add(time.Hour), PortalURL: portalA}
+	require.Error(t, tp.Login(t.Context()))
+	assert.Nil(t, tp.current)
+}
+
+func TestRefreshUsesResolvedRefreshTokenWhenStoreIsStale(t *testing.T) {
+	t.Parallel()
+
+	idp, calls := newCountingRefreshIDP(t, "rotated-refresh", 0)
+
+	// The previous refresh rotated the refresh token, and its Save failed.
+	resolved := refreshableStoredToken(idp.URL, -time.Minute)
+	resolved.RefreshToken = "rotated-refresh"
+
+	store := &mockStore{tok: refreshableStoredToken(idp.URL, -time.Minute)}
+	tp := NewTokenProvider(store, &config.Config{PortalURL: portalA}, io.Discard)
+	tp.current = resolved
+
+	refreshed, err := tp.resolveStoredToken(oidc.ClientContext(t.Context(), idp.Client()))
+	require.NoError(t, err)
+	assert.Equal(t, "new-access", refreshed.AccessToken)
+	assert.Equal(t, int32(1), calls.Load(), "token requests to the IdP")
+}
+
+func TestUserInfoUsesTheRefreshedTokenWhenSaveFails(t *testing.T) {
+	t.Parallel()
+
+	idp := newRefreshIDP(t)
+	store := &mockStore{tok: refreshableStoredToken(idp.URL, -time.Minute), saveErr: errors.New("disk full")}
+
+	tp := NewTokenProvider(store, &config.Config{PortalURL: portalA}, io.Discard)
+
+	_, err := tp.GetToken(oidc.ClientContext(t.Context(), idp.Client()))
+	require.NoError(t, err)
+
+	info, err := tp.UserInfo()
+	require.NoError(t, err)
+	assert.Equal(t, "user@example.com", info.Email)
+	assert.True(t, info.ExpiresAt.After(time.Now().Add(time.Minute)), "ExpiresAt = %s", info.ExpiresAt)
 }

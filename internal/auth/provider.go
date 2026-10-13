@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -28,7 +29,8 @@ type TokenProvider interface {
 	// Logout clears stored credentials.
 	Logout() error
 	// UserInfo returns the claims of the token GetToken resolves: KRCI_TOKEN
-	// when set, the stored ID token otherwise.
+	// when set, otherwise the resolved ID token (the stored one before any
+	// resolution).
 	UserInfo() (*UserInfo, error)
 }
 
@@ -39,6 +41,13 @@ type tokenProvider struct {
 	store token.Store
 	cfg   *config.Config
 	w     io.Writer
+
+	// mu serialises resolution of the stored token: concurrent requests share
+	// one load and one refresh.
+	mu sync.Mutex
+	// current is the token the last resolution returned; nil before the first
+	// resolution, after a failed one, and after Login or Logout.
+	current *token.StoredToken
 }
 
 // NewTokenProvider creates a TokenProvider with the given store and config.
@@ -78,17 +87,25 @@ func (p *tokenProvider) GetToken(ctx context.Context) (string, error) {
 	return stored.IDToken, nil
 }
 
-// resolveStoredToken loads, validates, and optionally refreshes the cached token.
-// A stored token is usable only when bound to the configured portal URL. A
-// token bound to another portal, or to none, is treated as absent: it is
-// neither refreshed nor returned.
+// resolveStoredToken returns the resolved token while it is valid; otherwise
+// it loads the stored token and refreshes it when expired. A stored token is
+// usable only when bound to the configured portal URL. A token bound to
+// another portal, or to none, is treated as absent: it is neither refreshed
+// nor returned.
 func (p *tokenProvider) resolveStoredToken(ctx context.Context) (*token.StoredToken, error) {
-	stored, err := p.store.Load()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.current != nil && p.current.Valid() {
+		return p.current, nil
+	}
+
+	previous := p.current
+	p.current = nil
+
+	stored, err := p.loadStored()
 	if err != nil {
-		if errors.Is(err, token.ErrNoToken) {
-			return nil, ErrNotAuthenticated
-		}
-		return nil, fmt.Errorf("loading cached token: %w", err)
+		return nil, err
 	}
 
 	if stored.PortalURL == "" || stored.PortalURL != p.cfg.PortalURL {
@@ -96,7 +113,15 @@ func (p *tokenProvider) resolveStoredToken(ctx context.Context) (*token.StoredTo
 	}
 
 	if stored.Valid() {
+		p.current = stored
+
 		return stored, nil
+	}
+
+	// After a failed Save the store holds an older refresh token than the
+	// previous resolution; an IdP that rotates refresh tokens rejects it.
+	if previous != nil && previous.RefreshToken != "" {
+		stored = previous
 	}
 
 	if stored.RefreshToken != "" {
@@ -104,14 +129,28 @@ func (p *tokenProvider) resolveStoredToken(ctx context.Context) (*token.StoredTo
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrRefreshFailed, err)
 		}
+
+		p.current = refreshed
+
 		return refreshed, nil
 	}
 
 	return nil, ErrTokenExpired
 }
 
+// forgetCurrent drops the resolved token, so the next resolution loads the
+// store.
+func (p *tokenProvider) forgetCurrent() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.current = nil
+}
+
 // Login performs the interactive OIDC login flow.
 func (p *tokenProvider) Login(ctx context.Context) error {
+	defer p.forgetCurrent()
+
 	claims, err := p.login(ctx)
 	if err != nil {
 		return err
@@ -131,11 +170,14 @@ func writeLoginSummary(w io.Writer, claims *UserInfo) {
 
 // Logout clears stored credentials.
 func (p *tokenProvider) Logout() error {
+	defer p.forgetCurrent()
+
 	return p.store.Clear()
 }
 
 // UserInfo returns user claims by decoding the token GetToken resolves
-// (unverified, display only). Non-authorising: it does not apply the portal
+// (unverified, display only): the resolved token when there is one, the
+// stored token otherwise. Non-authorising: it does not apply the portal
 // binding check; callers resolve the token with GetToken first. For
 // KRCI_TOKEN, FromEnv is true and ExpiresAt comes from its exp claim, zero
 // when the token has none.
@@ -155,12 +197,9 @@ func (p *tokenProvider) UserInfo() (*UserInfo, error) {
 		return info, nil
 	}
 
-	stored, err := p.store.Load()
+	stored, err := p.resolvedOrStored()
 	if err != nil {
-		if errors.Is(err, token.ErrNoToken) {
-			return nil, ErrNotAuthenticated
-		}
-		return nil, fmt.Errorf("loading stored token: %w", err)
+		return nil, err
 	}
 	info, err := decodeIDTokenClaims(stored.IDToken)
 	if err != nil {
@@ -168,6 +207,34 @@ func (p *tokenProvider) UserInfo() (*UserInfo, error) {
 	}
 	info.ExpiresAt = stored.ExpiresAt
 	return info, nil
+}
+
+// resolvedOrStored returns the resolved token, or loads the store when there
+// is none. It checks neither expiry nor the portal binding.
+func (p *tokenProvider) resolvedOrStored() (*token.StoredToken, error) {
+	p.mu.Lock()
+	current := p.current
+	p.mu.Unlock()
+
+	if current != nil {
+		return current, nil
+	}
+
+	return p.loadStored()
+}
+
+// loadStored loads the stored token. A missing token is ErrNotAuthenticated.
+func (p *tokenProvider) loadStored() (*token.StoredToken, error) {
+	stored, err := p.store.Load()
+	if err != nil {
+		if errors.Is(err, token.ErrNoToken) {
+			return nil, ErrNotAuthenticated
+		}
+
+		return nil, fmt.Errorf("loading cached token: %w", err)
+	}
+
+	return stored, nil
 }
 
 // refresh uses the OIDC refresh_token grant to obtain new tokens.
