@@ -110,18 +110,17 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 
 func renderTable(w io.Writer, isTTY bool, page, pageSize int, result *portal.SCAProjectList) error {
 	headers := []string{"NAME", "VERSION", "CLASSIFIER", "ACTIVE", "LAST_BOM", "RISK", "VULNS (C/H/M/L)"}
-	rows := make([][]string, 0, len(result.Items))
+	rows := make([][]output.Cell, 0, len(result.Items))
 
 	for _, p := range result.Items {
-		rows = append(rows, []string{
+		rows = append(rows, append(output.Texts(
 			p.Name,
 			p.Version,
 			p.Classifier,
 			scainternal.BoolYesNo(p.Active),
 			formatLastBom(p.LastBomImport),
 			scainternal.FormatRisk(p.RiskScore),
-			scainternal.FormatVulnCounts(p.Metrics, isTTY),
-		})
+		), scainternal.FormatVulnCounts(p.Metrics)))
 	}
 
 	if err := output.PrintTable(w, isTTY, headers, rows); err != nil {

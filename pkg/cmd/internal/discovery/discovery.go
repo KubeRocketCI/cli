@@ -81,15 +81,10 @@ func OptTimeCell(at *string) string {
 	return output.FormatRelativeTime(*at)
 }
 
-// OptStatusCell renders an ArgoCD health-status cell with optional TTY color,
-// output.EmptyCell when the pointer is nil or the value is empty.
-func OptStatusCell(s *string, isTTY bool) string {
-	v := ptr.Deref(s, "")
-	if isTTY && v != "" {
-		return ColorForArgoStatus(v)
-	}
-
-	return output.OrDash(v)
+// OptStatusCell renders an ArgoCD health-status cell, output.EmptyCell when
+// the pointer is nil or the value is empty.
+func OptStatusCell(s *string) output.Cell {
+	return ColorForArgoStatus(output.OrDash(ptr.Deref(s, "")))
 }
 
 // ShortDigestCell truncates a digest to ShortDigestLen characters for table
@@ -107,23 +102,18 @@ func ShortDigestCell(digest *string) string {
 	return d[:ShortDigestLen]
 }
 
-// IngressLines renders an ingress-URL slice as one cell per URL. Each line is
-// the hostname (no scheme), truncated to MaxIngressHostLen visible characters
-// and wrapped in an OSC 8 hyperlink (full URL preserved as the link target)
-// when isTTY. Returns nil when urls is empty; callers display a single "-"
-// row in that case.
-func IngressLines(urls []string, isTTY bool) []string {
+// IngressLines renders an ingress-URL slice as one cell per URL: the hostname
+// (no scheme) truncated to MaxIngressHostLen visible characters. The styled
+// form is an OSC 8 hyperlink to the full URL. Returns nil when urls is empty;
+// callers display a single "-" row in that case.
+func IngressLines(urls []string) []output.Cell {
 	if len(urls) == 0 {
 		return nil
 	}
 
-	lines := make([]string, 0, len(urls))
+	lines := make([]output.Cell, 0, len(urls))
 	for _, u := range urls {
-		host := output.Truncate(HostnameFromURL(u), MaxIngressHostLen)
-		if isTTY {
-			host = output.Hyperlink(host, u)
-		}
-		lines = append(lines, host)
+		lines = append(lines, output.Hyperlink(output.Truncate(HostnameFromURL(u), MaxIngressHostLen), u))
 	}
 
 	return lines
@@ -139,23 +129,23 @@ func IngressLines(urls []string, isTTY bool) []string {
 //	project2   …    ingress1
 //
 // When ingressLines is empty, a single row is emitted with "-" in INGRESS.
-func ExpandIngressRows(cells []string, ingressLines []string) [][]string {
+func ExpandIngressRows(cells []output.Cell, ingressLines []output.Cell) [][]output.Cell {
 	if len(ingressLines) == 0 {
-		row := make([]string, 0, len(cells)+1)
+		row := make([]output.Cell, 0, len(cells)+1)
 		row = append(row, cells...)
-		row = append(row, output.EmptyCell)
-		return [][]string{row}
+		row = append(row, output.Text(output.EmptyCell))
+		return [][]output.Cell{row}
 	}
 
-	out := make([][]string, 0, len(ingressLines))
+	out := make([][]output.Cell, 0, len(ingressLines))
 
-	first := make([]string, 0, len(cells)+1)
+	first := make([]output.Cell, 0, len(cells)+1)
 	first = append(first, cells...)
 	first = append(first, ingressLines[0])
 	out = append(out, first)
 
 	for _, ing := range ingressLines[1:] {
-		row := make([]string, len(cells)+1)
+		row := make([]output.Cell, len(cells)+1)
 		row[len(cells)] = ing
 		out = append(out, row)
 	}
@@ -179,19 +169,19 @@ func HostnameFromURL(u string) string {
 	return stripped
 }
 
-// ColorForArgoStatus renders an ArgoCD health-status string with a TTY color.
-// healthy → green, degraded/missing → red, progressing → blue (matching the
-// running-pipeline color in `output.PipelineStatusColor`). Anything else
-// (including suspended/unknown) is made printable on one row and left unstyled.
-func ColorForArgoStatus(s string) string {
+// ColorForArgoStatus colors an ArgoCD health status: healthy → green,
+// degraded/missing → red, progressing → blue (matching the running-pipeline
+// color in `output.PipelineStatusColor`). Anything else (including
+// suspended/unknown) is left unstyled.
+func ColorForArgoStatus(s string) output.Cell {
 	switch portal.ArgoHealthStatus(strings.ToLower(s)) {
 	case portal.ArgoHealthHealthy:
-		return output.GreenText(s)
+		return output.Green(s)
 	case portal.ArgoHealthDegraded, portal.ArgoHealthMissing:
-		return output.RedText(s)
+		return output.Red(s)
 	case portal.ArgoHealthProgressing:
-		return output.BlueText(s)
+		return output.Blue(s)
 	default:
-		return output.SingleLine(s)
+		return output.Text(s)
 	}
 }

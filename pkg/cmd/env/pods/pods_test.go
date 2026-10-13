@@ -284,29 +284,30 @@ func TestStatusCell(t *testing.T) {
 
 	cases := map[string]struct {
 		pod   portal.EnvPod
-		color func(string) string
+		color func(string) output.Cell
 	}{
 		"healthy": {
 			pod:   portal.EnvPod{Status: "Running", Phase: portal.PodPhaseRunning, ReadyContainers: 2, TotalContainers: 2},
-			color: output.GreenText,
+			color: output.Green,
 		},
 		"unhealthy": {
 			pod:   portal.EnvPod{Status: "CrashLoopBackOff", Phase: portal.PodPhaseRunning, TotalContainers: 1},
-			color: output.YellowText,
+			color: output.Yellow,
 		},
 		"failed": {
 			pod:   portal.EnvPod{Status: "Error", Phase: portal.PodPhaseFailed, TotalContainers: 1},
-			color: output.RedText,
+			color: output.Red,
 		},
 	}
 
 	for name, tc := range cases {
-		if got := statusCell(tc.pod, false); got != tc.pod.Status {
-			t.Errorf("%s: without a TTY the status stays plain, got %q", name, got)
+		got := statusCell(tc.pod)
+		if got.Render(false) != tc.pod.Status {
+			t.Errorf("%s: without a TTY the status stays plain, got %q", name, got.Render(false))
 		}
 
-		if got, want := statusCell(tc.pod, true), tc.color(tc.pod.Status); got != want {
-			t.Errorf("%s: statusCell on a TTY = %q, want %q", name, got, want)
+		if want := tc.color(tc.pod.Status); got != want {
+			t.Errorf("%s: statusCell = %#v, want %#v", name, got, want)
 		}
 	}
 }

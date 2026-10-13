@@ -176,7 +176,7 @@ func (opts *StatusOptions) printStatus(info *auth.UserInfo, haveInfo bool) error
 	}
 
 	lines = append(lines, output.DetailLine{
-		Label: "Status", Value: "Authenticated", Styled: output.GreenText("Authenticated"),
+		Label: "Status", Value: "Authenticated", Styled: output.Green("Authenticated"),
 	})
 
 	if expiry := info.ExpiresAt; !expiry.IsZero() {
@@ -186,7 +186,7 @@ func (opts *StatusOptions) printStatus(info *auth.UserInfo, haveInfo bool) error
 		}
 
 		if remaining < 5*time.Minute {
-			expires.Styled = output.YellowText(expires.Value)
+			expires.Styled = output.Yellow(expires.Value)
 		}
 
 		lines = append(lines, expires)

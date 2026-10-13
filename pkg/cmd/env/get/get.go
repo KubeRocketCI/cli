@@ -273,17 +273,17 @@ func renderProjects(w io.Writer, isTTY bool, projects []portal.EnvProject) error
 	}
 
 	headers := []string{"PROJECT", "STATUS", "SYNC", "VERSION", "IMAGE_SHA", "INGRESS"}
-	rows := make([][]string, 0, len(projects))
+	rows := make([][]output.Cell, 0, len(projects))
 
 	for _, p := range projects {
-		cells := []string{
-			p.Name,
-			discovery.OptStatusCell(p.Status, isTTY),
-			discovery.OptCell(p.Sync),
-			discovery.OptCell(p.Version),
-			discovery.ShortDigestCell(p.ImageDigest),
+		cells := []output.Cell{
+			output.Text(p.Name),
+			discovery.OptStatusCell(p.Status),
+			output.Text(discovery.OptCell(p.Sync)),
+			output.Text(discovery.OptCell(p.Version)),
+			output.Text(discovery.ShortDigestCell(p.ImageDigest)),
 		}
-		rows = append(rows, discovery.ExpandIngressRows(cells, discovery.IngressLines(p.IngressURLs, isTTY))...)
+		rows = append(rows, discovery.ExpandIngressRows(cells, discovery.IngressLines(p.IngressURLs))...)
 	}
 
 	return output.PrintTable(w, isTTY, headers, rows)

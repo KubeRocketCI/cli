@@ -160,7 +160,7 @@ func emptyNote(project, branch string, streams []portal.ProjectVersionStream) st
 // renderStreamsTable prints one row per branch with its newest version.
 func renderStreamsTable(w io.Writer, isTTY bool, streams []portal.ProjectVersionStream) error {
 	headers := []string{"BRANCH", "VERSIONS", "LATEST", "CREATED", "IMAGE"}
-	rows := make([][]string, 0, len(streams))
+	rows := make([][]output.Cell, 0, len(streams))
 
 	for _, s := range streams {
 		latest, created := output.EmptyCell, output.EmptyCell
@@ -169,13 +169,13 @@ func renderStreamsTable(w io.Writer, isTTY bool, streams []portal.ProjectVersion
 			created = output.OrDash(s.Versions[0].Created)
 		}
 
-		rows = append(rows, []string{
+		rows = append(rows, output.Texts(
 			s.Branch,
 			strconv.Itoa(len(s.Versions)),
 			latest,
 			created,
 			output.OrDash(s.Image),
-		})
+		))
 	}
 
 	return output.PrintTable(w, isTTY, headers, rows)
@@ -186,17 +186,17 @@ func renderStreamsTable(w io.Writer, isTTY bool, streams []portal.ProjectVersion
 func renderVersionsTable(w io.Writer, isTTY bool, streams []portal.ProjectVersionStream) error {
 	headers := []string{"VERSION", "CREATED", "DIGEST", "IMAGE"}
 
-	var rows [][]string
+	var rows [][]output.Cell
 
 	for _, s := range streams {
 		for _, v := range s.Versions {
 			digest := v.Digest
-			rows = append(rows, []string{
+			rows = append(rows, output.Texts(
 				output.OrDash(v.Name),
 				output.OrDash(v.Created),
 				discovery.ShortDigestCell(&digest),
 				output.OrDash(s.Image),
-			})
+			))
 		}
 	}
 

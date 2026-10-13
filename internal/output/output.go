@@ -3,11 +3,9 @@ package output
 
 import (
 	"bytes"
-	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
-	"regexp"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -47,46 +45,122 @@ var (
 	grayStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 )
 
-// StatusColor returns the status string with color applied based on its value.
-// Recognized values (from KubeRocketCI CRD status field):
-//   - "created"     renders green
-//   - "in_progress" renders yellow
-//   - "failed"      renders red
+// Cell is a table cell or detail value in two forms, plain and styled, each
+// printable on one row. Only this package builds a styled form.
+type Cell struct {
+	plain  string
+	styled string
+}
+
+// Text is s, printable on one row, unstyled in both forms. Text("") is the zero
+// Cell.
+func Text(s string) Cell {
+	c := cell(s)
+
+	return Cell{plain: c, styled: c}
+}
+
+// styledText is the zero Cell for empty text.
+func styledText(st lipgloss.Style, s string) Cell {
+	c := cell(s)
+	if c == "" {
+		return Cell{}
+	}
+
+	return Cell{plain: c, styled: st.Render(c)}
+}
+
+// Texts is Text applied to each of ss.
+func Texts(ss ...string) []Cell {
+	out := make([]Cell, len(ss))
+	for i, s := range ss {
+		out[i] = Text(s)
+	}
+
+	return out
+}
+
+// Green is s, printable on one row, styled green.
+func Green(s string) Cell { return styledText(greenStyle, s) }
+
+// Yellow is s, printable on one row, styled yellow.
+func Yellow(s string) Cell { return styledText(yellowStyle, s) }
+
+// Red is s, printable on one row, styled red.
+func Red(s string) Cell { return styledText(redStyle, s) }
+
+// Blue is s, printable on one row, styled blue.
+func Blue(s string) Cell { return styledText(blueStyle, s) }
+
+// Gray is s, printable on one row, styled gray.
+func Gray(s string) Cell { return styledText(grayStyle, s) }
+
+// Concat joins cells form by form.
+func Concat(cells ...Cell) Cell {
+	var plain, styled strings.Builder
+
+	for _, c := range cells {
+		plain.WriteString(c.plain)
+		styled.WriteString(c.styled)
+	}
+
+	return Cell{plain: plain.String(), styled: styled.String()}
+}
+
+// Render returns the styled form when isTTY, the plain form otherwise.
+func (c Cell) Render(isTTY bool) string {
+	if isTTY {
+		return c.styled
+	}
+
+	return c.plain
+}
+
+// IsZero reports whether c is the zero Cell.
+func (c Cell) IsZero() bool { return c == Cell{} }
+
+// StatusColor is the KubeRocketCI CRD status as a Cell, styled by value:
+//   - "created"     green
+//   - "in_progress" yellow
+//   - "failed"      red
 //
-// Any other value is made printable on one row and left unstyled.
-func StatusColor(status string) string {
+// Any other value is unstyled in both forms.
+func StatusColor(status string) Cell {
 	switch strings.ToLower(status) {
 	case "created":
-		return greenStyle.Render(status)
+		return Green(status)
 	case "in_progress":
-		return yellowStyle.Render(status)
+		return Yellow(status)
 	case "failed":
-		return redStyle.Render(status)
+		return Red(status)
 	default:
-		return cell(status)
+		return Text(status)
 	}
 }
 
-func PipelineStatusColor(status string) string {
+// PipelineStatusColor colors a pipeline-run status. An unknown status is
+// left unstyled.
+func PipelineStatusColor(status string) Cell {
 	switch status {
 	case portal.StatusSucceeded:
-		return greenStyle.Render(status)
+		return Green(status)
 	case portal.StatusFailed, portal.StatusCancelled, portal.StatusTimeout:
-		return redStyle.Render(status)
+		return Red(status)
 	case portal.StatusRunning:
-		return blueStyle.Render(status)
+		return Blue(status)
 	default:
-		return cell(status)
+		return Text(status)
 	}
 }
 
-// AvailableText returns a colorized "Yes" or "No" instead of true/false.
-func AvailableText(available bool) string {
+// AvailableText is "Yes" or "No" in place of true/false; the styled form is
+// green or red.
+func AvailableText(available bool) Cell {
 	if available {
-		return greenStyle.Render("Yes")
+		return Green("Yes")
 	}
 
-	return redStyle.Render("No")
+	return Red("No")
 }
 
 // FormatRelativeTime converts an RFC3339 timestamp to a short relative display.
@@ -219,56 +293,6 @@ var oneRow = strings.NewReplacer("\n", " ", "\r", " ", "\t", " ")
 // cell is printable on one display row.
 func cell(s string) string { return oneRow.Replace(printable(s)) }
 
-// sgrShape and linkShape match the shapes of an SGR sequence and an OSC 8
-// link. A match passes styledCell only when the termseq policy, the one the
-// stream applies, accepts it.
-const (
-	sgrShape  = `\x1b\[[0-9;]*m`
-	linkShape = `\x1b\]8;[^\x1b\x07]*(?:\x1b\\|\x07)`
-)
-
-var seqCandidate = regexp.MustCompile(sgrShape + "|" + linkShape)
-
-// styledCell is cell applied to the text between the sequences the stream
-// keeps, which pass unchanged. A sequence in cluster text passes too: it
-// cannot be told from the caller's own.
-func styledCell(s string) string {
-	var b strings.Builder
-
-	last := 0
-
-	for _, loc := range seqCandidate.FindAllStringIndex(s, -1) {
-		b.WriteString(cell(s[last:loc[0]]))
-
-		seq := s[loc[0]:loc[1]]
-		if kept(seq) {
-			b.WriteString(seq)
-		} else {
-			b.WriteString(cell(seq))
-		}
-
-		last = loc[1]
-	}
-
-	b.WriteString(cell(s[last:]))
-
-	return b.String()
-}
-
-// kept reports whether the stream passes seq, a seqCandidate match.
-func kept(seq string) bool {
-	if seq[1] == '[' {
-		_, _, ok := termseq.SGR(seq[2 : len(seq)-1])
-
-		return ok
-	}
-
-	payload := strings.TrimSuffix(strings.TrimSuffix(seq[2:], "\x07"), "\x1b\\")
-	_, ok := termseq.OSC8(payload)
-
-	return ok
-}
-
 func mapStrings(ss []string, f func(string) string) []string {
 	out := make([]string, len(ss))
 	for i, s := range ss {
@@ -278,53 +302,48 @@ func mapStrings(ss []string, f func(string) string) []string {
 	return out
 }
 
-func mapRows(rows [][]string, f func(string) string) [][]string {
+func renderRows(rows [][]Cell, isTTY bool) [][]string {
 	out := make([][]string, len(rows))
+
 	for i, r := range rows {
-		out[i] = mapStrings(r, f)
+		out[i] = make([]string, len(r))
+		for j, c := range r {
+			out[i][j] = c.Render(isTTY)
+		}
 	}
 
 	return out
 }
 
-// Hyperlink renders text, on one row, as an OSC 8 link to target when
-// termseq.Link accepts the target, which it percent-encodes. Otherwise it
-// returns the text alone.
-func Hyperlink(text, target string) string {
-	text = cell(text)
+// Hyperlink is text, printable on one row, styled as an OSC 8 link to target
+// when termseq.Link accepts the target, which it percent-encodes. Otherwise
+// both forms are the text alone. Empty text is the zero Cell.
+func Hyperlink(text, target string) Cell {
+	c := Text(text)
 
 	encoded, ok := termseq.Link(target)
-	if !ok {
-		return text
+	if !ok || c.IsZero() {
+		return c
 	}
 
-	return lipgloss.NewStyle().Hyperlink(encoded).Render(text)
+	c.styled = lipgloss.NewStyle().Hyperlink(encoded).Render(c.plain)
+
+	return c
 }
 
-// GreenText returns s rendered in green.
-func GreenText(s string) string { return greenStyle.Render(s) }
-
-// YellowText returns s rendered in yellow.
-func YellowText(s string) string { return yellowStyle.Render(s) }
-
-// RedText returns s rendered in red.
-func RedText(s string) string { return redStyle.Render(s) }
-
-// BlueText returns s rendered in blue.
-func BlueText(s string) string { return blueStyle.Render(s) }
-
-// PrintTable writes a styled table when isTTY, a plain tabwriter table
-// otherwise. Every header and cell stays on one row with its control
-// characters visible. The styled table passes SGR and OSC 8 sequences in a
-// cell unchanged.
-func PrintTable(w io.Writer, isTTY bool, headers []string, rows [][]string) error {
+// PrintTable writes a styled table of the styled forms when isTTY, a plain
+// tabwriter table of the plain forms otherwise. Every header stays on one row
+// with its control characters visible.
+func PrintTable(w io.Writer, isTTY bool, headers []string, rows [][]Cell) error {
 	headers = mapStrings(headers, cell)
 
+	rendered := renderRows(rows, isTTY)
+
 	if isTTY {
-		return printStyledTable(w, headers, mapRows(rows, styledCell))
+		return printStyledTable(w, headers, rendered)
 	}
 
-	return printPlainTable(w, headers, mapRows(rows, cell))
+	return printPlainTable(w, headers, rendered)
 }
 
 // printStyledTable renders a lipgloss table with colored headers, alternating row colors, and no borders.
@@ -445,61 +464,66 @@ func PrintYAML(w io.Writer, v any) error {
 //	CRITICAL  → red         HIGH      → yellow
 //	MEDIUM    → blue        LOW       → gray
 //	INFO      → gray        UNASSIGNED→ gray
-func SCASeverityColor(severity string) string {
+func SCASeverityColor(severity string) Cell {
 	switch strings.ToUpper(severity) {
 	case "CRITICAL":
-		return redStyle.Render(severity)
+		return Red(severity)
 	case "HIGH":
-		return yellowStyle.Render(severity)
+		return Yellow(severity)
 	case "MEDIUM":
-		return blueStyle.Render(severity)
+		return Blue(severity)
 	case "LOW", "INFO", "UNASSIGNED":
-		return grayStyle.Render(severity)
+		return Gray(severity)
 	default:
-		return cell(severity)
+		return Text(severity)
 	}
 }
 
 // SonarGateStatusColor colorizes a SonarQube quality-gate / issue status value.
 // An unknown value is made printable on one row and left unstyled.
-func SonarGateStatusColor(status portal.QualityGateStatus) string {
+func SonarGateStatusColor(status portal.QualityGateStatus) Cell {
 	s := string(status)
 
 	switch status {
 	case portal.QualityGateOK:
-		return greenStyle.Render(s)
+		return Green(s)
 	case portal.QualityGateWarn:
-		return yellowStyle.Render(s)
+		return Yellow(s)
 	case portal.QualityGateError:
-		return redStyle.Render(s)
+		return Red(s)
 	case portal.QualityGateNone:
-		return grayStyle.Render(s)
+		return Gray(s)
 	default:
-		return cell(s)
+		return Text(s)
 	}
 }
 
 // DetailLine holds one label-value pair for resource detail rendering.
-// In a terminal, a non-empty Styled is shown instead of Value.
+// In a terminal, the styled form of a non-zero Styled is shown instead of
+// Value. Only the styled form of Styled is used; plain output prints Value.
 type DetailLine struct {
 	Label  string
 	Value  string
-	Styled string
+	Styled Cell
 }
 
 // PrintDetailLines writes one "<label>: <value>" line per entry, each on one
 // row with its control characters visible. Plain output pads "<label>:" to
-// detailLabelWidth columns. When isTTY, labels use LabelStyle and a non-empty
-// Styled replaces the ValueStyle rendering of Value; SGR and OSC 8 sequences
-// in it pass unchanged.
+// detailLabelWidth columns. When isTTY, labels use LabelStyle and a non-zero
+// Styled replaces the ValueStyle rendering of Value.
 func PrintDetailLines(w io.Writer, isTTY bool, lines []DetailLine) error {
 	for _, l := range lines {
 		label, value := cell(l.Label), cell(l.Value)
 
 		var err error
 		if isTTY {
-			_, err = fmt.Fprintf(w, "%s %s\n",
-				LabelStyle.Render(label+":"), cmp.Or(styledCell(l.Styled), ValueStyle.Render(value)))
+			if l.Styled.IsZero() {
+				value = ValueStyle.Render(value)
+			} else {
+				value = l.Styled.styled
+			}
+
+			_, err = fmt.Fprintf(w, "%s %s\n", LabelStyle.Render(label+":"), value)
 		} else {
 			_, err = fmt.Fprintf(w, "%-*s%s\n", detailLabelWidth, label+":", value)
 		}
@@ -533,8 +557,7 @@ func LabelWidth(groups ...[]DetailLine) int {
 // PrintAligned writes "<indent><label><pad>   <value>" per line, each on one
 // row with its control characters visible. The label column is width or
 // LabelWidth(lines), whichever is wider. When isTTY, labels use
-// alignedLabelStyle and a non-empty Styled replaces Value; SGR and OSC 8
-// sequences in it pass unchanged.
+// alignedLabelStyle and a non-zero Styled replaces Value.
 func PrintAligned(w io.Writer, isTTY bool, lines []DetailLine, indent string, width int) error {
 	width = max(width, LabelWidth(lines))
 
@@ -544,7 +567,9 @@ func PrintAligned(w io.Writer, isTTY bool, lines []DetailLine, indent string, wi
 
 		if isTTY {
 			label = alignedLabelStyle.Render(label)
-			value = cmp.Or(styledCell(l.Styled), value)
+			if !l.Styled.IsZero() {
+				value = l.Styled.styled
+			}
 		}
 
 		if _, err := fmt.Fprintf(w, "%s%s%*s   %s\n", indent, label, pad, "", value); err != nil {

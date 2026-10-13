@@ -134,7 +134,7 @@ func renderRunHeader(w io.Writer, run *portal.PipelineRunInfo) error {
 
 	if _, err := fmt.Fprintf(w, "%s %s\n",
 		ReasonLabel.Render("Status:"),
-		PipelineStatusColor(run.Status),
+		PipelineStatusColor(run.Status).Render(true),
 	); err != nil {
 		return err
 	}

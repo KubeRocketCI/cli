@@ -105,7 +105,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 
 func renderTable(w io.Writer, isTTY bool, result *portal.SonarProjectList) error {
 	headers := []string{"KEY", "NAME", "GATE"}
-	rows := make([][]string, 0, len(result.Projects))
+	rows := make([][]output.Cell, 0, len(result.Projects))
 
 	for _, p := range result.Projects {
 		status := p.QualityGateStatus
@@ -113,12 +113,7 @@ func renderTable(w io.Writer, isTTY bool, result *portal.SonarProjectList) error
 			status = portal.QualityGateNone
 		}
 
-		gate := string(status)
-		if isTTY {
-			gate = output.SonarGateStatusColor(status)
-		}
-
-		rows = append(rows, []string{p.Key, p.Name, gate})
+		rows = append(rows, append(output.Texts(p.Key, p.Name), output.SonarGateStatusColor(status)))
 	}
 
 	if err := output.PrintTable(w, isTTY, headers, rows); err != nil {

@@ -128,16 +128,16 @@ func podsRun(ctx context.Context, opts *PodsOptions) error {
 
 func renderTable(w io.Writer, isTTY bool, pods []portal.EnvPod) error {
 	headers := []string{"POD", "PROJECT", "STATUS", "READY", "RESTARTS", "CREATED"}
-	rows := make([][]string, 0, len(pods))
+	rows := make([][]output.Cell, 0, len(pods))
 
 	for _, p := range pods {
-		rows = append(rows, []string{
-			p.Name,
-			discovery.OptCell(p.Project),
-			statusCell(p, isTTY),
-			fmt.Sprintf("%d/%d", p.ReadyContainers, p.TotalContainers),
-			restartsCell(p),
-			discovery.OptTimeCell(p.CreatedAt),
+		rows = append(rows, []output.Cell{
+			output.Text(p.Name),
+			output.Text(discovery.OptCell(p.Project)),
+			statusCell(p),
+			output.Text(fmt.Sprintf("%d/%d", p.ReadyContainers, p.TotalContainers)),
+			output.Text(restartsCell(p)),
+			output.Text(discovery.OptTimeCell(p.CreatedAt)),
 		})
 	}
 
@@ -148,20 +148,18 @@ func renderTable(w io.Writer, isTTY bool, pods []portal.EnvPod) error {
 	return discovery.PrintSection(w, isTTY, "Details", detailLines(pods))
 }
 
-// statusCell colors the status on a TTY: green for a healthy pod, red for a
-// Failed one, yellow otherwise.
-func statusCell(p portal.EnvPod, isTTY bool) string {
+// statusCell colors the status: green for a healthy pod, red for a Failed
+// one, yellow otherwise.
+func statusCell(p portal.EnvPod) output.Cell {
 	status := output.SingleLine(p.Status)
 
 	switch {
-	case !isTTY:
-		return status
 	case p.Healthy():
-		return output.GreenText(status)
+		return output.Green(status)
 	case p.Phase == portal.PodPhaseFailed:
-		return output.RedText(status)
+		return output.Red(status)
 	default:
-		return output.YellowText(status)
+		return output.Yellow(status)
 	}
 }
 

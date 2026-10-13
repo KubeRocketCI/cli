@@ -15,14 +15,14 @@ import (
 
 // sgr matches the SGR sequences Style.Render emits; tests strip them before
 // comparing bytes.
-var sgr = regexp.MustCompile(sgrShape)
+var sgr = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
 func TestSonarGateStatusColor_PassthroughWhenUnknown(t *testing.T) {
 	t.Parallel()
 
 	// Unknown statuses must pass through without ANSI codes.
 	got := SonarGateStatusColor(portal.QualityGateStatus("UNKNOWN_STATUS"))
-	if got != "UNKNOWN_STATUS" {
+	if got != Text("UNKNOWN_STATUS") {
 		t.Errorf("SonarGateStatusColor returned %q, want %q", got, "UNKNOWN_STATUS")
 	}
 }
@@ -32,7 +32,7 @@ func TestSonarGateStatusColor_RecognizesKnownStatuses(t *testing.T) {
 
 	// For known statuses, the returned string should at least still contain the status text.
 	for _, s := range []portal.QualityGateStatus{portal.QualityGateOK, portal.QualityGateWarn, portal.QualityGateError, portal.QualityGateNone} {
-		got := SonarGateStatusColor(s)
+		got := SonarGateStatusColor(s).Render(true)
 		if !strings.Contains(got, string(s)) {
 			t.Errorf("SonarGateStatusColor(%q) returned %q, missing status text", s, got)
 		}
@@ -43,7 +43,7 @@ func TestSonarGateStatusColor_EmptyStatusReturnsEmpty(t *testing.T) {
 	t.Parallel()
 
 	// An empty QualityGateStatus hits the default branch and must return "".
-	got := SonarGateStatusColor(portal.QualityGateStatus(""))
+	got := SonarGateStatusColor(portal.QualityGateStatus("")).Render(true)
 	if got != "" {
 		t.Errorf("SonarGateStatusColor(%q) = %q, want %q", "", got, "")
 	}
@@ -192,7 +192,7 @@ func TestPrintTable_Plain(t *testing.T) {
 	var buf bytes.Buffer
 
 	headers := []string{"NAME", "STATUS"}
-	rows := [][]string{{"foo", "OK"}, {"bar", "ERROR"}}
+	rows := [][]Cell{Texts("foo", "OK"), {Text("bar"), Red("ERROR")}}
 
 	if err := PrintTable(&buf, false, headers, rows); err != nil {
 		t.Fatalf("PrintTable(isTTY=false) returned error: %v", err)
@@ -209,7 +209,7 @@ func TestPrintTable_Styled(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	if err := PrintTable(&buf, true, []string{"NAME", "STATUS"}, [][]string{{"foo", "OK"}}); err != nil {
+	if err := PrintTable(&buf, true, []string{"NAME", "STATUS"}, [][]Cell{{Text("foo"), Green("OK")}}); err != nil {
 		t.Fatalf("PrintTable(isTTY=true) returned error: %v", err)
 	}
 
@@ -253,7 +253,8 @@ func TestPrintDetailLines(t *testing.T) {
 
 	lines := []DetailLine{
 		{Label: "Name", Value: "foo"},
-		{Label: "Status", Value: "created", Styled: "[created-styled]"},
+		{Label: "Status", Value: "created", Styled: Green("[created-styled]")},
+		{Label: "Available", Value: "true", Styled: AvailableText(true)},
 	}
 
 	cases := []struct {
@@ -262,9 +263,9 @@ func TestPrintDetailLines(t *testing.T) {
 		want  string
 	}{
 		{"plain pads the label to 14 columns and ignores Styled", false,
-			"Name:         foo\nStatus:       created\n"},
-		{"styled pads through LabelStyle and prefers Styled", true,
-			"Name:          foo\nStatus:        [created-styled]\n"},
+			"Name:         foo\nStatus:       created\nAvailable:    true\n"},
+		{"styled pads through LabelStyle and prefers a non-zero Styled", true,
+			"Name:          foo\nStatus:        [created-styled]\nAvailable:     Yes\n"},
 	}
 
 	for _, tc := range cases {
@@ -303,7 +304,7 @@ func TestPrintAligned(t *testing.T) {
 
 	lines := []DetailLine{
 		{Label: "Short", Value: "val1"},
-		{Label: "A longer label", Value: "OK", Styled: "[OK-styled]"},
+		{Label: "A longer label", Value: "3", Styled: Concat(Text("3 "), Red("CRITICAL"))},
 	}
 
 	cases := []struct {
@@ -315,20 +316,20 @@ func TestPrintAligned(t *testing.T) {
 		{
 			name:   "plain pads to the longest label and ignores Styled",
 			indent: "  ",
-			want:   "  Short            val1\n  A longer label   OK\n",
+			want:   "  Short            val1\n  A longer label   3\n",
 		},
 		{
 			name:  "styled renders labels and prefers Styled",
 			isTTY: true,
 			want: alignedLabelStyle.Render("Short") + "            val1\n" +
-				alignedLabelStyle.Render("A longer label") + "   [OK-styled]\n",
+				alignedLabelStyle.Render("A longer label") + "   3 " + redStyle.Render("CRITICAL") + "\n",
 		},
 		{
 			name:   "styled keeps the indent outside the label style",
 			isTTY:  true,
 			indent: "  ",
 			want: "  " + alignedLabelStyle.Render("Short") + "            val1\n" +
-				"  " + alignedLabelStyle.Render("A longer label") + "   [OK-styled]\n",
+				"  " + alignedLabelStyle.Render("A longer label") + "   3 " + redStyle.Render("CRITICAL") + "\n",
 		},
 	}
 
@@ -443,7 +444,7 @@ func TestPrintTable_HostileCells(t *testing.T) {
 	t.Parallel()
 
 	headers := []string{"NAME\nX"}
-	rows := [][]string{{"a\x1b[2J\nb\tc"}}
+	rows := [][]Cell{{Text("a\x1b[2J\nb\tc")}}
 
 	var plain bytes.Buffer
 	if err := PrintTable(&plain, false, headers, rows); err != nil {
@@ -455,22 +456,26 @@ func TestPrintTable_HostileCells(t *testing.T) {
 	}
 
 	// Every control that lipgloss measures as zero width but a terminal acts
-	// on, inside and outside the CLI's own sequences, plus link payloads that
-	// carry a line break.
+	// on, inside and outside the CLI's own sequences, link payloads that carry
+	// a line break, and cluster text holding sequences the stream keeps.
 	link := Hyperlink("t", "http://h/")
-	hostile := [][]string{
-		{"legit\f\f\fpay\x7f\v\x1b[2J\u202ements " + greenStyle.Render("ok\fnot") + " " + link},
-		{"x\x1b]8;\nFORGED\x07"},
-		{"x\x1b]8;;http://h/\rFORGED\x07"},
+	hostile := [][]Cell{
+		{Concat(Text("legit\f\f\fpay\x7f\v\x1b[2J\u202ements "), Green("ok\fnot"), Text(" "), link)},
+		{Text("x\x1b]8;\nFORGED\x07")},
+		{Text("x\x1b]8;;http://h/\rFORGED\x07")},
 		{Hyperlink("a", "http://a/\nb")},
-		{"a\nb\t" + greenStyle.Render("ok")},
+		{Concat(Text("a\nb\t"), Green("ok"))},
+		{Text(clusterSeqs)},
+		{Green("\x1b[31mx")},
 	}
-	visible := [][]string{
-		{"legit^L^L^Lpay^?^K^[[2Jments " + greenStyle.Render("ok^Lnot") + " " + link},
-		{"x^[]8; FORGED^G"},
-		{"x^[]8;;http://h/ FORGED^G"},
-		{"a"},
-		{"a b " + greenStyle.Render("ok")},
+	visible := [][]Cell{
+		{Concat(Text("legit^L^L^Lpay^?^K^[[2Jments "), Green("ok^Lnot"), Text(" "), link)},
+		{Text("x^[]8; FORGED^G")},
+		{Text("x^[]8;;http://h/ FORGED^G")},
+		{Text("a")},
+		{Concat(Text("a b "), Green("ok"))},
+		{Text(clusterSeqsVisible)},
+		{Green("^[[31mx")},
 	}
 
 	var styled bytes.Buffer
@@ -483,7 +488,7 @@ func TestPrintTable_HostileCells(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, want := range []string{greenStyle.Render("ok^Lnot"), link, "x^[]8; FORGED^G"} {
+	for _, want := range []string{greenStyle.Render("ok^Lnot"), link.Render(true), "x^[]8; FORGED^G", clusterSeqsVisible} {
 		if !strings.Contains(styled.String(), want) {
 			t.Errorf("styled table is missing %q:\n%q", want, styled.String())
 		}
@@ -498,17 +503,28 @@ func TestPrintTable_HostileCells(t *testing.T) {
 	}
 }
 
+// clusterSeqs holds an SGR sequence and an OSC 8 link that termseq accepts;
+// as cluster text they print in caret notation.
+const (
+	clusterSeqs        = "\x1b[31mred\x1b[m \x1b]8;;http://h/\x1b\\t\x1b]8;;\x1b\\"
+	clusterSeqsVisible = "^[[31mred^[[m ^[]8;;http://h/^[\\t^[]8;;^[\\"
+)
+
 func TestPrintDetailLines_HostileValues(t *testing.T) {
 	t.Parallel()
 
-	lines := []DetailLine{{Label: "Na\nme", Value: "v\x1b]0;t\x07\nw", Styled: greenStyle.Render("x\fy") + "\nz"}}
+	lines := []DetailLine{
+		{Label: "Na\nme", Value: "v\x1b]0;t\x07\nw", Styled: Concat(Green("x\fy"), Text("\nz"))},
+		{Label: "Seq", Value: clusterSeqs},
+		{Label: "Styled", Value: "v", Styled: Green(clusterSeqs)},
+	}
 
 	var plain bytes.Buffer
 	if err := PrintDetailLines(&plain, false, lines); err != nil {
 		t.Fatal(err)
 	}
 
-	if want := "Na me:        v^[]0;t^G w\n"; plain.String() != want {
+	if want := "Na me:        v^[]0;t^G w\nSeq:          " + clusterSeqsVisible + "\nStyled:       v\n"; plain.String() != want {
 		t.Errorf("plain = %q, want %q", plain.String(), want)
 	}
 
@@ -517,7 +533,36 @@ func TestPrintDetailLines_HostileValues(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got, want := sgr.ReplaceAllString(styled.String(), ""), "Na me:         x^Ly z\n"; got != want {
+	want := "Na me:         x^Ly z\nSeq:           " + clusterSeqsVisible + "\nStyled:        " + clusterSeqsVisible + "\n"
+	if got := sgr.ReplaceAllString(styled.String(), ""); got != want {
+		t.Errorf("styled = %q, want %q", got, want)
+	}
+}
+
+func TestPrintAligned_HostileValues(t *testing.T) {
+	t.Parallel()
+
+	lines := []DetailLine{
+		{Label: "Seq", Value: clusterSeqs},
+		{Label: "Styled", Value: "v", Styled: Green(clusterSeqs)},
+	}
+
+	var plain bytes.Buffer
+	if err := PrintAligned(&plain, false, lines, "", 0); err != nil {
+		t.Fatal(err)
+	}
+
+	if want := "Seq      " + clusterSeqsVisible + "\nStyled   v\n"; plain.String() != want {
+		t.Errorf("plain = %q, want %q", plain.String(), want)
+	}
+
+	var styled bytes.Buffer
+	if err := PrintAligned(&styled, true, lines, "", 0); err != nil {
+		t.Fatal(err)
+	}
+
+	want := "Seq      " + clusterSeqsVisible + "\nStyled   " + clusterSeqsVisible + "\n"
+	if got := sgr.ReplaceAllString(styled.String(), ""); got != want {
 		t.Errorf("styled = %q, want %q", got, want)
 	}
 }
@@ -538,8 +583,8 @@ func TestPrintAligned_MinimumWidth(t *testing.T) {
 func TestStatusColor_UnknownIsPrintable(t *testing.T) {
 	t.Parallel()
 
-	if got := StatusColor("odd\x1b[2J\nstate"); got != "odd^[[2J state" {
-		t.Errorf("StatusColor = %q", got)
+	if got := StatusColor("odd\x1b[2J\nstate"); got != Text("odd^[[2J state") {
+		t.Errorf("StatusColor = %#v", got)
 	}
 }
 
@@ -552,49 +597,36 @@ func TestLabelWidth(t *testing.T) {
 	}
 }
 
-func TestStyledCell(t *testing.T) {
+func TestCell(t *testing.T) {
 	t.Parallel()
 
-	link := "\x1b]8;;http://h/\x1b\\t\x1b]8;;\x1b\\"
-
-	cases := map[string]struct{ in, want string }{
-		"SGR and a link pass, the rest is visible": {
-			in:   "\x1b[32mok\x1b[m \x1b[2J\f" + link + "\u009b2J",
-			want: "\x1b[32mok\x1b[m ^[[2J^L" + link + "^[[2J",
-		},
-		"a newline in a link payload":         {in: "x\x1b]8;\nFORGED\x07", want: "x^[]8; FORGED^G"},
-		"a carriage return in a link payload": {in: "x\x1b]8;;http://h/\rFORGED\x07", want: "x^[]8;;http://h/ FORGED^G"},
-		"a bidi override in a link payload":   {in: "\x1b]8;;http://h/\u202e\x07t", want: "^[]8;;http://h/^Gt"},
-		"an SGR the stream drops is visible":  {in: "\x1b[7mrev\x1b[m", want: "^[[7mrev\x1b[m"},
-		"an index the stream rejects":         {in: "\x1b[38;5;999mX", want: "^[[38;5;999mX"},
-		"too many SGR fields":                 {in: "\x1b[1;1;1;1;1;1;1;1;1mX", want: "^[[1;1;1;1;1;1;1;1;1mX"},
-		"a malformed link payload":            {in: "\x1b]8;x\x07t", want: "^[]8;x^Gt"},
-		"a javascript link":                   {in: "\x1b]8;;javascript:alert(1)\x07t", want: "^[]8;;javascript:alert(1)^Gt"},
-		"a link over the limit":               {in: "\x1b]8;;http://h/" + strings.Repeat("a", 2048) + "\x07t", want: "^[]8;;http://h/" + strings.Repeat("a", 2048) + "^Gt"},
+	cases := map[string]struct {
+		c             Cell
+		plain, styled string
+	}{
+		"text":                       {Text("a\nb"), "a b", "a b"},
+		"green":                      {Green("ok"), "ok", greenStyle.Render("ok")},
+		"a tab is one space":         {Green("a\tb"), "a b", greenStyle.Render("a b")},
+		"CRLF is two spaces":         {Green("a\r\nb"), "a  b", greenStyle.Render("a  b")},
+		"concat joins form by form":  {Concat(Text("3 "), Red("HIGH")), "3 HIGH", "3 " + redStyle.Render("HIGH")},
+		"texts":                      {Concat(Texts("a", "\tb")...), "a b", "a b"},
+		"an unknown status is plain": {PipelineStatusColor("odd"), "odd", "odd"},
+		"empty green is zero":        {Green(""), "", ""},
+		"empty link is zero":         {Hyperlink("", "http://h/"), "", ""},
 	}
 
 	for name, tc := range cases {
-		if got := styledCell(tc.in); got != tc.want {
-			t.Errorf("%s: styledCell = %q, want %q", name, got, tc.want)
+		if got := tc.c.Render(false); got != tc.plain {
+			t.Errorf("%s: Render(false) = %q, want %q", name, got, tc.plain)
+		}
+
+		if got := tc.c.Render(true); got != tc.styled {
+			t.Errorf("%s: Render(true) = %q, want %q", name, got, tc.styled)
 		}
 	}
-}
 
-// Every style the CLI renders with, and a link, pass styledCell unchanged.
-func TestStyledCell_KeepsOwnStyles(t *testing.T) {
-	t.Parallel()
-
-	own := []string{
-		HeaderStyle.Render("h"), EvenRowStyle.Render("e"), OddRowStyle.Render("o"), LabelStyle.Render("l"),
-		SectionStyle.Render("s"), DimStyle.Render("d"), greenStyle.Render("g"), yellowStyle.Render("y"),
-		redStyle.Render("r"), blueStyle.Render("b"), grayStyle.Render("x"),
-		Hyperlink("t", "http://h/"), Hyperlink("t", "https://h/p?q=1#f"),
-	}
-
-	for _, s := range own {
-		if got := styledCell(s); got != s {
-			t.Errorf("styledCell(%q) = %q, want it unchanged", s, got)
-		}
+	if !(Cell{}).IsZero() || !Green("").IsZero() || !Hyperlink("", "http://h/").IsZero() || Text("x").IsZero() {
+		t.Error("IsZero: want true for empty text only")
 	}
 }
 
@@ -614,8 +646,13 @@ func TestHyperlink(t *testing.T) {
 	}
 
 	for name, tc := range cases {
-		if got := Hyperlink(tc.text, tc.target); got != tc.want {
+		c := Hyperlink(tc.text, tc.target)
+		if got := c.Render(true); got != tc.want {
 			t.Errorf("%s: Hyperlink = %q, want %q", name, got, tc.want)
+		}
+
+		if got := c.Render(false); got != cell(tc.text) {
+			t.Errorf("%s: plain Hyperlink = %q, want %q", name, got, cell(tc.text))
 		}
 	}
 }

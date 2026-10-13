@@ -225,35 +225,18 @@ const (
 
 func renderSummaryTable(opts *ListOptions, result *portal.PipelineRunListResult) error {
 	return render.RenderBare(opts.IO, opts.OutputFormat, result, func(w io.Writer, isTTY bool) error {
-		rows := make([][]string, 0, len(result.PipelineRuns))
+		rows := make([][]output.Cell, 0, len(result.PipelineRuns))
 
 		for _, pr := range result.PipelineRuns {
-			status := pr.Status
-			prCol := pr.PRNumber
-
-			nameCol := output.Truncate(pr.Name, colWidthName)
-
-			if isTTY {
-				status = output.PipelineStatusColor(pr.Status)
-
-				if pr.PRURL != "" && pr.PRNumber != "" {
-					prCol = output.Hyperlink(pr.PRNumber, pr.PRURL)
-				}
-
-				if pr.PortalURL != "" {
-					nameCol = output.Hyperlink(nameCol, pr.PortalURL)
-				}
-			}
-
-			rows = append(rows, []string{
-				nameCol,
-				status,
-				output.Truncate(pr.Project, colWidthProject),
-				prCol,
-				output.Truncate(pr.Author, colWidthAuthor),
-				pr.Type,
-				output.FormatRelativeTime(pr.StartTime),
-				pr.Duration,
+			rows = append(rows, []output.Cell{
+				output.Hyperlink(output.Truncate(pr.Name, colWidthName), pr.PortalURL),
+				output.PipelineStatusColor(pr.Status),
+				output.Text(output.Truncate(pr.Project, colWidthProject)),
+				output.Hyperlink(pr.PRNumber, pr.PRURL),
+				output.Text(output.Truncate(pr.Author, colWidthAuthor)),
+				output.Text(pr.Type),
+				output.Text(output.FormatRelativeTime(pr.StartTime)),
+				output.Text(pr.Duration),
 			})
 		}
 
