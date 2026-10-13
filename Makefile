@@ -16,6 +16,11 @@ GO_LDFLAGS = -s -w \
 DIST_DIR := dist
 BIN_DIR := bin
 
+# Go toolchain for every recipe, from go.mod; GOTOOLCHAIN in the environment overrides it.
+# golangci-lint loads the standard library of this toolchain and must be built with it.
+GO_VERSION := $(shell sed -n 's/^go //p' go.mod)
+export GOTOOLCHAIN ?= go$(GO_VERSION)
+
 # Tools - pinned versions
 GOLANGCI_LINT_VERSION ?= v2.11.3
 GORELEASER_VERSION ?= v2.10.2
