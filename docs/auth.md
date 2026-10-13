@@ -50,6 +50,8 @@ URL before the first request:
   for `http`), so `https://host:443` and `https://host` are the same port.
   Redirects to the same host and port are followed; the chain stops after 10
   requests.
+- A 200 response whose Content-Type is not JSON, such as the web page served
+  for a wrong portal path, fails the command.
 
 | Condition | Exit | Message (stderr) |
 |---|---|---|
@@ -59,6 +61,7 @@ URL before the first request:
 | URL carries user info | `1` | `invalid portal URL: user info is not allowed: <url>` (password shown as `xxxxx`) |
 | Scheme is not `https`, or `http` host is not loopback | `1` | `invalid portal URL: must use https, or http on localhost or a loopback IP: <url>` |
 | Redirect to another host or port (an omitted port is the scheme's default), or from `https` to `http` | `1` | `<context>: Get "<location>": redirect refused from <url> to <target>` |
+| 200 response whose Content-Type is not JSON | `1` | `<context>: unexpected portal response: HTTP 200 with Content-Type "<type>", not JSON` |
 
 `auth login` checks the URL before issuer discovery and before the browser
 opens, so a refused URL is never saved to `config.yaml`.

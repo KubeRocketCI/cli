@@ -935,7 +935,7 @@ func newMockPortal(t *testing.T, handlers pathHandlers, opts ...Option) *Pipelin
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	client, err := restapi.NewClientWithResponses(srv.URL)
+	client, err := NewRestClient(srv.URL, 5*time.Second)
 	require.NoError(t, err)
 
 	return NewPipelineRunService(client, "", "", "ns", opts...)

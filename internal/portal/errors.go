@@ -16,6 +16,15 @@ var (
 	// another host or port, or from https to http.
 	ErrRedirectRefused = errors.New("redirect refused")
 
+	// ErrUnexpectedResponse is returned when the portal answers 200 with a
+	// Content-Type that is not JSON, e.g. a web page from a proxy or the SPA
+	// fallback.
+	ErrUnexpectedResponse = errors.New("unexpected portal response")
+
+	// ErrResponseTooLarge is returned when a portal response body exceeds
+	// the read cap.
+	ErrResponseTooLarge = errors.New("portal response too large")
+
 	// ErrDeploymentNotFound is returned when a CDPipeline (deployment)
 	// look-up fails. Wraps ErrNotFound so callers using errors.Is for
 	// generic not-found handling still match.

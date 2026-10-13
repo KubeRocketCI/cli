@@ -319,7 +319,7 @@ func (p *fakePortal) start(t *testing.T) func() (*restapi.ClientWithResponses, e
 	p.url = srv.URL
 
 	return func() (*restapi.ClientWithResponses, error) {
-		return restapi.NewClientWithResponses(srv.URL + "/rest")
+		return portal.NewRestClient(srv.URL+"/rest", 5*time.Second)
 	}
 }
 
@@ -464,7 +464,7 @@ func TestStatus_PortalUnreachable(t *testing.T) {
 
 	tp := &mockTokenProvider{infoErr: errors.New("invalid ID token format")}
 	restClient := func() (*restapi.ClientWithResponses, error) {
-		return restapi.NewClientWithResponses(url + "/rest")
+		return portal.NewRestClient(url+"/rest", 5*time.Second)
 	}
 
 	_, err := runStatusWithPortal(t, tp, restClient)
@@ -487,9 +487,11 @@ func TestStatus_PortalAnswersNotConfig(t *testing.T) {
 		"readable KRCI_TOKEN claims": {Email: "forged@example.com", FromEnv: true},
 	}
 
-	bodies := map[string]struct{ contentType, body string }{
-		"html page":   {contentType: "text/html; charset=utf-8", body: "<!doctype html><html></html>"},
-		"JSON object": {contentType: "application/json", body: `{"status":"ok"}`},
+	bodies := map[string]struct{ contentType, body, wantErr string }{
+		"html page": {contentType: "text/html; charset=utf-8", body: "<!doctype html><html></html>",
+			wantErr: "verifying the token with the portal: requesting cluster config: unexpected portal response"},
+		"JSON object": {contentType: "application/json", body: `{"status":"ok"}`,
+			wantErr: "verifying the token with the portal: parsing cluster config"},
 	}
 
 	for claimsName, info := range claims {
@@ -514,8 +516,8 @@ func TestStatus_PortalAnswersNotConfig(t *testing.T) {
 						t.Errorf("err = %v, must not wrap portal.ErrUnauthorized", err)
 					}
 
-					if !strings.Contains(err.Error(), "verifying the token with the portal: parsing cluster config") {
-						t.Errorf("error = %q, want the verification and parse context", err.Error())
+					if !strings.Contains(err.Error(), answer.wantErr) {
+						t.Errorf("error = %q, want %q", err.Error(), answer.wantErr)
 					}
 
 					if p.calls != 1 {

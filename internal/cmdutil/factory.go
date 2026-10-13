@@ -149,9 +149,9 @@ func New(ios *iostreams.IOStreams) *Factory {
 				return nil
 			}
 
-			cachedRest, cachedRestErr = restapi.NewClientWithResponses(
+			cachedRest, cachedRestErr = portal.NewRestClient(
 				cfg.PortalURL+"/rest",
-				restapi.WithHTTPClient(portal.NewHTTPClient(DefaultHTTPTimeout)),
+				DefaultHTTPTimeout,
 				restapi.WithRequestEditorFn(bearerAuth),
 			)
 		})

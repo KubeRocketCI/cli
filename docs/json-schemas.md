@@ -1013,6 +1013,8 @@ Common messages:
 | Portal too old for the command               | `portal has no endpoint for this command (<route>); upgrade the portal`                  |
 | Portal upstream 502/503/504                  | `upstream service unavailable: <Portal message or HTTP status phrase>`                   |
 | Other status, 500 included                   | `portal returned HTTP <code>: <body>`; a long body is cut and ends with `...`            |
+| Portal answers 200 with a Content-Type that is not JSON (a proxy page, or the web page served for a wrong portal path) | the verb's context, then `unexpected portal response: HTTP 200 with Content-Type "<type>", not JSON` |
+| Portal response body over 64 MiB (1 MiB for the config calls of `auth login`) | the verb's context, then `portal response too large: more than <n> bytes`                |
 | Network failure                              | the verb's context, then the transport error                                             |
 | Portal redirects to another host or port (an omitted port is the scheme's default), or from `https` to `http` | the verb's context, then `Get "<location>": redirect refused from <url> to <target>`; the target is not requested |
 

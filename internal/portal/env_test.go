@@ -11,8 +11,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 )
 
 // envTestRecorder routes /rest/v1/resources/list calls to a list of typed
@@ -114,7 +112,7 @@ func newEnvServiceForTest(t *testing.T, rec *envTestRecorder) (*EnvService, func
 
 	url, closer := newEnvTestServer(t, rec)
 
-	client, err := restapi.NewClientWithResponses(url + "/rest")
+	client, err := NewRestClient(url+"/rest", 5*time.Second)
 	if err != nil {
 		closer()
 		t.Fatalf("new client: %v", err)
@@ -175,7 +173,7 @@ func newDeploymentByProjectServiceForTest(t *testing.T, rec *envTestRecorder) (*
 
 	url, closer := newEnvTestServer(t, rec)
 
-	client, err := restapi.NewClientWithResponses(url + "/rest")
+	client, err := NewRestClient(url+"/rest", 5*time.Second)
 	if err != nil {
 		closer()
 		t.Fatalf("new client: %v", err)

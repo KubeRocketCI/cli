@@ -36,13 +36,13 @@ func FetchOIDCConfig(ctx context.Context, portalURL string) (string, error) {
 		return "", fmt.Errorf("creating OIDC config request: %w", err)
 	}
 
-	resp, err := NewHTTPClient(configTimeout).Do(req)
+	resp, err := newDoer(configTimeout, maxConfigBodyBytes).Do(req)
 	if err != nil {
 		return "", fmt.Errorf("requesting OIDC config: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxConfigBodyBytes))
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("reading OIDC config response: %w", err)
 	}
@@ -81,7 +81,7 @@ func FetchClusterConfig(ctx context.Context, portalURL, token string) (*ClusterC
 
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err := NewHTTPClient(configTimeout).Do(req)
+	resp, err := newDoer(configTimeout, maxConfigBodyBytes).Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("requesting cluster config: %w", err)
 	}
@@ -96,7 +96,7 @@ func FetchClusterConfig(ctx context.Context, portalURL, token string) (*ClusterC
 func readClusterConfig(resp *http.Response) (*ClusterConfig, error) {
 	defer func() { _ = resp.Body.Close() }()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxConfigBodyBytes))
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading cluster config response: %w", err)
 	}

@@ -1,6 +1,7 @@
 package portal
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 )
 
 func TestValidatePortalURL(t *testing.T) {
@@ -266,7 +269,7 @@ func TestCheckRedirect(t *testing.T) {
 	}
 }
 
-func TestNewHTTPClient_Redirects(t *testing.T) {
+func TestHTTPClient_Redirects(t *testing.T) {
 	t.Parallel()
 
 	t.Run("same host is followed", func(t *testing.T) {
@@ -283,7 +286,7 @@ func TestNewHTTPClient_Redirects(t *testing.T) {
 		}))
 		t.Cleanup(srv.Close)
 
-		resp := get(t, NewHTTPClient(5*time.Second), srv.URL+"/start")
+		resp := get(t, newHTTPClient(5*time.Second), srv.URL+"/start")
 		require.NoError(t, resp.err)
 		assert.Equal(t, http.StatusNoContent, resp.status)
 		assert.Equal(t, "/end", resp.finalPath)
@@ -295,7 +298,7 @@ func TestNewHTTPClient_Redirects(t *testing.T) {
 		target, hits := countingServer(t)
 		origin := redirectingServer(t, target.URL+"/end")
 
-		resp := get(t, NewHTTPClient(5*time.Second), origin.URL+"/start")
+		resp := get(t, newHTTPClient(5*time.Second), origin.URL+"/start")
 		require.ErrorIs(t, resp.err, ErrRedirectRefused)
 		assert.Contains(t, resp.err.Error(), "from "+origin.URL+"/start to "+target.URL+"/end")
 		assert.Zero(t, hits.Load(), "redirect target was requested")
@@ -309,7 +312,7 @@ func TestNewHTTPClient_Redirects(t *testing.T) {
 		}))
 		t.Cleanup(srv.Close)
 
-		client := NewHTTPClient(5 * time.Second)
+		client := newHTTPClient(5 * time.Second)
 		client.Transport = srv.Client().Transport
 
 		resp := get(t, client, srv.URL+"/start")
@@ -317,6 +320,156 @@ func TestNewHTTPClient_Redirects(t *testing.T) {
 		assert.Contains(t, resp.err.Error(),
 			"from "+srv.URL+"/start to http://"+strings.TrimPrefix(srv.URL, "https://")+"/end")
 	})
+}
+
+func TestDoer_ResponseContract(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		status      int
+		contentType string
+		wantErr     error
+		wantErrMsg  string
+		wantCT      string
+	}{
+		{name: "200 JSON", status: http.StatusOK, contentType: "application/json; charset=utf-8",
+			wantCT: "application/json; charset=utf-8"},
+		{name: "200 web page", status: http.StatusOK, contentType: "text/html; charset=utf-8",
+			wantErr: ErrUnexpectedResponse},
+		{name: "200 without Content-Type", status: http.StatusOK, wantErr: ErrUnexpectedResponse},
+		{name: "200 long Content-Type", status: http.StatusOK, contentType: strings.Repeat("t", 1000),
+			wantErr: ErrUnexpectedResponse, wantErrMsg: `Content-Type "` + strings.Repeat("t", maxErrorBodyLen) + `...", not JSON`},
+		{name: "401 JSON keeps the body raw", status: http.StatusUnauthorized, contentType: "application/json"},
+		{name: "502 page keeps the body raw", status: http.StatusBadGateway, contentType: "text/html"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			const body = `{"statusCode":401,"error":"Unauthorized"}`
+
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header()["Content-Type"] = []string{tt.contentType}
+				w.WriteHeader(tt.status)
+				_, _ = io.WriteString(w, body)
+			}))
+			t.Cleanup(srv.Close)
+
+			resp, err := newDoer(5*time.Second, maxResponseBodyBytes).Do(newRequest(t, srv.URL))
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.ErrorContains(t, err, tt.wantErrMsg)
+				assert.Nil(t, resp)
+
+				return
+			}
+
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = resp.Body.Close() })
+
+			got, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			assert.Equal(t, tt.status, resp.StatusCode)
+			assert.Equal(t, tt.wantCT, resp.Header.Get("Content-Type"))
+			assert.Equal(t, body, string(got))
+		})
+	}
+}
+
+// TestDoer_GeneratedParsers pins the Doer to the generated parsers: every 200
+// it passes decodes into JSON200, and an error body of any shape reaches the
+// caller undecoded.
+func TestDoer_GeneratedParsers(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		status      int
+		contentType string
+		body        string
+	}{
+		{name: "200 JSON", status: http.StatusOK, contentType: "application/json; charset=utf-8",
+			body: `{"clusterName":"c","defaultNamespace":"ns"}`},
+		{name: "200 JSON suffix type", status: http.StatusOK, contentType: "application/problem+json",
+			body: `{"clusterName":"c","defaultNamespace":"ns"}`},
+		{name: "401 Fastify body", status: http.StatusUnauthorized, contentType: "application/json",
+			body: `{"statusCode":401,"error":"Unauthorized","message":"Unauthorized"}`},
+		{name: "403 not JSON", status: http.StatusForbidden, contentType: "application/json", body: `denied`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", tt.contentType)
+				w.WriteHeader(tt.status)
+				_, _ = io.WriteString(w, tt.body)
+			}))
+			t.Cleanup(srv.Close)
+
+			client, err := NewRestClient(srv.URL, 5*time.Second)
+			require.NoError(t, err)
+
+			resp, err := client.ConfigGetWithResponse(t.Context())
+			require.NoError(t, err)
+			assert.Equal(t, tt.body, string(resp.Body))
+
+			if tt.status == http.StatusOK {
+				require.NotNil(t, resp.JSON200)
+				assert.Equal(t, "ns", resp.JSON200.DefaultNamespace)
+			}
+		})
+	}
+}
+
+func TestDoer_BodyCap(t *testing.T) {
+	t.Parallel()
+
+	const limit = 8
+
+	tests := []struct {
+		name    string
+		status  int
+		size    int
+		wantErr bool
+	}{
+		{name: "at the cap", status: http.StatusOK, size: limit},
+		{name: "past the cap", status: http.StatusOK, size: limit + 1, wantErr: true},
+		{name: "error body past the cap", status: http.StatusInternalServerError, size: limit + 1, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.status)
+				_, _ = io.WriteString(w, strings.Repeat("x", tt.size))
+			}))
+			t.Cleanup(srv.Close)
+
+			d := newDoer(5*time.Second, limit)
+
+			resp, err := d.Do(newRequest(t, srv.URL))
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = resp.Body.Close() })
+
+			got, err := io.ReadAll(resp.Body)
+			if !tt.wantErr {
+				require.NoError(t, err)
+				assert.Len(t, got, tt.size)
+
+				return
+			}
+
+			require.ErrorIs(t, err, ErrResponseTooLarge)
+			assert.Len(t, got, limit)
+		})
+	}
 }
 
 type getResult struct {
@@ -375,4 +528,20 @@ func redirectingServer(t *testing.T, location string) *httptest.Server {
 	t.Cleanup(srv.Close)
 
 	return srv
+}
+
+func TestNewRestClient_DoerReplacesCallerHTTPClient(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = io.WriteString(w, "<html></html>")
+	}))
+	t.Cleanup(srv.Close)
+
+	client, err := NewRestClient(srv.URL, 5*time.Second, restapi.WithHTTPClient(http.DefaultClient))
+	require.NoError(t, err)
+
+	_, err = client.ConfigGetWithResponse(t.Context())
+	require.ErrorIs(t, err, ErrUnexpectedResponse)
 }

@@ -5,8 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
-
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
+	"time"
 )
 
 func cdPipelineGetJSONWithMessage(name string, applications []string, message string) string {
@@ -27,7 +26,7 @@ func newDeploymentServiceForTest(t *testing.T, rec *envTestRecorder) (*Deploymen
 
 	url, closer := newEnvTestServer(t, rec)
 
-	client, err := restapi.NewClientWithResponses(url + "/rest")
+	client, err := NewRestClient(url+"/rest", 5*time.Second)
 	if err != nil {
 		closer()
 		t.Fatalf("new client: %v", err)

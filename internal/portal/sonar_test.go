@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/internal/ptr"
@@ -23,7 +24,7 @@ func newTestClient(t *testing.T, handler http.HandlerFunc) (*restapi.ClientWithR
 
 	srv := httptest.NewServer(handler)
 
-	client, err := restapi.NewClientWithResponses(srv.URL + "/rest")
+	client, err := NewRestClient(srv.URL+"/rest", 5*time.Second)
 	if err != nil {
 		srv.Close()
 		t.Fatalf("NewClientWithResponses: %v", err)
@@ -394,14 +395,11 @@ func TestSonarService_List_500_MessagePassthrough(t *testing.T) {
 	}
 }
 
-func TestSonarService_List_EmptyJSON200(t *testing.T) {
+func TestSonarService_List_NotJSON200(t *testing.T) {
 	t.Parallel()
 
-	// The generated client sets JSON200 to nil when Content-Type is not application/json.
-	// Simulate by returning no Content-Type so the generated client leaves JSON200 nil.
 	handler := func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		// No Content-Type → JSON200 stays nil in the generated client.
 		w.Write([]byte(`{}`))
 	}
 
@@ -409,12 +407,8 @@ func TestSonarService_List_EmptyJSON200(t *testing.T) {
 	defer closer()
 
 	_, err := NewSonarService(client).List(context.Background(), SonarListParams{})
-	if err == nil {
-		t.Fatal("expected error when JSON200 is nil")
-	}
-
-	if !strings.Contains(err.Error(), "portal returned empty sonar list response") {
-		t.Errorf("unexpected error message: %v", err)
+	if !errors.Is(err, ErrUnexpectedResponse) {
+		t.Errorf("err = %v, want ErrUnexpectedResponse", err)
 	}
 }
 
@@ -1100,15 +1094,13 @@ func TestSonarNotFoundErr_NonNotFound_PassThrough(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Get / Gate / Issues — JSON200 == nil (200 response without application/json
-// Content-Type leaves JSON200 nil in the generated client)
+// Get / Gate / Issues: a 200 without a JSON Content-Type fails with ErrUnexpectedResponse.
 // ---------------------------------------------------------------------------
 
-func TestSonarService_Get_EmptyJSON200(t *testing.T) {
+func TestSonarService_Get_NotJSON200(t *testing.T) {
 	t.Parallel()
 
 	handler := func(w http.ResponseWriter, _ *http.Request) {
-		// No Content-Type → generated client leaves JSON200 nil.
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{}`))
 	}
@@ -1117,20 +1109,15 @@ func TestSonarService_Get_EmptyJSON200(t *testing.T) {
 	defer closer()
 
 	_, err := NewSonarService(client).Get(context.Background(), testProject, SonarScope{})
-	if err == nil {
-		t.Fatal("expected error when JSON200 is nil")
-	}
-
-	if !strings.Contains(err.Error(), "portal returned empty sonar get response") {
-		t.Errorf("unexpected error message: %v", err)
+	if !errors.Is(err, ErrUnexpectedResponse) {
+		t.Errorf("err = %v, want ErrUnexpectedResponse", err)
 	}
 }
 
-func TestSonarService_Gate_EmptyJSON200(t *testing.T) {
+func TestSonarService_Gate_NotJSON200(t *testing.T) {
 	t.Parallel()
 
 	handler := func(w http.ResponseWriter, _ *http.Request) {
-		// No Content-Type → generated client leaves JSON200 nil.
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{}`))
 	}
@@ -1139,20 +1126,15 @@ func TestSonarService_Gate_EmptyJSON200(t *testing.T) {
 	defer closer()
 
 	_, err := NewSonarService(client).Gate(context.Background(), testProject, SonarScope{})
-	if err == nil {
-		t.Fatal("expected error when JSON200 is nil")
-	}
-
-	if !strings.Contains(err.Error(), "portal returned empty sonar gate response") {
-		t.Errorf("unexpected error message: %v", err)
+	if !errors.Is(err, ErrUnexpectedResponse) {
+		t.Errorf("err = %v, want ErrUnexpectedResponse", err)
 	}
 }
 
-func TestSonarService_Issues_EmptyJSON200(t *testing.T) {
+func TestSonarService_Issues_NotJSON200(t *testing.T) {
 	t.Parallel()
 
 	handler := func(w http.ResponseWriter, _ *http.Request) {
-		// No Content-Type → generated client leaves JSON200 nil.
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{}`))
 	}
@@ -1161,11 +1143,7 @@ func TestSonarService_Issues_EmptyJSON200(t *testing.T) {
 	defer closer()
 
 	_, err := NewSonarService(client).Issues(context.Background(), SonarIssuesParams{ProjectKey: testProject})
-	if err == nil {
-		t.Fatal("expected error when JSON200 is nil")
-	}
-
-	if !strings.Contains(err.Error(), "portal returned empty sonar issues response") {
-		t.Errorf("unexpected error message: %v", err)
+	if !errors.Is(err, ErrUnexpectedResponse) {
+		t.Errorf("err = %v, want ErrUnexpectedResponse", err)
 	}
 }
