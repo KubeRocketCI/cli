@@ -51,23 +51,10 @@ func NewStoredToken(tok *oauth2.Token, issuerURL, clientID, portalURL string) *S
 	}
 }
 
-// ToOAuth2Token converts to oauth2.Token for use with oauth2.TokenSource.
-func (t *StoredToken) ToOAuth2Token() *oauth2.Token {
-	tok := &oauth2.Token{
-		AccessToken:  t.AccessToken,
-		RefreshToken: t.RefreshToken,
-		Expiry:       t.ExpiresAt,
-		TokenType:    "Bearer",
-	}
-
-	return tok.WithExtra(map[string]any{
-		"id_token": t.IDToken,
-	})
-}
-
-// Valid returns true if the access token has not expired (with 30s buffer).
+// Valid reports whether the access token has more than 30 s left. A zero
+// ExpiresAt means the token does not expire, as in oauth2.
 func (t *StoredToken) Valid() bool {
-	return time.Until(t.ExpiresAt) > 30*time.Second
+	return t.ExpiresAt.IsZero() || time.Until(t.ExpiresAt) > 30*time.Second
 }
 
 // EncryptedFileStore persists tokens as AES-256-GCM encrypted JSON files.

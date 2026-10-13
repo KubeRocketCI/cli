@@ -436,7 +436,7 @@ func TestStoredTokenValid(t *testing.T) {
 		{"almost expired", time.Now().Add(31 * time.Second), true},
 		{"within buffer", time.Now().Add(29 * time.Second), false},
 		{"expired", time.Now().Add(-time.Minute), false},
-		{"zero time", time.Time{}, false},
+		{"no expiry", time.Time{}, true},
 	}
 
 	for _, tt := range tests {
