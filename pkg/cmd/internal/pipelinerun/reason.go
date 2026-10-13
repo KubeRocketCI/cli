@@ -1,4 +1,4 @@
-package output
+package pipelinerun
 
 import (
 	"encoding/json"
@@ -11,17 +11,29 @@ import (
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/list"
 
+	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
 )
 
-// Pipeline run output styles.
 var (
-	SectionStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(accentColor))
-	ReasonLabel  = LabelStyle.Width(12)
-	SuccessStyle = lipgloss.NewStyle().Foreground(lipgloss.Green)
-	FailStyle    = lipgloss.NewStyle().Foreground(lipgloss.Red)
-	DimStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	sectionStyle = output.HeaderStyle.UnsetPadding()
+	reasonLabel  = output.LabelStyle.Width(12)
 )
+
+// StatusColor colors a pipeline-run status. An unknown status is left
+// unstyled.
+func StatusColor(status string) output.Cell {
+	switch status {
+	case portal.StatusSucceeded:
+		return output.Green(status)
+	case portal.StatusFailed, portal.StatusCancelled, portal.StatusTimeout:
+		return output.Red(status)
+	case portal.StatusRunning:
+		return output.Blue(status)
+	default:
+		return output.Text(status)
+	}
+}
 
 // RenderReason renders pipeline info + task tree + failure diagnosis using lipgloss.
 func RenderReason(w io.Writer, result *portal.PipelineRunListResult) error {
@@ -31,7 +43,7 @@ func RenderReason(w io.Writer, result *portal.PipelineRunListResult) error {
 
 	run := &result.PipelineRuns[0]
 
-	if err := renderRunHeader(w, run); err != nil {
+	if err := RenderRunInfo(w, run); err != nil {
 		return err
 	}
 
@@ -40,7 +52,7 @@ func RenderReason(w io.Writer, result *portal.PipelineRunListResult) error {
 			return err
 		}
 
-		if _, err := fmt.Fprintln(w, SectionStyle.Render("Tasks:")); err != nil {
+		if _, err := fmt.Fprintln(w, sectionStyle.Render("Tasks:")); err != nil {
 			return err
 		}
 
@@ -63,14 +75,14 @@ func RenderReason(w io.Writer, result *portal.PipelineRunListResult) error {
 			continue
 		}
 
-		if _, err := fmt.Fprintln(w, SectionStyle.Render("Failed: "+SingleLine(t.Name))); err != nil {
+		if _, err := fmt.Fprintln(w, sectionStyle.Render("Failed: "+output.SingleLine(t.Name))); err != nil {
 			return err
 		}
 
 		if t.FailedStep != "" {
 			if _, err := fmt.Fprintf(w, "%s %s (exit code %d)\n",
-				ReasonLabel.Render("Step:"),
-				SingleLine(t.FailedStep), t.ExitCode,
+				reasonLabel.Render("Step:"),
+				output.SingleLine(t.FailedStep), t.ExitCode,
 			); err != nil {
 				return err
 			}
@@ -78,23 +90,15 @@ func RenderReason(w io.Writer, result *portal.PipelineRunListResult) error {
 
 		if t.Message != "" {
 			if _, err := fmt.Fprintf(w, "%s %s\n",
-				ReasonLabel.Render("Message:"),
-				SingleLine(t.Message),
+				reasonLabel.Render("Message:"),
+				output.SingleLine(t.Message),
 			); err != nil {
 				return err
 			}
 		}
 
 		if t.Logs != "" {
-			if _, err := fmt.Fprintln(w); err != nil {
-				return err
-			}
-
-			if _, err := fmt.Fprintln(w, SectionStyle.Render("Logs: "+SingleLine(t.Name))); err != nil {
-				return err
-			}
-
-			if _, err := fmt.Fprintln(w, t.Logs); err != nil {
+			if err := RenderLogs(w, "Logs: "+output.SingleLine(t.Name), t.Logs); err != nil {
 				return err
 			}
 		}
@@ -103,9 +107,19 @@ func RenderReason(w io.Writer, result *portal.PipelineRunListResult) error {
 	return nil
 }
 
-// RenderRunInfo renders a single pipeline run's info header.
-func RenderRunInfo(w io.Writer, run *portal.PipelineRunInfo) error {
-	return renderRunHeader(w, run)
+// RenderLogs writes a blank line, header in the section style and logs.
+func RenderLogs(w io.Writer, header, logs string) error {
+	if _, err := fmt.Fprintln(w); err != nil {
+		return err
+	}
+
+	if _, err := fmt.Fprintln(w, sectionStyle.Render(header)); err != nil {
+		return err
+	}
+
+	_, err := fmt.Fprintln(w, logs)
+
+	return err
 }
 
 // RenderNoTaskData writes a dim note for --reason when no task data is
@@ -122,19 +136,20 @@ func RenderNoTaskData(w io.Writer, reason string) error {
 		msg = "Task data is not available. The run may not yet be indexed in Tekton Results."
 	}
 
-	_, err := fmt.Fprintln(w, DimStyle.Render(msg))
+	_, err := fmt.Fprintln(w, output.DimStyle.Render(msg))
 
 	return err
 }
 
-func renderRunHeader(w io.Writer, run *portal.PipelineRunInfo) error {
-	if _, err := fmt.Fprintln(w, SectionStyle.Render("Pipeline: "+SingleLine(run.Name))); err != nil {
+// RenderRunInfo renders a single pipeline run's info header.
+func RenderRunInfo(w io.Writer, run *portal.PipelineRunInfo) error {
+	if _, err := fmt.Fprintln(w, sectionStyle.Render("Pipeline: "+output.SingleLine(run.Name))); err != nil {
 		return err
 	}
 
 	if _, err := fmt.Fprintf(w, "%s %s\n",
-		ReasonLabel.Render("Status:"),
-		PipelineStatusColor(run.Status).Render(true),
+		reasonLabel.Render("Status:"),
+		StatusColor(run.Status).Render(true),
 	); err != nil {
 		return err
 	}
@@ -150,7 +165,7 @@ func renderRunHeader(w io.Writer, run *portal.PipelineRunInfo) error {
 			continue
 		}
 
-		if _, err := fmt.Fprintf(w, "%s %s\n", ReasonLabel.Render(field.label), SingleLine(field.value)); err != nil {
+		if _, err := fmt.Fprintf(w, "%s %s\n", reasonLabel.Render(field.label), output.SingleLine(field.value)); err != nil {
 			return err
 		}
 	}
@@ -161,7 +176,7 @@ func renderRunHeader(w io.Writer, run *portal.PipelineRunInfo) error {
 // renderResults prints pipeline results as name=value lines, sorted by name,
 // under one Results: label. Array and object values print as compact JSON.
 func renderResults(w io.Writer, results map[string]any) error {
-	label := ReasonLabel.Render("Results:")
+	label := reasonLabel.Render("Results:")
 	indent := strings.Repeat(" ", lipgloss.Width(label))
 
 	for i, name := range slices.Sorted(maps.Keys(results)) {
@@ -170,7 +185,7 @@ func renderResults(w io.Writer, results map[string]any) error {
 			prefix = label
 		}
 
-		if _, err := fmt.Fprintf(w, "%s %s=%s\n", prefix, SingleLine(name), resultValue(results[name])); err != nil {
+		if _, err := fmt.Fprintf(w, "%s %s=%s\n", prefix, output.SingleLine(name), resultValue(results[name])); err != nil {
 			return err
 		}
 	}
@@ -180,15 +195,15 @@ func renderResults(w io.Writer, results map[string]any) error {
 
 func resultValue(v any) string {
 	if s, ok := v.(string); ok {
-		return SingleLine(s)
+		return output.SingleLine(s)
 	}
 
 	b, err := json.Marshal(v)
 	if err != nil {
-		return cell(fmt.Sprint(v))
+		b = []byte(fmt.Sprint(v))
 	}
 
-	return cell(string(b))
+	return output.Text(string(b)).Render(false)
 }
 
 func taskListEnumerator(tasks []portal.TaskRunInfo) list.Enumerator {
@@ -198,19 +213,19 @@ func taskListEnumerator(tasks []portal.TaskRunInfo) list.Enumerator {
 		}
 
 		if portal.IsFailureStatus(tasks[i].Status) {
-			return FailStyle.Render("✗") + " "
+			return output.Red("✗").Render(true) + " "
 		}
 
-		return SuccessStyle.Render("✓") + " "
+		return output.Green("✓").Render(true) + " "
 	}
 }
 
 func formatTaskLine(t portal.TaskRunInfo) string {
-	style := SuccessStyle
+	status := output.Green(t.Status)
 	if portal.IsFailureStatus(t.Status) {
-		style = FailStyle
+		status = output.Red(t.Status)
 	}
 
 	return fmt.Sprintf("%-28s %s  %s",
-		SingleLine(t.Name), style.Render(cell(t.Status)), DimStyle.Render(SingleLine(t.Duration)))
+		output.SingleLine(t.Name), status.Render(true), output.DimStyle.Render(output.SingleLine(t.Duration)))
 }

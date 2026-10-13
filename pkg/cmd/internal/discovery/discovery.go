@@ -170,8 +170,7 @@ func HostnameFromURL(u string) string {
 }
 
 // ColorForArgoStatus colors an ArgoCD health status: healthy → green,
-// degraded/missing → red, progressing → blue (matching the running-pipeline
-// color in `output.PipelineStatusColor`). Anything else (including
+// degraded/missing → red, progressing → blue. Anything else (including
 // suspended/unknown) is left unstyled.
 func ColorForArgoStatus(s string) output.Cell {
 	switch portal.ArgoHealthStatus(strings.ToLower(s)) {

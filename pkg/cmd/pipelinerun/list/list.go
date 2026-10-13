@@ -184,10 +184,10 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 
 	if opts.IncludeReason {
 		if len(result.Tasks) > 0 {
-			return output.RenderReason(opts.IO.Out, result)
+			return pipelinerun.RenderReason(opts.IO.Out, result)
 		}
 
-		if err := output.RenderNoTaskData(opts.IO.Out, result.TasksUnavailable); err != nil {
+		if err := pipelinerun.RenderNoTaskData(opts.IO.Out, result.TasksUnavailable); err != nil {
 			return err
 		}
 	}
@@ -200,17 +200,7 @@ func listRun(ctx context.Context, opts *ListOptions) error {
 		pr := result.PipelineRuns[0]
 		header := output.SingleLine(fmt.Sprintf("Logs: %s (%s)", pr.Name, pr.Status))
 
-		if _, err := fmt.Fprintln(opts.IO.Out); err != nil {
-			return err
-		}
-
-		if _, err := fmt.Fprintln(opts.IO.Out, output.SectionStyle.Render(header)); err != nil {
-			return err
-		}
-
-		if _, err := fmt.Fprintln(opts.IO.Out, result.Logs); err != nil {
-			return err
-		}
+		return pipelinerun.RenderLogs(opts.IO.Out, header, result.Logs)
 	}
 
 	return nil
@@ -230,7 +220,7 @@ func renderSummaryTable(opts *ListOptions, result *portal.PipelineRunListResult)
 		for _, pr := range result.PipelineRuns {
 			rows = append(rows, []output.Cell{
 				output.Hyperlink(output.Truncate(pr.Name, colWidthName), pr.PortalURL),
-				output.PipelineStatusColor(pr.Status),
+				pipelinerun.StatusColor(pr.Status),
 				output.Text(output.Truncate(pr.Project, colWidthProject)),
 				output.Hyperlink(pr.PRNumber, pr.PRURL),
 				output.Text(output.Truncate(pr.Author, colWidthAuthor)),

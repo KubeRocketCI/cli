@@ -604,15 +604,14 @@ func TestCell(t *testing.T) {
 		c             Cell
 		plain, styled string
 	}{
-		"text":                       {Text("a\nb"), "a b", "a b"},
-		"green":                      {Green("ok"), "ok", greenStyle.Render("ok")},
-		"a tab is one space":         {Green("a\tb"), "a b", greenStyle.Render("a b")},
-		"CRLF is two spaces":         {Green("a\r\nb"), "a  b", greenStyle.Render("a  b")},
-		"concat joins form by form":  {Concat(Text("3 "), Red("HIGH")), "3 HIGH", "3 " + redStyle.Render("HIGH")},
-		"texts":                      {Concat(Texts("a", "\tb")...), "a b", "a b"},
-		"an unknown status is plain": {PipelineStatusColor("odd"), "odd", "odd"},
-		"empty green is zero":        {Green(""), "", ""},
-		"empty link is zero":         {Hyperlink("", "http://h/"), "", ""},
+		"text":                      {Text("a\nb"), "a b", "a b"},
+		"green":                     {Green("ok"), "ok", greenStyle.Render("ok")},
+		"a tab is one space":        {Green("a\tb"), "a b", greenStyle.Render("a b")},
+		"CRLF is two spaces":        {Green("a\r\nb"), "a  b", greenStyle.Render("a  b")},
+		"concat joins form by form": {Concat(Text("3 "), Red("HIGH")), "3 HIGH", "3 " + redStyle.Render("HIGH")},
+		"texts":                     {Concat(Texts("a", "\tb")...), "a b", "a b"},
+		"empty green is zero":       {Green(""), "", ""},
+		"empty link is zero":        {Hyperlink("", "http://h/"), "", ""},
 	}
 
 	for name, tc := range cases {

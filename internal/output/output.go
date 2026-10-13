@@ -23,6 +23,9 @@ import (
 // ANSI color code used for borders and header accents.
 const accentColor = "99"
 
+// ANSI color code used for muted text.
+const mutedColor = "245"
+
 // detailLabelWidth is the column width of "<label>:" in detail output.
 const detailLabelWidth = 14
 
@@ -30,10 +33,11 @@ const detailLabelWidth = 14
 var (
 	HeaderStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(accentColor)).Padding(0, 1)
 	EvenRowStyle = lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.BrightWhite)
-	OddRowStyle  = lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("245"))
+	OddRowStyle  = lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color(mutedColor))
 	BorderStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(accentColor))
-	LabelStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("245")).Width(detailLabelWidth)
+	LabelStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(mutedColor)).Width(detailLabelWidth)
 	ValueStyle   = lipgloss.NewStyle()
+	DimStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color(mutedColor))
 )
 
 // Status color styles using lipgloss 4-bit color constants.
@@ -42,7 +46,7 @@ var (
 	yellowStyle = lipgloss.NewStyle().Foreground(lipgloss.Yellow)
 	redStyle    = lipgloss.NewStyle().Foreground(lipgloss.Red)
 	blueStyle   = lipgloss.NewStyle().Foreground(lipgloss.Blue)
-	grayStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	grayStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color(mutedColor))
 )
 
 // Cell is a table cell or detail value in two forms, plain and styled, each
@@ -133,21 +137,6 @@ func StatusColor(status string) Cell {
 		return Yellow(status)
 	case "failed":
 		return Red(status)
-	default:
-		return Text(status)
-	}
-}
-
-// PipelineStatusColor colors a pipeline-run status. An unknown status is
-// left unstyled.
-func PipelineStatusColor(status string) Cell {
-	switch status {
-	case portal.StatusSucceeded:
-		return Green(status)
-	case portal.StatusFailed, portal.StatusCancelled, portal.StatusTimeout:
-		return Red(status)
-	case portal.StatusRunning:
-		return Blue(status)
 	default:
 		return Text(status)
 	}

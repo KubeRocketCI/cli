@@ -13,12 +13,12 @@ import (
 // renderRow renders the shared pipeline-run row (NAME/STATUS/PROJECT/PR/
 // AUTHOR/TYPE/STARTED/DURATION) for `pipelinerun start` and `project build`:
 // -o json emits the schemaVersion envelope, -o table (default) colours
-// STATUS via output.PipelineStatusColor.
+// STATUS via StatusColor.
 func renderRow(ios *iostreams.IOStreams, format string, result *portal.StartResult) error {
 	return render.Render(ios, format, result, func(w io.Writer, isTTY bool) error {
 		row := []output.Cell{
 			output.Text(output.OrDash(result.Name)),
-			output.PipelineStatusColor(output.OrDash(result.Status)),
+			StatusColor(output.OrDash(result.Status)),
 			output.Text(output.OrDash(result.Project)),
 			output.Text(output.OrDash(result.PR)),
 			output.Text(output.OrDash(result.Author)),
