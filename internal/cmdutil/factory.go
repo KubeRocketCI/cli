@@ -26,8 +26,9 @@ const DefaultHTTPTimeout = 45 * time.Second
 // Config memoizes the first successful result and retries after a failure;
 // TokenProvider, RestClient and Services memoize their first result, including
 // an error.
-// Commands copy the func values when NewCmdRoot builds the tree; reassigning a
-// field afterwards does not reach them. Set the config source through
+// Set every field before NewCmdRoot builds the tree. Commands copy the func
+// values when the tree is built; Services reads RestClient, Config and Now on
+// its first call and keeps the result. Set the config source through
 // SetConfigResolver.
 type Factory struct {
 	IOStreams     *iostreams.IOStreams
@@ -40,7 +41,6 @@ type Factory struct {
 	Services func() (*portal.Services, error)
 
 	// Now is the clock for running pipeline-run durations. Default: time.Now.
-	// Set it before the command is built.
 	Now func() time.Time
 
 	muCfg   sync.Mutex // guards resolve and cfg

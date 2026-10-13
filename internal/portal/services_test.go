@@ -216,3 +216,31 @@ func TestServices_Accessors(t *testing.T) {
 		})
 	}
 }
+
+// portalURL and the clock never reach the wire; the cmd/krci contract stub
+// covers namespace and clusterName per route.
+func TestServices_PipelineRunAccessors(t *testing.T) {
+	t.Parallel()
+
+	client, err := restapi.NewClientWithResponses("https://portal.example.com/rest")
+	require.NoError(t, err)
+
+	fixed := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	target := Target{PortalURL: "https://portal.example.com", Cluster: "core", Namespace: "krci"}
+	s := NewServices(client, target, WithNow(func() time.Time { return fixed }))
+
+	run := s.PipelineRun()
+	assert.Same(t, client, run.client)
+	assert.Equal(t, target.PortalURL, run.portalURL)
+	assert.Equal(t, target.Cluster, run.clusterName)
+	assert.Equal(t, target.Namespace, run.namespace)
+	assert.Equal(t, fixed, run.now())
+
+	start := s.PipelineRunStart()
+	assert.Same(t, client, start.client)
+	assert.Equal(t, target.Namespace, start.namespace)
+
+	build := s.ProjectBuild()
+	assert.Same(t, client, build.client)
+	assert.Equal(t, target.Namespace, build.namespace)
+}

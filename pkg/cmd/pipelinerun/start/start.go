@@ -7,18 +7,15 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
-	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/portal"
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/pipelinerun"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
 type StartOptions struct {
 	IO           *iostreams.IOStreams
-	RestClient   func() (*restapi.ClientWithResponses, error)
-	Config       func() (*config.Config, error)
+	Services     func() (*portal.Services, error)
 	Pipeline     string
 	Params       []string
 	Labels       []string
@@ -33,9 +30,8 @@ type StartOptions struct {
 // runF is the business logic function; pass nil to use the default startRun.
 func NewCmdStart(f *cmdutil.Factory, runF func(*StartOptions) error) *cobra.Command {
 	opts := &StartOptions{
-		IO:         f.IOStreams,
-		RestClient: f.RestClient,
-		Config:     f.Config,
+		IO:       f.IOStreams,
+		Services: f.Services,
 	}
 
 	cmd := &cobra.Command{
@@ -128,17 +124,12 @@ func startRun(ctx context.Context, opts *StartOptions) error {
 }
 
 func start(ctx context.Context, opts *StartOptions) error {
-	cfg, err := opts.Config()
+	services, err := opts.Services()
 	if err != nil {
 		return err
 	}
 
-	client, err := opts.RestClient()
-	if err != nil {
-		return err
-	}
-
-	svc := portal.NewPipelineRunStartService(client, cfg.Namespace)
+	svc := services.PipelineRunStart()
 
 	result, err := svc.Start(ctx, portal.StartInput{
 		Pipeline: opts.Pipeline,

@@ -9,10 +9,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
-	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/portal"
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/pipelinerun"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
@@ -20,8 +18,7 @@ import (
 // BuildOptions holds all inputs for `krci project build <name>`.
 type BuildOptions struct {
 	IO           *iostreams.IOStreams
-	RestClient   func() (*restapi.ClientWithResponses, error)
-	Config       func() (*config.Config, error)
+	Services     func() (*portal.Services, error)
 	Project      string
 	Branch       string
 	Params       []string
@@ -35,9 +32,8 @@ type BuildOptions struct {
 // runF is the business-logic function; pass nil to use the default run.
 func NewCmdBuild(f *cmdutil.Factory, runF func(*BuildOptions) error) *cobra.Command {
 	opts := &BuildOptions{
-		IO:         f.IOStreams,
-		RestClient: f.RestClient,
-		Config:     f.Config,
+		IO:       f.IOStreams,
+		Services: f.Services,
 	}
 
 	cmd := &cobra.Command{
@@ -150,17 +146,12 @@ func buildRun(ctx context.Context, opts *BuildOptions) error {
 }
 
 func build(ctx context.Context, opts *BuildOptions) error {
-	cfg, err := opts.Config()
+	services, err := opts.Services()
 	if err != nil {
 		return err
 	}
 
-	client, err := opts.RestClient()
-	if err != nil {
-		return err
-	}
-
-	svc := portal.NewProjectBuildService(client, cfg.Namespace)
+	svc := services.ProjectBuild()
 
 	result, err := svc.Build(ctx, portal.BuildInput{
 		Codebase: opts.Project,

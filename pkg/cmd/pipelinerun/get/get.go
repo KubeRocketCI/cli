@@ -11,11 +11,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/KubeRocketCI/cli/internal/cmdutil"
-	"github.com/KubeRocketCI/cli/internal/config"
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/pipelinerun"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
@@ -28,9 +26,7 @@ const (
 // GetOptions holds all inputs for the pipelinerun get command.
 type GetOptions struct {
 	IO            *iostreams.IOStreams
-	RestClient    func() (*restapi.ClientWithResponses, error)
-	Config        func() (*config.Config, error)
-	Now           func() time.Time
+	Services      func() (*portal.Services, error)
 	Name          string
 	OutputFormat  string
 	IncludeLogs   bool
@@ -44,10 +40,8 @@ type GetOptions struct {
 // NewCmdGet returns the "pipelinerun get" cobra.Command.
 func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command {
 	opts := &GetOptions{
-		IO:         f.IOStreams,
-		RestClient: f.RestClient,
-		Config:     f.Config,
-		Now:        f.Now,
+		IO:       f.IOStreams,
+		Services: f.Services,
 	}
 
 	cmd := &cobra.Command{
@@ -105,18 +99,12 @@ func (opts *GetOptions) validate(timeoutSet bool) error {
 }
 
 func getRun(ctx context.Context, opts *GetOptions) error {
-	cfg, err := opts.Config()
+	services, err := opts.Services()
 	if err != nil {
 		return err
 	}
 
-	client, err := opts.RestClient()
-	if err != nil {
-		return err
-	}
-
-	svc := portal.NewPipelineRunService(client, cfg.PortalURL, cfg.ClusterName, cfg.Namespace,
-		portal.WithNow(opts.Now))
+	svc := services.PipelineRun()
 
 	result, err := fetchRun(ctx, svc, opts)
 	if err != nil {

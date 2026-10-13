@@ -98,3 +98,19 @@ func (s *Services) Deployment() *DeploymentService {
 func (s *Services) Env() *EnvService {
 	return NewEnvService(s.client, s.target.Cluster, s.target.Namespace)
 }
+
+// PipelineRun returns the pipeline run service of the target. It measures
+// running-run durations on the clock set by WithNow (default time.Now).
+func (s *Services) PipelineRun() *PipelineRunService {
+	return NewPipelineRunService(s.client, s.target.PortalURL, s.target.Cluster, s.target.Namespace, WithNow(s.now))
+}
+
+// PipelineRunStart returns the pipeline run start service of the target.
+func (s *Services) PipelineRunStart() *PipelineRunStartService {
+	return NewPipelineRunStartService(s.client, s.target.Namespace)
+}
+
+// ProjectBuild returns the project build service of the target.
+func (s *Services) ProjectBuild() *ProjectBuildService {
+	return NewProjectBuildService(s.client, s.target.Namespace)
+}
