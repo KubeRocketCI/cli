@@ -31,13 +31,34 @@ func TestNewServices_Clock(t *testing.T) {
 func TestServices_VerifySession(t *testing.T) {
 	t.Parallel()
 
+	const configJSON = `{"clusterName":"in-cluster","defaultNamespace":"platform","sonarWebUrl":"","dependencyTrackWebUrl":""}`
+
 	tests := []struct {
-		name    string
-		status  int
-		wantErr error
+		name        string
+		status      int
+		contentType string
+		body        string
+		wantErr     error
+		wantErrMsg  string
 	}{
-		{name: "accepted", status: http.StatusOK},
-		{name: "rejected", status: http.StatusUnauthorized, wantErr: ErrUnauthorized},
+		{name: "accepted", status: http.StatusOK, contentType: "application/json", body: configJSON},
+		{name: "rejected", status: http.StatusUnauthorized, contentType: "application/json", body: configJSON,
+			wantErr: ErrUnauthorized},
+		{name: "rejected with malformed JSON", status: http.StatusUnauthorized, contentType: "application/json",
+			body: `{"error":`, wantErr: ErrUnauthorized},
+		{name: "forbidden with malformed JSON", status: http.StatusForbidden, contentType: "application/json",
+			body: `{"error":`, wantErr: ErrPermissionDenied},
+		{name: "200 page instead of config", status: http.StatusOK, contentType: "text/html; charset=utf-8",
+			body: "<!doctype html><html></html>", wantErrMsg: "parsing cluster config: "},
+		{name: "200 without body", status: http.StatusOK, wantErrMsg: "parsing cluster config: "},
+		{name: "200 JSON null", status: http.StatusOK, contentType: "application/json", body: `null`,
+			wantErrMsg: "parsing cluster config: response lacks"},
+		{name: "200 empty JSON object", status: http.StatusOK, contentType: "application/json", body: `{}`,
+			wantErrMsg: "parsing cluster config: response lacks"},
+		{name: "200 unrelated JSON object", status: http.StatusOK, contentType: "application/json",
+			body: `{"status":"ok"}`, wantErrMsg: "parsing cluster config: response lacks"},
+		{name: "200 config with empty values", status: http.StatusOK, contentType: "application/json",
+			body: `{"clusterName":"","defaultNamespace":""}`},
 	}
 
 	for _, tt := range tests {
@@ -48,8 +69,13 @@ func TestServices_VerifySession(t *testing.T) {
 
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				gotPath = r.URL.Path
+
+				if tt.contentType != "" {
+					w.Header().Set("Content-Type", tt.contentType)
+				}
+
 				w.WriteHeader(tt.status)
-				_, _ = w.Write([]byte(`{"clusterName":"in-cluster","defaultNamespace":"platform","sonarWebUrl":"","dependencyTrackWebUrl":""}`))
+				_, _ = w.Write([]byte(tt.body))
 			}))
 			defer srv.Close()
 
@@ -59,13 +85,14 @@ func TestServices_VerifySession(t *testing.T) {
 			err = NewServices(client, Target{}).VerifySession(t.Context())
 			assert.Equal(t, "/rest/v1/config", gotPath)
 
-			if tt.wantErr != nil {
+			switch {
+			case tt.wantErr != nil:
 				require.ErrorIs(t, err, tt.wantErr)
-
-				return
+			case tt.wantErrMsg != "":
+				require.ErrorContains(t, err, tt.wantErrMsg)
+			default:
+				require.NoError(t, err)
 			}
-
-			require.NoError(t, err)
 		})
 	}
 }

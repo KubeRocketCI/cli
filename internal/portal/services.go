@@ -54,14 +54,17 @@ func NewServices(client *restapi.ClientWithResponses, target Target, opts ...Opt
 
 // VerifySession calls the authenticated /rest/v1/config endpoint, so the
 // portal validates the client's bearer token. ErrUnauthorized means the portal
-// rejected the token.
+// rejected the token. A 200 is accepted only when its body is the cluster
+// config (see readClusterConfig).
 func (s *Services) VerifySession(ctx context.Context) error {
-	resp, err := s.client.ConfigGetWithResponse(ctx)
+	resp, err := s.client.ConfigGet(ctx)
 	if err != nil {
 		return fmt.Errorf("requesting cluster config: %w", err)
 	}
 
-	return checkResponse(resp.StatusCode(), resp.Body)
+	_, err = readClusterConfig(resp)
+
+	return err
 }
 
 // Sonar returns the SonarQube service.

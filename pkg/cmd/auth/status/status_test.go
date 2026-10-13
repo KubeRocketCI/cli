@@ -2,6 +2,7 @@ package status
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -289,7 +290,10 @@ func TestStatus_Authenticated_Table(t *testing.T) {
 
 // fakePortal answers the session check with status and records the calls.
 type fakePortal struct {
-	status        int
+	status int
+	// contentType and body default to application/json and the cluster config.
+	contentType   string
+	body          string
 	calls         int
 	path          string
 	authorization string
@@ -305,8 +309,10 @@ func (p *fakePortal) start(t *testing.T) func() (*restapi.ClientWithResponses, e
 		p.calls++
 		p.path = r.URL.Path
 		p.authorization = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", cmp.Or(p.contentType, "application/json"))
 		w.WriteHeader(p.status)
-		_, _ = w.Write([]byte(`{"clusterName":"in-cluster","defaultNamespace":"ns","sonarWebUrl":"","dependencyTrackWebUrl":""}`))
+		_, _ = w.Write([]byte(cmp.Or(p.body,
+			`{"clusterName":"in-cluster","defaultNamespace":"ns","sonarWebUrl":"","dependencyTrackWebUrl":""}`)))
 	}))
 	t.Cleanup(srv.Close)
 
@@ -468,6 +474,69 @@ func TestStatus_PortalUnreachable(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "verifying the token with the portal") {
 		t.Errorf("error = %q, want the verification context", err.Error())
+	}
+}
+
+// TestStatus_PortalAnswersNotConfig covers a same-host proxy or SPA fallback
+// that answers 200 with something other than the cluster config.
+func TestStatus_PortalAnswersNotConfig(t *testing.T) {
+	t.Parallel()
+
+	claims := map[string]*auth.UserInfo{
+		"unreadable claims":          nil,
+		"readable KRCI_TOKEN claims": {Email: "forged@example.com", FromEnv: true},
+	}
+
+	bodies := map[string]struct{ contentType, body string }{
+		"html page":   {contentType: "text/html; charset=utf-8", body: "<!doctype html><html></html>"},
+		"JSON object": {contentType: "application/json", body: `{"status":"ok"}`},
+	}
+
+	for claimsName, info := range claims {
+		for bodyName, answer := range bodies {
+			for _, format := range []string{"table", "json"} {
+				t.Run(claimsName+"/"+bodyName+"/"+format, func(t *testing.T) {
+					t.Parallel()
+
+					tp := &mockTokenProvider{info: info}
+					if info == nil {
+						tp.infoErr = errors.New("invalid ID token format")
+					}
+
+					p := &fakePortal{status: http.StatusOK, contentType: answer.contentType, body: answer.body}
+
+					stdout, err := runStatusWithPortal(t, tp, p.start(t), "-o", format)
+					if err == nil {
+						t.Fatal("an answer that is not the cluster config must not report authenticated")
+					}
+
+					if errors.Is(err, portal.ErrUnauthorized) {
+						t.Errorf("err = %v, must not wrap portal.ErrUnauthorized", err)
+					}
+
+					if !strings.Contains(err.Error(), "verifying the token with the portal: parsing cluster config") {
+						t.Errorf("error = %q, want the verification and parse context", err.Error())
+					}
+
+					if p.calls != 1 {
+						t.Errorf("portal check ran %d time(s), want 1", p.calls)
+					}
+
+					if format == "table" {
+						if stdout != "" {
+							t.Errorf("stdout should be empty, got %q", stdout)
+						}
+
+						return
+					}
+
+					env := parseEnvelope(t, stdout)
+					if env.Error == nil || env.Data != nil || env.Error.Message != err.Error() {
+						t.Errorf("want an error envelope with message %q and no data, got %s", err.Error(), stdout)
+					}
+				})
+			}
+		}
 	}
 }
 

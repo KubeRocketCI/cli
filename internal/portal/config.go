@@ -3,6 +3,7 @@ package portal
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,8 +16,12 @@ type ClusterConfig struct {
 	DefaultNamespace string `json:"defaultNamespace"`
 }
 
-// configTimeout caps each config endpoint request.
-const configTimeout = 10 * time.Second
+const (
+	// configTimeout caps each config endpoint request.
+	configTimeout = 10 * time.Second
+	// maxConfigBodyBytes caps the config endpoint response body.
+	maxConfigBodyBytes = 1 << 20
+)
 
 // FetchOIDCConfig calls the public /rest/v1/config/oidc endpoint (no auth)
 // and returns the OIDC issuer URL for pre-login discovery.
@@ -37,7 +42,7 @@ func FetchOIDCConfig(ctx context.Context, portalURL string) (string, error) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxConfigBodyBytes))
 	if err != nil {
 		return "", fmt.Errorf("reading OIDC config response: %w", err)
 	}
@@ -80,23 +85,40 @@ func FetchClusterConfig(ctx context.Context, portalURL, token string) (*ClusterC
 	if err != nil {
 		return nil, fmt.Errorf("requesting cluster config: %w", err)
 	}
+
+	return readClusterConfig(resp)
+}
+
+// readClusterConfig reads and closes the body of a /rest/v1/config response.
+// A non-200 status returns the checkResponse error without added context. A
+// 200 body must be a JSON object with the clusterName and defaultNamespace
+// keys; their values may be empty.
+func readClusterConfig(resp *http.Response) (*ClusterConfig, error) {
 	defer func() { _ = resp.Body.Close() }()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxConfigBodyBytes))
 	if err != nil {
 		return nil, fmt.Errorf("reading cluster config response: %w", err)
 	}
 
 	if err := checkResponse(resp.StatusCode, body); err != nil {
-		return nil, fmt.Errorf("cluster config: %w", err)
+		return nil, err
 	}
 
-	var cfg ClusterConfig
-	if err := json.Unmarshal(body, &cfg); err != nil {
+	var raw struct {
+		ClusterName      *string `json:"clusterName"`
+		DefaultNamespace *string `json:"defaultNamespace"`
+	}
+
+	if err := json.Unmarshal(body, &raw); err != nil {
 		return nil, fmt.Errorf("parsing cluster config: %w", err)
 	}
 
-	return &cfg, nil
+	if raw.ClusterName == nil || raw.DefaultNamespace == nil {
+		return nil, errors.New("parsing cluster config: response lacks clusterName or defaultNamespace")
+	}
+
+	return &ClusterConfig{ClusterName: *raw.ClusterName, DefaultNamespace: *raw.DefaultNamespace}, nil
 }
 
 func restURL(portalURL, path string) string {

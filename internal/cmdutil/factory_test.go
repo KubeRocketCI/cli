@@ -380,7 +380,8 @@ func TestFactoryServices_VerifySessionReachesPortal(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath, gotAuth = r.URL.Path, r.Header.Get("Authorization")
-		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"clusterName":"in-cluster","defaultNamespace":"platform"}`))
 	}))
 	t.Cleanup(srv.Close)
 
