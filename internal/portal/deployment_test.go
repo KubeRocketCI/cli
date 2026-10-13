@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 )
@@ -96,4 +97,21 @@ func TestExtractQualityGates_NoGatesIsEmpty(t *testing.T) {
 		assert.NotNil(t, got, name)
 		assert.Empty(t, got, name)
 	}
+}
+
+func TestDeploymentService_Get_ListsOnlyItsStages(t *testing.T) {
+	t.Parallel()
+
+	rec := envWithStage(t, "in-cluster")
+
+	svc, closer := newDeploymentServiceForTest(t, rec)
+	defer closer()
+
+	detail, err := svc.Get(t.Context(), "my-pipeline")
+	require.NoError(t, err)
+	assert.Len(t, detail.Stages, 1)
+
+	calls := callsOfKind(rec, "Stage")
+	require.Len(t, calls, 1)
+	assert.Equal(t, map[string]string{labelCDPipelineName: "my-pipeline"}, calls[0].LabelSelectors)
 }

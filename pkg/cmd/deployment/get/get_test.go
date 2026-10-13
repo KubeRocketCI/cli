@@ -85,3 +85,18 @@ func TestGet_NotFoundKeepsTheSentinel(t *testing.T) {
 		t.Errorf("errors.Is(%q, portal.ErrNotFound) = false, want true", err)
 	}
 }
+
+func TestGet_RejectsInvalidNameBeforeTheRequest(t *testing.T) {
+	t.Parallel()
+
+	for _, name := range []string{"demo x", "demo=a", "Demo"} {
+		f, _ := cmdtest.NewPortalFactory(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			t.Errorf("%q: portal was called", name)
+		}))
+
+		err := cmdtest.Execute(NewCmdGet, f, []string{name})
+		if err == nil || !strings.Contains(err.Error(), "DNS-1123") {
+			t.Errorf("%q: error = %v, want a DNS-1123 message", name, err)
+		}
+	}
+}

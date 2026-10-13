@@ -443,9 +443,13 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 	cdpipelines := list(kindCDPipeline, "deployment-cdpipelines")
 	apiPipeline := at(http.MethodPost, pathGet, "deployment-api-pipeline")
 	apiPipeline.kind, apiPipeline.name = kindCDPipeline, emptyDeployment
+	apiPipelineStages := list("Stage", "deployment-api-pipeline-stages")
+	apiPipelineStages.bodyContains = []string{`"labels":{"app.edp.epam.com/cdPipelineName":"` + emptyDeployment + `"}`}
 	projectApps := list("Application", "project-applications")
 	projectApps.bodyContains = []string{`"labels":{"app.edp.epam.com/app-name":"` + projectName + `"}`}
-	project := []route{codebases, codebase, streams, branches, cdpipelines, apiPipeline, stages, projectApps}
+	project := []route{
+		codebases, codebase, streams, branches, cdpipelines, apiPipeline, apiPipelineStages, stages, projectApps,
+	}
 
 	sonar := []route{
 		getQuery(pathSonarList, url.Values{"page": {"1"}, "pageSize": {"50"}}, "sonar-projects"),

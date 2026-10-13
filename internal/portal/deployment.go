@@ -98,8 +98,10 @@ func NewDeploymentService(client *restapi.ClientWithResponses, clusterName, name
 	return &DeploymentService{client: client, clusterName: clusterName, namespace: namespace}
 }
 
-func (s *DeploymentService) k8sList(ctx context.Context, rc restapi.K8sListJSONBody) (*restapi.K8sListResponse, error) {
-	return s.client.K8sListWithResponse(ctx, buildK8sListBody(s.clusterName, s.namespace, rc, nil))
+func (s *DeploymentService) k8sList(
+	ctx context.Context, rc restapi.K8sListJSONBody, labels map[string]string,
+) (*restapi.K8sListResponse, error) {
+	return s.client.K8sListWithResponse(ctx, buildK8sListBody(s.clusterName, s.namespace, rc, labels))
 }
 
 // List returns all CDPipelines with their stage names ordered by spec.order.
@@ -110,7 +112,7 @@ func (s *DeploymentService) List(ctx context.Context) ([]Deployment, error) {
 
 	g.Go(func() error {
 		var err error
-		pipelineResp, err = s.k8sList(ctx, cdPipelineResourceConfig)
+		pipelineResp, err = s.k8sList(ctx, cdPipelineResourceConfig, nil)
 		if err != nil {
 			return fmt.Errorf("listing cdpipelines: %w", err)
 		}
@@ -120,7 +122,7 @@ func (s *DeploymentService) List(ctx context.Context) ([]Deployment, error) {
 
 	g.Go(func() error {
 		var err error
-		stageResp, err = s.k8sList(ctx, stageResourceConfig)
+		stageResp, err = s.k8sList(ctx, stageResourceConfig, nil)
 		if err != nil {
 			return fmt.Errorf("listing stages: %w", err)
 		}
@@ -181,7 +183,7 @@ func (s *DeploymentService) Get(ctx context.Context, name string) (*DeploymentDe
 
 	g.Go(func() error {
 		var err error
-		stageResp, err = s.k8sList(ctx, stageResourceConfig)
+		stageResp, err = s.k8sList(ctx, stageResourceConfig, map[string]string{labelCDPipelineName: name})
 		if err != nil {
 			return fmt.Errorf("listing stages for cdpipeline %q: %w", name, err)
 		}
@@ -309,6 +311,8 @@ func sortStagesByOrder(stages []Stage) {
 	slices.SortStableFunc(stages, func(a, b Stage) int { return cmp.Compare(a.Order, b.Order) })
 }
 
+// filterAndSortStages keeps the stages whose spec.cdPipeline is pipelineName.
+// Membership is spec.cdPipeline, not the label: the operator never corrects a set label.
 func filterAndSortStages(items []k8sItem, pipelineName string) []Stage {
 	stages := []Stage{}
 

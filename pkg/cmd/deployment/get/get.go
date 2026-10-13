@@ -44,6 +44,10 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
   # Output as JSON
   krci deployment get my-pipeline -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := cmdutil.ValidateK8sName("<name>", args[0]); err != nil {
+				return err
+			}
+
 			opts.Name = args[0]
 
 			if runF != nil {
