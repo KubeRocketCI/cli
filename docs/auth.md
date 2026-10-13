@@ -87,6 +87,9 @@ Groups:       admin, developers, viewers
 | `KRCI_TOKEN` is a JWT past its `exp`    | `1`  | `KRCI_TOKEN has expired: supply a fresh token` |
 | `KRCI_TOKEN` or unreadable claims, portal rejects the token | `1` | `not authenticated: the portal rejected the token` |
 | `KRCI_TOKEN` or unreadable claims, portal unreachable       | `1` | `verifying the token with the portal: <cause>` |
+| `KRCI_TOKEN` or unreadable claims, portal URL, cluster name, or namespace not set | `1` | `<setting> not configured`, then how to set it |
+| `KRCI_TOKEN` or unreadable claims, portal URL invalid       | `1` | `invalid portal URL: <reason>`; see [Common messages](json-schemas.md#error-envelope) |
+| Config file holds a value of the wrong type (a YAML syntax error is only a warning) | `1` | `loading config: <cause>` |
 
 The stored session comes from `krci auth login` and is checked locally.
 `KRCI_TOKEN`, and a stored token whose claims cannot be read, are checked with
@@ -130,8 +133,8 @@ krci auth status -o json
 `expiresAt` is RFC3339 in UTC, `null` when the token has no expiry; `user`
 and `name` are omitted when the stored token's claims cannot be read.
 
-Without a valid session the command still exits `1` and writes the error
-envelope to stdout, so a script can branch on either signal:
+Once flags and arguments are accepted, a failure exits `1` and writes the
+error envelope to stdout, so a script can branch on either signal:
 
 ```json
 {

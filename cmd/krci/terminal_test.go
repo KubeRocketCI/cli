@@ -26,7 +26,7 @@ func TestHostileDescription(t *testing.T) {
 		}
 	}
 
-	res := runStub(t, routes, nil, []string{"deployment", "get", envDeployment})
+	res := runStub(t, routes, nil, "", []string{"deployment", "get", envDeployment})
 	require.Equal(t, 0, res.code, res.stderr)
 
 	got := res.stdout

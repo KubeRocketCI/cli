@@ -42,6 +42,14 @@ func runStatus(t *testing.T, tp auth.TokenProvider, args ...string) (stdout stri
 	f := cmdtest.NewFactory()
 	f.TokenProvider = func() (auth.TokenProvider, error) { return tp, nil }
 
+	return runStatusFactory(t, f, args...)
+}
+
+// runStatusFactory executes `auth status` on f with the given argv and returns
+// what the command wrote to f's stdout.
+func runStatusFactory(t *testing.T, f *cmdutil.Factory, args ...string) (stdout string, err error) {
+	t.Helper()
+
 	cmd := NewCmdStatus(f, nil)
 	cmd.SetArgs(args)
 	cmd.SetOut(&bytes.Buffer{})
@@ -125,6 +133,47 @@ func TestStatus_NotAuthenticated_JSONErrorEnvelope(t *testing.T) {
 
 	if env.Data != nil {
 		t.Errorf("error envelope must not carry data, got %s", stdout)
+	}
+}
+
+func TestStatus_TokenProviderError_JSONErrorEnvelope(t *testing.T) {
+	t.Parallel()
+
+	loadErr := errors.New("loading config: parsing config: bad scopes")
+
+	f := cmdtest.NewFactory()
+	f.TokenProvider = func() (auth.TokenProvider, error) { return nil, loadErr }
+
+	stdout, err := runStatusFactory(t, f, "-o", "json")
+	if !errors.Is(err, loadErr) {
+		t.Fatalf("err = %v, want %v", err, loadErr)
+	}
+
+	env := parseEnvelope(t, stdout)
+	if env.Error == nil || env.Error.Message != loadErr.Error() {
+		t.Fatalf("expected an error envelope with %q, got %s", loadErr, stdout)
+	}
+
+	if env.Data != nil {
+		t.Errorf("error envelope must not carry data, got %s", stdout)
+	}
+}
+
+func TestStatus_TokenProviderError_TableModeEmptyStdout(t *testing.T) {
+	t.Parallel()
+
+	loadErr := errors.New("loading config: parsing config: bad scopes")
+
+	f := cmdtest.NewFactory()
+	f.TokenProvider = func() (auth.TokenProvider, error) { return nil, loadErr }
+
+	stdout, err := runStatusFactory(t, f)
+	if !errors.Is(err, loadErr) {
+		t.Fatalf("err = %v, want %v", err, loadErr)
+	}
+
+	if stdout != "" {
+		t.Errorf("stdout should be empty in table mode, got %q", stdout)
 	}
 }
 
@@ -310,14 +359,7 @@ func runStatusWithPortal(
 	f.TokenProvider = func() (auth.TokenProvider, error) { return tp, nil }
 	f.RestClient = restClient
 
-	cmd := NewCmdStatus(f, nil)
-	cmd.SetArgs(args)
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
-
-	err = cmd.Execute()
-
-	return f.IOStreams.Out.(*bytes.Buffer).String(), err
+	return runStatusFactory(t, f, args...)
 }
 
 func TestStatus_UnreadableClaims_PortalAccepts(t *testing.T) {

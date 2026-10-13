@@ -964,9 +964,9 @@ Rules:
 
 Rules:
 
-- `authenticated` is always `true` in a success envelope: a missing,
-  expired, or rejected session is an error (exit `1`) and produces the error
-  envelope below with one of:
+- `authenticated` is always `true` in a success envelope. Once flags and
+  arguments are accepted, a failure exits `1` and produces the error envelope
+  below with one of:
 
   | Condition                                             | Message                                            |
   | ----------------------------------------------------- | -------------------------------------------------- |
@@ -975,6 +975,9 @@ Rules:
   | Expired `KRCI_TOKEN`                                  | `KRCI_TOKEN has expired: supply a fresh token`     |
   | Portal rejects the token (401)                        | `not authenticated: the portal rejected the token` |
   | Portal unreachable or other failure                   | `verifying the token with the portal: <cause>`     |
+  | `KRCI_TOKEN` or unreadable claims, portal URL, cluster name, or namespace not set | `<setting> not configured`, then how to set it |
+  | `KRCI_TOKEN` or unreadable claims, portal URL invalid | `invalid portal URL: <reason>`; see [Common messages](#error-envelope) |
+  | Config file holds a value of the wrong type           | `loading config: <cause>`                          |
 
 - `groups` is always an array (`[]` when none).
 - `expiresAt` is RFC3339 in UTC, `null` when the stored token has no expiry.

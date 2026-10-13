@@ -1,0 +1,8 @@
+Error: portal URL not configured
+
+Set it via:
+  --portal-url flag
+  KRCI_PORTAL_URL env var
+  portal-url in ~/.config/krci/config.yaml
+
+Or run: krci auth login --portal-url <url>

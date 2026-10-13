@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "1",
+  "error": {
+    "message": "loading config: parsing config: decoding failed due to the following error(s):\n\n'scopes' expected type 'string', got unconvertible type 'map[string]interface {}'"
+  }
+}

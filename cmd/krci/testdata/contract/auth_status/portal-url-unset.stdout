@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "1",
+  "error": {
+    "message": "portal URL not configured\n\nSet it via:\n  --portal-url flag\n  KRCI_PORTAL_URL env var\n  portal-url in ~/.config/krci/config.yaml\n\nOr run: krci auth login --portal-url \u003curl\u003e"
+  }
+}
