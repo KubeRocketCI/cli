@@ -2,7 +2,7 @@
 
 OIDC Authorization Code + PKCE flow against the Portal's configured provider.
 Tokens are stored encrypted on disk (AES-256-GCM); the key lives in the OS
-keyring.
+keyring, or in `~/.config/krci/.keyfile` (see [Config & token storage](#config--token-storage)).
 
 ## Subcommands
 
@@ -155,9 +155,9 @@ krci auth status -o json |
 krci auth logout
 ```
 
-Deletes `~/.config/krci/tokens.enc` and removes the key from the keyring. The
-portal URL in `config.yaml` is preserved so subsequent `auth login` runs don't
-need `--portal-url` again.
+Deletes `~/.config/krci/tokens.enc`. The encryption key stays in the keyring or
+`.keyfile`. The portal URL in `config.yaml` is preserved so subsequent
+`auth login` runs don't need `--portal-url` again.
 
 ## Config & token storage
 
@@ -166,6 +166,23 @@ need `--portal-url` again.
 | `~/.config/krci/config.yaml`  | Portal URL, issuer, cluster, namespace      |
 | `~/.config/krci/tokens.enc`   | AES-encrypted access/refresh/id tokens      |
 | OS keyring (`krci`)           | Symmetric key used to decrypt `tokens.enc`  |
+| `~/.config/krci/.keyfile`     | The key, when the keyring is empty or unavailable, or with `KRCI_KEYRING_BACKEND=file` |
+
+Reading a token never creates a key. The CLI looks up the key in the keyring,
+then in `.keyfile`; with `KRCI_KEYRING_BACKEND=file`, only in `.keyfile`.
+
+| Key lookup result | `tokens.enc` | Output |
+|---|---|---|
+| Key found, file decrypts | kept | — |
+| Key found, file does not decrypt | deleted | `Warning: removing undecryptable token file (<path>): <cause>`, then `not authenticated: run 'krci auth login'` |
+| No key in any store checked | kept; the next login replaces it | `Warning: no encryption key for the token file (<path>); the next login replaces it.` (once per command), then `not authenticated: run 'krci auth login'` |
+| Keyring fails, no `.keyfile` | kept | an error ending in `unable to access OS keyring: <cause>` |
+| Key unreadable or malformed | kept | an error ending in the key error, such as `key file <path>: decoding key: <cause>` |
+
+On login with a working but empty keyring, an unreadable or malformed
+`.keyfile` is ignored with a warning and a new key is stored in the keyring.
+When the keyring also rejects the new key, login fails with an error naming
+`.keyfile`; delete it and log in again.
 
 `tokens.enc` records the portal URL the token was bound to at login or refresh.
 A stored token is used only when that URL equals the configured portal URL;

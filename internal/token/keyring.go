@@ -47,21 +47,53 @@ func ensureConfigDir(configDir string) (string, error) {
 	return cleanDir, nil
 }
 
-// getOrCreateKey retrieves the 256-bit AES key using the configured backend.
-// Respects KRCI_KEYRING_BACKEND env var: "keyring" (default) or "file".
-// Warnings are written to w.
-func getOrCreateKey(service, user, configDir string, w io.Writer) ([]byte, error) {
-	backend := os.Getenv("KRCI_KEYRING_BACKEND")
-	if backend == "file" {
-		return getOrCreateFileKey(configDir, w)
-	}
-
-	return getOrCreateKeyringKey(service, user, configDir, w)
+// usesFileBackend reports whether KRCI_KEYRING_BACKEND selects the file
+// backend. Any other value selects the keyring backend.
+func usesFileBackend() bool {
+	return os.Getenv("KRCI_KEYRING_BACKEND") == "file"
 }
 
-// getOrCreateKeyringKey tries the OS keyring, falling back to file if unavailable.
-func getOrCreateKeyringKey(service, user, configDir string, w io.Writer) ([]byte, error) {
-	encoded, err := keyring.Get(service, user)
+// loadKey returns the stored 256-bit AES key without creating one.
+// File backend: .keyfile. Keyring backend: the OS keyring, then .keyfile.
+// ErrKeyNotFound means none of the checked stores holds a key;
+// ErrKeyringAccess means the keyring failed and .keyfile is absent. Warnings
+// are written to w.
+func loadKey(service, configDir string, w io.Writer) ([]byte, error) {
+	if usesFileBackend() {
+		return loadFileKey(configDir, w)
+	}
+
+	encoded, err := keyring.Get(service, keyringUser)
+	if err == nil {
+		return decodeKey(encoded)
+	}
+
+	if errors.Is(err, keyring.ErrNotFound) {
+		return loadFileKey(configDir, w)
+	}
+
+	key, fileErr := loadFileKey(configDir, w)
+	if errors.Is(fileErr, ErrKeyNotFound) {
+		return nil, fmt.Errorf("%w: %w", ErrKeyringAccess, err)
+	}
+
+	if fileErr == nil {
+		warnKeyringFallback(configDir, w)
+	}
+
+	return key, fileErr
+}
+
+// getOrCreateKey returns the key loadKey would find, or generates and stores
+// one. File backend: .keyfile. Keyring backend: a readable .keyfile is reused
+// while the keyring is empty, otherwise a new key goes to the keyring; when
+// the keyring fails, .keyfile is read or created. Warnings are written to w.
+func getOrCreateKey(service, configDir string, w io.Writer) ([]byte, error) {
+	if usesFileBackend() {
+		return loadOrCreateFileKey(configDir, w)
+	}
+
+	encoded, err := keyring.Get(service, keyringUser)
 	if err == nil {
 		return decodeKey(encoded)
 	}
@@ -69,21 +101,53 @@ func getOrCreateKeyringKey(service, user, configDir string, w io.Writer) ([]byte
 	if !errors.Is(err, keyring.ErrNotFound) {
 		warnKeyringFallback(configDir, w)
 
-		return getOrCreateFileKey(configDir, w)
+		return loadOrCreateFileKey(configDir, w)
 	}
 
+	key, fileErr := loadFileKey(configDir, w)
+	if fileErr == nil {
+		return key, nil
+	}
+
+	if !errors.Is(fileErr, ErrKeyNotFound) {
+		_, _ = fmt.Fprintf(w, "Warning: ignoring the key file and creating a new key: %v\n", fileErr)
+	}
+
+	return createKeyringKey(service, configDir, w)
+}
+
+// createKeyringKey generates a key and stores it in the keyring, or in
+// .keyfile when the keyring rejects it.
+func createKeyringKey(service, configDir string, w io.Writer) ([]byte, error) {
 	key, err := generateKey()
 	if err != nil {
 		return nil, err
 	}
 
-	if err := keyring.Set(service, user, encodeKey(key)); err != nil {
+	if err := keyring.Set(service, keyringUser, encodeKey(key)); err != nil {
 		warnKeyringFallback(configDir, w)
 
 		return key, saveKeyToFile(key, configDir)
 	}
 
 	return key, nil
+}
+
+// loadOrCreateFileKey reads .keyfile, or generates a key and stores it there
+// when the file does not exist. A key file written concurrently by another
+// process wins.
+func loadOrCreateFileKey(configDir string, w io.Writer) ([]byte, error) {
+	key, err := loadFileKey(configDir, w)
+	if !errors.Is(err, ErrKeyNotFound) {
+		return key, err
+	}
+
+	key, err = generateKey()
+	if err != nil {
+		return nil, err
+	}
+
+	return key, saveKeyToFile(key, configDir)
 }
 
 // warnKeyringFallback writes a warning to w when falling back to file-based key storage.
@@ -107,30 +171,31 @@ func generateKey() ([]byte, error) {
 	return key, nil
 }
 
-// getOrCreateFileKey loads the key from file, or generates and saves one.
-func getOrCreateFileKey(configDir string, w io.Writer) ([]byte, error) {
+// loadFileKey reads the key from .keyfile. ErrKeyNotFound means the file does
+// not exist.
+func loadFileKey(configDir string, w io.Writer) ([]byte, error) {
 	keyPath, err := configPath(configDir, ".keyfile")
 	if err != nil {
 		return nil, err
 	}
 
 	data, err := os.ReadFile(keyPath)
-	if err == nil {
-		validateFilePermissions(keyPath, w)
-
-		return decodeKey(string(data))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, ErrKeyNotFound
 	}
 
-	if !errors.Is(err, os.ErrNotExist) {
+	if err != nil {
 		return nil, fmt.Errorf("reading key file: %w", err)
 	}
 
-	key, err := generateKey()
+	validateFilePermissions(keyPath, w)
+
+	key, err := decodeKey(string(data))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("key file %s: %w", keyPath, err)
 	}
 
-	return key, saveKeyToFile(key, configDir)
+	return key, nil
 }
 
 // saveKeyToFile writes the key atomically with exclusive create and fsync.
@@ -188,7 +253,7 @@ func readWinnersKey(keyPath string, dst []byte) error {
 
 	existingKey, err := decodeKey(string(data))
 	if err != nil {
-		return fmt.Errorf("decoding existing key: %w", err)
+		return fmt.Errorf("decoding existing key file %s: %w", keyPath, err)
 	}
 
 	copy(dst, existingKey)

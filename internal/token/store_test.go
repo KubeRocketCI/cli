@@ -228,7 +228,8 @@ func TestStoreLoadMalformedKeyFileKeepsFile(t *testing.T) {
 	store := NewEncryptedStore(path, NewAESEncryptor("krci-test", dir, &buf), &buf)
 
 	_, err := store.Load()
-	require.ErrorContains(t, err, "decrypting token: getting encryption key: decoding key: ")
+	require.ErrorContains(t, err, "decrypting token: getting encryption key: key file "+
+		filepath.Join(dir, ".keyfile")+": decoding key: ")
 	require.NotErrorIs(t, err, ErrNoToken)
 	assert.Empty(t, buf.String())
 

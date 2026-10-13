@@ -13,7 +13,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// ErrNoToken indicates no stored token exists.
+// ErrNoToken indicates no usable stored token.
 var ErrNoToken = errors.New("no stored token")
 
 // Store persists and retrieves encrypted OAuth tokens.
@@ -77,6 +77,8 @@ type EncryptedFileStore struct {
 	path      string
 	encryptor Encryptor
 	w         io.Writer
+	// warnedNoKey is set once Load has reported a token file without a key.
+	warnedNoKey bool
 }
 
 // NewEncryptedStore creates a token store that encrypts data at rest.
@@ -118,9 +120,11 @@ func (s *EncryptedFileStore) Save(tok *StoredToken) error {
 }
 
 // Load reads and decrypts the token from disk.
-// A file that fails with ErrInvalidCiphertext is reported on the store's writer and removed; once removed, Load
-// returns ErrNoToken silently. Any other Decrypt failure, such as a key that cannot be loaded, keeps the file and
-// is returned.
+//   - ErrInvalidCiphertext: the file is reported on the store's writer and removed; once removed, Load returns
+//     ErrNoToken silently.
+//   - ErrKeyNotFound: the file is kept and reported on the writer once per store; Load returns ErrNoToken and
+//     the next Save replaces the file.
+//   - Any other Decrypt failure, such as a key that cannot be loaded: the file is kept and the error returned.
 func (s *EncryptedFileStore) Load() (*StoredToken, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -136,6 +140,16 @@ func (s *EncryptedFileStore) Load() (*StoredToken, error) {
 
 	plaintext, err := s.encryptor.Decrypt(ciphertext)
 	if err != nil {
+		if errors.Is(err, ErrKeyNotFound) {
+			if !s.warnedNoKey {
+				s.warnedNoKey = true
+				_, _ = fmt.Fprintf(s.w, "Warning: no encryption key for the token file (%s); the next login replaces it.\n",
+					s.path)
+			}
+
+			return nil, ErrNoToken
+		}
+
 		if !errors.Is(err, ErrInvalidCiphertext) {
 			return nil, fmt.Errorf("decrypting token: %w", err)
 		}
