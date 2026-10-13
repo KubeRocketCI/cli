@@ -1,10 +1,16 @@
 package portal
 
 import (
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 )
 
 func TestNewServices_Clock(t *testing.T) {
@@ -17,3 +23,64 @@ func TestNewServices_Clock(t *testing.T) {
 	s := NewServices(nil, Target{}, WithNow(func() time.Time { return fixed }))
 	assert.Equal(t, fixed, s.now())
 }
+
+func TestServices_VerifySession(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		status  int
+		wantErr error
+	}{
+		{name: "accepted", status: http.StatusOK},
+		{name: "rejected", status: http.StatusUnauthorized, wantErr: ErrUnauthorized},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var gotPath string
+
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotPath = r.URL.Path
+				w.WriteHeader(tt.status)
+				_, _ = w.Write([]byte(`{"clusterName":"in-cluster","defaultNamespace":"platform","sonarWebUrl":"","dependencyTrackWebUrl":""}`))
+			}))
+			defer srv.Close()
+
+			client, err := restapi.NewClientWithResponses(srv.URL + "/rest")
+			require.NoError(t, err)
+
+			err = NewServices(client, Target{}).VerifySession(t.Context())
+			assert.Equal(t, "/rest/v1/config", gotPath)
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestServices_VerifySession_TransportError(t *testing.T) {
+	t.Parallel()
+
+	cause := errors.New("dial refused")
+
+	client, err := restapi.NewClientWithResponses("http://portal.invalid/rest",
+		restapi.WithHTTPClient(failingDoer{err: cause}))
+	require.NoError(t, err)
+
+	err = NewServices(client, Target{}).VerifySession(t.Context())
+	require.ErrorIs(t, err, cause)
+	assert.ErrorContains(t, err, "requesting cluster config: ")
+}
+
+// failingDoer fails every request with err.
+type failingDoer struct{ err error }
+
+func (d failingDoer) Do(*http.Request) (*http.Response, error) { return nil, d.err }

@@ -15,7 +15,6 @@ import (
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 )
 
@@ -23,7 +22,7 @@ import (
 type StatusOptions struct {
 	IO            *iostreams.IOStreams
 	TokenProvider func() (auth.TokenProvider, error)
-	RestClient    func() (*restapi.ClientWithResponses, error)
+	Services      func() (*portal.Services, error)
 	OutputFormat  string
 }
 
@@ -42,7 +41,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 	opts := &StatusOptions{
 		IO:            f.IOStreams,
 		TokenProvider: f.TokenProvider,
-		RestClient:    f.RestClient,
+		Services:      f.Services,
 	}
 
 	cmd := &cobra.Command{
@@ -128,16 +127,16 @@ func (opts *StatusOptions) resolveStatus(ctx context.Context) (info *auth.UserIn
 	return info, true, nil
 }
 
-// verifySession asks the portal to validate the token through the same
-// client every portal command uses, and returns the error the command exits
-// with when the portal rejects the token or cannot be asked.
+// verifySession asks the portal to validate the token through Services and
+// returns the error the command exits with when the portal rejects the token
+// or cannot be asked.
 func (opts *StatusOptions) verifySession(ctx context.Context) error {
-	client, err := opts.RestClient()
+	services, err := opts.Services()
 	if err != nil {
 		return err
 	}
 
-	if err := portal.VerifySession(ctx, client); err != nil {
+	if err := services.VerifySession(ctx); err != nil {
 		if errors.Is(err, portal.ErrUnauthorized) {
 			return cmdutil.Rewritef(err, "not authenticated: the portal rejected the token")
 		}
