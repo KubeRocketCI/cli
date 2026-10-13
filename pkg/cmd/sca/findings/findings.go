@@ -12,7 +12,6 @@ import (
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 	scainternal "github.com/KubeRocketCI/cli/pkg/cmd/sca/internal"
 )
@@ -25,7 +24,7 @@ const (
 // FindingsOptions holds all inputs for `krci sca findings <codebase>`.
 type FindingsOptions struct {
 	IO                *iostreams.IOStreams
-	RestClient        func() (*restapi.ClientWithResponses, error)
+	Services          func() (*portal.Services, error)
 	Codebase          string
 	Branch            string
 	Severity          []string
@@ -37,8 +36,8 @@ type FindingsOptions struct {
 // NewCmdFindings returns the "sca findings" cobra.Command.
 func NewCmdFindings(f *cmdutil.Factory, runF func(*FindingsOptions) error) *cobra.Command {
 	opts := &FindingsOptions{
-		IO:         f.IOStreams,
-		RestClient: f.RestClient,
+		IO:       f.IOStreams,
+		Services: f.Services,
 	}
 
 	cmd := &cobra.Command{
@@ -103,12 +102,12 @@ func NewCmdFindings(f *cmdutil.Factory, runF func(*FindingsOptions) error) *cobr
 }
 
 func findingsRun(ctx context.Context, opts *FindingsOptions) error {
-	client, err := opts.RestClient()
+	services, err := opts.Services()
 	if err != nil {
 		return scainternal.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
-	result, err := portal.NewSCAService(client).Findings(ctx, portal.SCAFindingsParams{
+	result, err := services.SCA().Findings(ctx, portal.SCAFindingsParams{
 		Codebase:          opts.Codebase,
 		Branch:            opts.Branch,
 		IncludeSuppressed: opts.IncludeSuppressed,

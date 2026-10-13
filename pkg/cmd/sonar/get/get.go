@@ -15,7 +15,6 @@ import (
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 	sonarinternal "github.com/KubeRocketCI/cli/pkg/cmd/sonar/internal"
 )
@@ -23,7 +22,7 @@ import (
 // GetOptions holds all inputs for `krci sonar get <project>`.
 type GetOptions struct {
 	IO           *iostreams.IOStreams
-	RestClient   func() (*restapi.ClientWithResponses, error)
+	Services     func() (*portal.Services, error)
 	Project      string
 	PullRequest  string
 	Branch       string
@@ -33,8 +32,8 @@ type GetOptions struct {
 // NewCmdGet returns the "sonar get" cobra.Command.
 func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command {
 	opts := &GetOptions{
-		IO:         f.IOStreams,
-		RestClient: f.RestClient,
+		IO:       f.IOStreams,
+		Services: f.Services,
 	}
 
 	cmd := &cobra.Command{
@@ -81,12 +80,12 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 }
 
 func getRun(ctx context.Context, opts *GetOptions) error {
-	client, err := opts.RestClient()
+	services, err := opts.Services()
 	if err != nil {
 		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
-	svc := portal.NewSonarService(client)
+	svc := services.Sonar()
 
 	detail, err := svc.Get(ctx, opts.Project, portal.SonarScope{
 		PullRequest: opts.PullRequest,

@@ -12,7 +12,6 @@ import (
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 	scainternal "github.com/KubeRocketCI/cli/pkg/cmd/sca/internal"
 )
@@ -22,7 +21,7 @@ const defaultComponentsPageSize = 50
 // ComponentsOptions holds all inputs for `krci sca components <codebase>`.
 type ComponentsOptions struct {
 	IO           *iostreams.IOStreams
-	RestClient   func() (*restapi.ClientWithResponses, error)
+	Services     func() (*portal.Services, error)
 	Codebase     string
 	Branch       string
 	Severity     []string
@@ -36,8 +35,8 @@ type ComponentsOptions struct {
 // NewCmdComponents returns the "sca components" cobra.Command.
 func NewCmdComponents(f *cmdutil.Factory, runF func(*ComponentsOptions) error) *cobra.Command {
 	opts := &ComponentsOptions{
-		IO:         f.IOStreams,
-		RestClient: f.RestClient,
+		IO:       f.IOStreams,
+		Services: f.Services,
 	}
 
 	cmd := &cobra.Command{
@@ -98,12 +97,12 @@ func NewCmdComponents(f *cmdutil.Factory, runF func(*ComponentsOptions) error) *
 }
 
 func componentsRun(ctx context.Context, opts *ComponentsOptions) error {
-	client, err := opts.RestClient()
+	services, err := opts.Services()
 	if err != nil {
 		return scainternal.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
-	result, err := portal.NewSCAService(client).Components(ctx, portal.SCAComponentsParams{
+	result, err := services.SCA().Components(ctx, portal.SCAComponentsParams{
 		Codebase:     opts.Codebase,
 		Branch:       opts.Branch,
 		Page:         opts.Page,

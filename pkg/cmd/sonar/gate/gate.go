@@ -12,7 +12,6 @@ import (
 	"github.com/KubeRocketCI/cli/internal/iostreams"
 	"github.com/KubeRocketCI/cli/internal/output"
 	"github.com/KubeRocketCI/cli/internal/portal"
-	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/pkg/cmd/internal/render"
 	sonarinternal "github.com/KubeRocketCI/cli/pkg/cmd/sonar/internal"
 )
@@ -20,7 +19,7 @@ import (
 // GateOptions holds all inputs for `krci sonar gate <project>`.
 type GateOptions struct {
 	IO           *iostreams.IOStreams
-	RestClient   func() (*restapi.ClientWithResponses, error)
+	Services     func() (*portal.Services, error)
 	Project      string
 	PullRequest  string
 	Branch       string
@@ -30,8 +29,8 @@ type GateOptions struct {
 // NewCmdGate returns the "sonar gate" cobra.Command.
 func NewCmdGate(f *cmdutil.Factory, runF func(*GateOptions) error) *cobra.Command {
 	opts := &GateOptions{
-		IO:         f.IOStreams,
-		RestClient: f.RestClient,
+		IO:       f.IOStreams,
+		Services: f.Services,
 	}
 
 	cmd := &cobra.Command{
@@ -80,12 +79,12 @@ func NewCmdGate(f *cmdutil.Factory, runF func(*GateOptions) error) *cobra.Comman
 }
 
 func gateRun(ctx context.Context, opts *GateOptions) error {
-	client, err := opts.RestClient()
+	services, err := opts.Services()
 	if err != nil {
 		return render.HandleError(opts.IO, opts.OutputFormat, err)
 	}
 
-	svc := portal.NewSonarService(client)
+	svc := services.Sonar()
 
 	g, err := svc.Gate(ctx, opts.Project, portal.SonarScope{
 		PullRequest: opts.PullRequest,

@@ -1,6 +1,7 @@
 package portal
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -84,3 +85,50 @@ func TestServices_VerifySession_TransportError(t *testing.T) {
 type failingDoer struct{ err error }
 
 func (d failingDoer) Do(*http.Request) (*http.Response, error) { return nil, d.err }
+
+func TestServices_Accessors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		call     func(context.Context, *Services) error
+		wantPath string
+	}{
+		{
+			name: "sonar",
+			call: func(ctx context.Context, s *Services) error {
+				_, err := s.Sonar().List(ctx, SonarListParams{Page: 1, PageSize: 50})
+				return err
+			},
+			wantPath: "/rest/v1/sonar/list",
+		},
+		{
+			name: "sca",
+			call: func(ctx context.Context, s *Services) error {
+				_, err := s.SCA().List(ctx, SCAListParams{Page: 1, PageSize: 25})
+				return err
+			},
+			wantPath: "/rest/v1/sca/list",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var gotPath string
+
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotPath = r.URL.Path
+				w.WriteHeader(http.StatusUnauthorized)
+			}))
+			t.Cleanup(srv.Close)
+
+			client, err := restapi.NewClientWithResponses(srv.URL + "/rest")
+			require.NoError(t, err)
+
+			require.ErrorIs(t, tt.call(t.Context(), NewServices(client, Target{})), ErrUnauthorized)
+			assert.Equal(t, tt.wantPath, gotPath)
+		})
+	}
+}
