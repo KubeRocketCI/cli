@@ -52,8 +52,8 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 Exits 1 when no session is stored or it is not bound to the configured
 portal URL, or the session has expired, so the command works as a shell
 guard. KRCI_TOKEN, and a stored token whose claims cannot be read, are
-checked with one portal call and exit 1 when the portal rejects the token
-or cannot be reached.
+checked with one portal call and exit 1 when the portal rejects the token,
+cannot be reached, or does not answer with its config.
 With -o json the outcome is a schemaVersion envelope: data.authenticated,
 data.user, data.name, data.groups, and data.expiresAt on success;
 error.message on failure.`,

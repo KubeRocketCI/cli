@@ -111,6 +111,22 @@ func TestFetchClusterConfig(t *testing.T) {
 			wantErrMsg: "unauthorized",
 		},
 		{
+			name: "JSON without the config keys",
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(`{}`))
+			},
+			wantErr:    true,
+			wantErrMsg: "parsing cluster config: response lacks",
+		},
+		{
+			name: "empty values",
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(`{"clusterName":"","defaultNamespace":""}`))
+			},
+		},
+		{
 			name: "invalid JSON",
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				w.Write([]byte(`not json`))

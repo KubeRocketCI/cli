@@ -86,7 +86,7 @@ Groups:       admin, developers, viewers
 | Session expired and refresh not possible| `1`  | `session expired: run 'krci auth login'`     |
 | `KRCI_TOKEN` is a JWT past its `exp`    | `1`  | `KRCI_TOKEN has expired: supply a fresh token` |
 | `KRCI_TOKEN` or unreadable claims, portal rejects the token | `1` | `not authenticated: the portal rejected the token` |
-| `KRCI_TOKEN` or unreadable claims, portal unreachable       | `1` | `verifying the token with the portal: <cause>` |
+| `KRCI_TOKEN` or unreadable claims, portal unreachable or the answer is not the portal config | `1` | `verifying the token with the portal: <cause>` |
 | `KRCI_TOKEN` or unreadable claims, portal URL, cluster name, or namespace not set | `1` | `<setting> not configured`, then how to set it |
 | `KRCI_TOKEN` or unreadable claims, portal URL invalid       | `1` | `invalid portal URL: <reason>`; see [Common messages](json-schemas.md#error-envelope) |
 | Config file holds a value of the wrong type (a YAML syntax error is only a warning) | `1` | `loading config: <cause>` |
