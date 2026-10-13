@@ -122,13 +122,15 @@ var envToken = base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`)) + 
 
 // contractRow is one run of the CLI. format is the -o value, required; table is
 // not golden-tested. env overrides the base environment; an empty value blanks
-// the variable.
+// the variable. config is the content of config.yaml in the isolated config
+// directory; empty writes no file.
 type contractRow struct {
 	cmd      string
 	args     []string
 	format   string
 	fixture  string
 	env      map[string]string
+	config   string
 	wantExit int
 	name     string
 }
@@ -209,6 +211,13 @@ var contractRows = []contractRow{
 	{cmd: cmdAuthStatus, format: formatJSON, fixture: "config", name: "env-token"},
 	{cmd: cmdAuthStatus, format: formatJSON, fixture: "config-401", wantExit: 1, name: nameUnauthorized},
 	{cmd: cmdAuthStatus, format: formatUnknown, fixture: "none", wantExit: 1, name: nameUnknownFormat},
+	// Valid YAML that fails the config decode; a YAML syntax error is only a warning.
+	{cmd: cmdAuthStatus, format: formatJSON, config: "scopes:\n  a: b\n", fixture: "none", wantExit: 1,
+		name: "bad-config"},
+	{cmd: cmdAuthStatus, format: formatJSON, fixture: "none", env: map[string]string{"KRCI_PORTAL_URL": ""},
+		wantExit: 1, name: "portal-url-unset"},
+	{cmd: cmdAuthStatus, format: formatJSON, fixture: "none",
+		env: map[string]string{"KRCI_PORTAL_URL": "http://portal.example.com"}, wantExit: 1, name: "insecure-portal-url"},
 
 	{cmd: cmdSonarList, format: formatJSON, fixture: "sonar", name: "projects"},
 	{cmd: cmdSonarList, format: formatJSON, fixture: "sonar-401", wantExit: 1, name: nameUnauthorized},
@@ -566,7 +575,7 @@ func runContractRow(t *testing.T, row contractRow) {
 	routes, ok := tables[row.fixture]
 	require.True(t, ok, "unknown fixture %q", row.fixture)
 
-	res := runStub(t, routes, row.env, row.argv())
+	res := runStub(t, routes, row.env, row.config, row.argv())
 
 	norm := strings.NewReplacer(
 		res.portalURL, "{{PORTAL}}",
@@ -586,10 +595,15 @@ type stubResult struct {
 
 // runStub serves routes from a stub portal and runs argv against it in an
 // isolated configuration: the base environment, then extra, with the Factory
-// clock at fixedNow. KRCI_PORTAL_URL in extra replaces the stub's URL.
-func runStub(t *testing.T, routes []route, extra map[string]string, argv []string) stubResult {
+// clock at fixedNow. KRCI_PORTAL_URL in extra replaces the stub's URL. A
+// non-empty configFile is written as config.yaml.
+func runStub(t *testing.T, routes []route, extra map[string]string, configFile string, argv []string) stubResult {
 	t.Helper()
-	isolatedConfigDir(t)
+
+	dir := isolatedConfigDir(t)
+	if configFile != "" {
+		writeConfigFile(t, dir, configFile)
+	}
 
 	env := map[string]string{
 		"KRCI_CLUSTER_NAME":    baseCluster,
@@ -737,6 +751,7 @@ func inventoryIntro(test string) string {
 		"Each row is one run of the CLI against a stub portal serving synthetic data.",
 		"stdout: `" + shapeEnvelope + "` has `schemaVersion` and no `error`, `" + shapeErrorEnvelope + "` has",
 		"`schemaVersion` and `error`, `" + shapeBare + "` is any other JSON, `" + shapeEmpty + "` is no output.",
+		"A row with a config file writes it under a temporary `HOME` in a subshell.",
 		"stderr is verbatim, newlines shown as `\\n`. Field rules are in",
 		"[json-schemas.md](json-schemas.md).",
 		"",
@@ -781,15 +796,26 @@ func TestContract_InventoryDoc(t *testing.T) {
 	golden(t, inventoryPath, []byte(b.String()))
 }
 
-// commandLine is the row as a shell command, env overrides first.
+// commandLine is the row as a shell command: env overrides, then the command.
+// A row with a config file runs in a subshell that writes it under a temporary
+// HOME, leaving the reader's own config untouched.
 func (r contractRow) commandLine() string {
 	words := make([]string, 0, len(r.env)+1)
 	for _, k := range slices.Sorted(maps.Keys(r.env)) {
 		words = append(words, k+"="+r.env[k])
 	}
 
-	return strings.Join(append(words, "krci"), " ") + " " + strings.Join(r.argv(), " ")
+	line := strings.Join(append(words, "krci"), " ") + " " + strings.Join(r.argv(), " ")
+	if r.config == "" {
+		return line
+	}
+
+	return "(HOME=$(mktemp -d) && mkdir -p ~/.config/krci && printf '" + printfQuoter.Replace(r.config) +
+		"' >~/.config/krci/config.yaml && " + line + ")"
 }
+
+// printfQuoter escapes text as a single-quoted printf format.
+var printfQuoter = strings.NewReplacer(`\`, `\\`, "%", "%%", "\n", `\n`, "'", `'\''`)
 
 // rowVerbs returns the row commands in order of first appearance.
 func rowVerbs() []string {

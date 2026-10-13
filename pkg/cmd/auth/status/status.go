@@ -85,15 +85,27 @@ error.message on failure.`,
 }
 
 func statusRun(ctx context.Context, opts *StatusOptions) error {
+	info, haveInfo, err := opts.resolveStatus(ctx)
+	if err != nil {
+		return opts.fail(err)
+	}
+
+	return opts.printStatus(info, haveInfo)
+}
+
+// resolveStatus returns the session's user info, or the error the command
+// exits with. haveInfo is false when the token's claims could not be read and
+// the portal accepted the token.
+func (opts *StatusOptions) resolveStatus(ctx context.Context) (info *auth.UserInfo, haveInfo bool, err error) {
 	tp, err := opts.TokenProvider()
 	if err != nil {
-		return err
+		return nil, false, err
 	}
 
 	// GetToken classifies the auth state (not-authenticated, expired,
 	// refresh-failed, or valid) and refreshes and persists an expired token.
 	if _, tokenErr := tp.GetToken(ctx); tokenErr != nil {
-		return opts.fail(classifyTokenError(tokenErr))
+		return nil, false, classifyTokenError(tokenErr)
 	}
 
 	info, infoErr := tp.UserInfo()
@@ -102,18 +114,18 @@ func statusRun(ctx context.Context, opts *StatusOptions) error {
 	// locally. KRCI_TOKEN, or claims that cannot be read, prove nothing
 	// locally: the portal decides.
 	if infoErr == nil && !info.FromEnv {
-		return opts.printStatus(info, true)
+		return info, true, nil
 	}
 
 	if err := opts.verifySession(ctx); err != nil {
-		return opts.fail(err)
+		return nil, false, err
 	}
 
 	if infoErr != nil {
-		return opts.printStatus(&auth.UserInfo{}, false)
+		return &auth.UserInfo{}, false, nil
 	}
 
-	return opts.printStatus(info, true)
+	return info, true, nil
 }
 
 // verifySession asks the portal to validate the token through the same
