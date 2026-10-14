@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httptrace"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -544,4 +545,31 @@ func TestNewRestClient_DoerReplacesCallerHTTPClient(t *testing.T) {
 
 	_, err = client.ConfigGetWithResponse(t.Context())
 	require.ErrorIs(t, err, ErrUnexpectedResponse)
+}
+
+func TestHTTPClient_KeepsConnectionsOnDefaultTransportReset(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	t.Cleanup(srv.Close)
+
+	client := newHTTPClient(5 * time.Second)
+
+	reused := func() bool {
+		var got bool
+
+		trace := &httptrace.ClientTrace{GotConn: func(info httptrace.GotConnInfo) { got = info.Reused }}
+		req := newRequest(t, srv.URL).WithContext(httptrace.WithClientTrace(t.Context(), trace))
+
+		resp, err := client.Do(req)
+		require.NoError(t, err)
+		_, _ = io.Copy(io.Discard, resp.Body)
+		require.NoError(t, resp.Body.Close())
+
+		return got
+	}
+
+	reused()
+	http.DefaultTransport.(*http.Transport).CloseIdleConnections()
+	assert.True(t, reused(), "the DefaultTransport reset closed a portal connection")
 }

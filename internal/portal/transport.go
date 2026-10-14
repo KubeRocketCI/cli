@@ -71,10 +71,15 @@ func isLoopbackHost(host string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
+// portalTransport holds the connections of portal clients only, with the
+// settings of http.DefaultTransport: DefaultTransport.CloseIdleConnections,
+// called by every httptest.Server.Close, does not reach it.
+var portalTransport = http.DefaultTransport.(*http.Transport).Clone()
+
 // newHTTPClient returns a client for portal requests: timeout caps each
 // request, and redirects follow checkRedirect.
 func newHTTPClient(timeout time.Duration) *http.Client {
-	return &http.Client{Timeout: timeout, CheckRedirect: checkRedirect}
+	return &http.Client{Timeout: timeout, Transport: portalTransport, CheckRedirect: checkRedirect}
 }
 
 // doer sends portal REST requests and enforces the response contract every
