@@ -214,6 +214,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-project-versions-project)
 | versions | `krci project versions my-app -o json` | 0 | envelope | empty |
 | not-found | `krci project versions my-app -o json` | 1 | error envelope | `Error: project 'my-app' not found` |
 | unauthorized | `krci project versions my-app -o json` | 1 | error envelope | `Error: authentication required: unauthorized: please run 'krci auth login'` |
+| long-name | `krci project versions llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll -o json` | 1 | error envelope | `Error: project 'llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll' not found` |
 
 ## `krci project deployments`
 
