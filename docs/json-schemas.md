@@ -868,6 +868,8 @@ Rules:
   in JSON it is the full `sha256:...`.
 - An empty `streams` is success (exit `0`); an unknown project is an error
   envelope with `project '<name>' not found` and exit `1`.
+- The project lookup is reported before a failed image stream or branch list,
+  so a name of 64 to 253 characters is `project '<name>' not found`.
 
 ## `krci deployment list`
 

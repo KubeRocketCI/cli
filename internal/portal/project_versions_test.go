@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -292,5 +293,66 @@ func TestProjectVersionsService_List_ProjectNotFound(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "project 'ghost' not found") {
 		t.Errorf("error = %q, want project 'ghost' not found", err.Error())
+	}
+}
+
+// The losing call answers first.
+func TestProjectVersionsService_List_ErrorOrder(t *testing.T) {
+	t.Parallel()
+
+	const late = 100 * time.Millisecond
+
+	found := map[string]string{"my-app": codebaseGetJSON("my-app")}
+
+	cases := map[string]struct {
+		rec  *envTestRecorder
+		want func(error) bool
+	}{
+		"missing project before failed lists": {
+			rec: &envTestRecorder{
+				getByName: map[string]string{},
+				statusByKind: map[string]int{
+					"CodebaseImageStream": http.StatusBadRequest,
+					"CodebaseBranch":      http.StatusBadRequest,
+				},
+				delayByKind: map[string]time.Duration{"Codebase": late},
+			},
+			want: func(err error) bool { return errors.Is(err, ErrProjectNotFound) },
+		},
+		"failed stream list before a failed branch list": {
+			rec: &envTestRecorder{
+				getByName: found,
+				statusByKind: map[string]int{
+					"CodebaseImageStream": http.StatusBadRequest,
+					"CodebaseBranch":      http.StatusForbidden,
+				},
+				delayByKind: map[string]time.Duration{"CodebaseImageStream": late},
+			},
+			want: func(err error) bool { return err != nil && strings.Contains(err.Error(), "HTTP 400") },
+		},
+		"failed branch list of a found project": {
+			rec: &envTestRecorder{
+				getByName:    found,
+				statusByKind: map[string]int{"CodebaseBranch": http.StatusForbidden},
+			},
+			want: func(err error) bool { return errors.Is(err, ErrPermissionDenied) },
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			rec := tc.rec
+			rec.t = t
+
+			svc, closer := newProjectVersionsServiceForTest(t, rec)
+			defer closer()
+
+			_, err := svc.List(t.Context(), "my-app", "")
+			if !tc.want(err) {
+				t.Fatalf("unexpected err = %v", err)
+			}
+		})
 	}
 }

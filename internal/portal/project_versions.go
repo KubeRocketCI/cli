@@ -7,8 +7,6 @@ import (
 	"sort"
 	"strings"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/internal/ptr"
 )
@@ -56,39 +54,26 @@ func (s *ProjectVersionsService) listBody(
 // so an unknown project fails instead of returning nothing; list the image
 // streams by the codebase label; list the CodebaseBranches by the same label,
 // which map a stream to its git branch name (a stream carries the branch
-// resource name, e.g. my-app-release-2-27-781f0, not "release/2.27").
+// resource name, e.g. my-app-release-2-27-781f0, not "release/2.27"). The
+// error order is the Codebase get, the image stream list, then the branch
+// list.
 func (s *ProjectVersionsService) List(ctx context.Context, project, branch string) ([]ProjectVersionStream, error) {
 	var streamResp, branchResp *restapi.K8sListResponse
 
-	g, gctx := errgroup.WithContext(ctx)
+	err := fanOut(ctx,
+		func(ctx context.Context) error { return s.checkProjectExists(ctx, project) },
+		func(ctx context.Context) (err error) {
+			streamResp, err = s.listOfProject(ctx, codebaseImageStreamResourceConfig, project, "image streams")
 
-	g.Go(func() error {
-		return s.checkProjectExists(gctx, project)
-	})
+			return err
+		},
+		func(ctx context.Context) (err error) {
+			branchResp, err = s.listOfProject(ctx, codebaseBranchResourceConfig, project, "branches")
 
-	g.Go(func() error {
-		var err error
-		streamResp, err = s.client.K8sListWithResponse(gctx,
-			s.listBody(codebaseImageStreamResourceConfig, map[string]string{labelCodebase: project}))
-		if err != nil {
-			return fmt.Errorf("listing image streams for project %q: %w", project, err)
-		}
-
-		return checkResponse(streamResp.StatusCode(), streamResp.Body)
-	})
-
-	g.Go(func() error {
-		var err error
-		branchResp, err = s.client.K8sListWithResponse(gctx,
-			s.listBody(codebaseBranchResourceConfig, map[string]string{labelCodebase: project}))
-		if err != nil {
-			return fmt.Errorf("listing branches for project %q: %w", project, err)
-		}
-
-		return checkResponse(branchResp.StatusCode(), branchResp.Body)
-	})
-
-	if err := g.Wait(); err != nil {
+			return err
+		},
+	)
+	if err != nil {
 		return nil, err
 	}
 
@@ -103,6 +88,19 @@ func (s *ProjectVersionsService) List(ctx context.Context, project, branch strin
 	}
 
 	return buildProjectVersionStreams(project, branch, streamItems, branchItems), nil
+}
+
+// listOfProject lists one kind by the codebase label of project; what names
+// the kind in a transport error.
+func (s *ProjectVersionsService) listOfProject(
+	ctx context.Context, rc restapi.K8sListJSONBody, project, what string,
+) (*restapi.K8sListResponse, error) {
+	resp, err := s.client.K8sListWithResponse(ctx, s.listBody(rc, map[string]string{labelCodebase: project}))
+	if err != nil {
+		return nil, fmt.Errorf("listing %s for project %q: %w", what, project, err)
+	}
+
+	return resp, checkResponse(resp.StatusCode(), resp.Body)
 }
 
 // checkProjectExists resolves the Codebase so that an unknown project is an

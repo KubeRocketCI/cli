@@ -281,6 +281,8 @@ var contractRows = []contractRow{
 		wantExit: 1, name: nameNotFound},
 	{cmd: cmdProjectVersions, args: []string{projectName}, format: formatJSON, fixture: "image-streams-401",
 		wantExit: 1, name: nameUnauthorized},
+	{cmd: cmdProjectVersions, args: []string{longName}, format: formatJSON, fixture: "long-project",
+		wantExit: 1, name: "long-name"},
 	{cmd: cmdProjectDeployments, args: []string{projectName}, format: formatJSON, fixture: "project",
 		name: "deployments"},
 	{cmd: cmdProjectDeployments, args: []string{projectName}, format: formatJSON, fixture: "cdpipelines-401",
@@ -476,6 +478,13 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 	project := []route{
 		codebases, codebase, streams, branches, cdpipelines, apiPipeline, apiPipelineStages, stages, projectApps,
 	}
+	longCodebase := codebase
+	longCodebase.name = longName
+	longProject := []route{
+		missing(longCodebase),
+		reject(labelled(streams, "app.edp.epam.com/codebase", longName)),
+		reject(labelled(branches, "app.edp.epam.com/codebase", longName)),
+	}
 
 	sonar := []route{
 		getQuery(pathSonarList, url.Values{"page": {"1"}, "pageSize": {"50"}}, "sonar-projects"),
@@ -525,6 +534,7 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 		"long-env":             longEnv,
 		"project":              project,
 		"codebase-404":         append([]route{missing(codebase)}, project...),
+		"long-project":         longProject,
 		"codebase-401":         append(denyAll([]route{codebases, codebase}), project...),
 		"image-streams-401":    append([]route{deny(streams)}, project...),
 		"cdpipelines-401":      append([]route{deny(cdpipelines)}, project...),

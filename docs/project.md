@@ -310,7 +310,9 @@ Empty result is success: `data.streams: []`, exit `0`, with
 With `--branch`, the note `No versions found for branch <branch> of project
 <name>.` also covers a branch that exists but has never been built. An
 unknown project is an error: exit `1` with `project '<name>' not found`, so a
-typo is not mistaken for a project that was never built.
+typo is not mistaken for a project that was never built. The project lookup is
+reported before any other failed read, so a name of 64 to 253 characters is
+`project '<name>' not found` too.
 
 ### Scripting examples
 
