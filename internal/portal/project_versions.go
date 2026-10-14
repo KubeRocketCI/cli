@@ -77,17 +77,7 @@ func (s *ProjectVersionsService) List(ctx context.Context, project, branch strin
 		return nil, err
 	}
 
-	var streamItems, branchItems []k8sItem
-
-	if streamResp.JSON200 != nil {
-		streamItems = streamResp.JSON200.Items
-	}
-
-	if branchResp.JSON200 != nil {
-		branchItems = branchResp.JSON200.Items
-	}
-
-	return buildProjectVersionStreams(project, branch, streamItems, branchItems), nil
+	return buildProjectVersionStreams(project, branch, streamResp.JSON200.Items, branchResp.JSON200.Items), nil
 }
 
 // listOfProject lists one kind by the codebase label of project; what names

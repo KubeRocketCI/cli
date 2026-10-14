@@ -89,27 +89,8 @@ func (s *DeploymentByProjectService) List(ctx context.Context, project string) (
 		return nil, err
 	}
 
-	var (
-		appItems      []k8sItem
-		stageItems    []k8sItem
-		pipelineItems []k8sItem
-	)
-
-	if appResp.JSON200 != nil {
-		appItems = appResp.JSON200.Items
-	}
-
-	if stageResp.JSON200 != nil {
-		stageItems = stageResp.JSON200.Items
-	}
-
-	if pipelineResp.JSON200 != nil {
-		pipelineItems = pipelineResp.JSON200.Items
-	}
-
-	rows := buildProjectDeploymentRows(project, appItems, stageItems, pipelineItems)
-
-	return rows, nil
+	return buildProjectDeploymentRows(project,
+		appResp.JSON200.Items, stageResp.JSON200.Items, pipelineResp.JSON200.Items), nil
 }
 
 // buildProjectDeploymentRows enumerates expected (deployment, env) pairs from

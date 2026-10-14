@@ -53,10 +53,6 @@ func (s *EnvService) List(ctx context.Context, f EnvListFilters) ([]EnvSummary, 
 		return nil, fmt.Errorf("listing stages: %w", err)
 	}
 
-	if resp.JSON200 == nil {
-		return []EnvSummary{}, nil
-	}
-
 	rows := make([]EnvSummary, 0, len(resp.JSON200.Items))
 	for _, item := range resp.JSON200.Items {
 		row := mapEnvSummary(item)
@@ -122,19 +118,12 @@ func (s *EnvService) pipelineOf(ctx context.Context, deployment string) (*restap
 // deployment and reads the registered apps of its CDPipeline. It reports false
 // when no Stage has that name.
 func pickTarget(stages *restapi.K8sListResponse, pipeline *restapi.K8sGetResponse, env string) (envTarget, bool) {
-	if stages.JSON200 == nil {
-		return envTarget{}, false
-	}
-
 	for _, it := range stages.JSON200.Items {
 		if stringVal(ptr.Deref(it.Spec, nil), "name") != env {
 			continue
 		}
 
-		var registered []string
-		if pipeline.JSON200 != nil {
-			registered = stringSliceVal(ptr.Deref(pipeline.JSON200.Spec, nil), "applications")
-		}
+		registered := stringSliceVal(ptr.Deref(pipeline.JSON200.Spec, nil), "applications")
 
 		return envTarget{stage: it, projects: registered}, true
 	}
@@ -221,12 +210,7 @@ func (s *EnvService) Get(ctx context.Context, deployment, env string) (*EnvDetai
 		return nil, err
 	}
 
-	var appItems []k8sItem
-	if appResp.JSON200 != nil {
-		appItems = appResp.JSON200.Items
-	}
-
-	detail := buildEnvDetail(deployment, target.stage, target.projects, appItems)
+	detail := buildEnvDetail(deployment, target.stage, target.projects, appResp.JSON200.Items)
 
 	return &detail, nil
 }
