@@ -7,8 +7,6 @@ import (
 	"sort"
 	"strings"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/KubeRocketCI/cli/internal/portal/restapi"
 	"github.com/KubeRocketCI/cli/internal/ptr"
 )
@@ -146,30 +144,26 @@ func pickTarget(stages *restapi.K8sListResponse, pipeline *restapi.K8sGetRespons
 
 // resolveTarget lists the Stages of deployment and gets its CDPipeline in
 // parallel, then picks the Stage of env. It reports false when no Stage has
-// that name; the error is a failed call.
+// that name. A CDPipeline error is reported before a Stage list error.
 func (s *EnvService) resolveTarget(ctx context.Context, deployment, env string) (envTarget, bool, error) {
 	var (
 		stageResp    *restapi.K8sListResponse
 		pipelineResp *restapi.K8sGetResponse
 	)
 
-	g, gctx := errgroup.WithContext(ctx)
+	err := fanOut(ctx,
+		func(ctx context.Context) (err error) {
+			pipelineResp, err = s.pipelineOf(ctx, deployment)
 
-	g.Go(func() error {
-		var err error
-		stageResp, err = s.stagesOf(gctx, deployment)
+			return err
+		},
+		func(ctx context.Context) (err error) {
+			stageResp, err = s.stagesOf(ctx, deployment)
 
-		return err
-	})
-
-	g.Go(func() error {
-		var err error
-		pipelineResp, err = s.pipelineOf(gctx, deployment)
-
-		return err
-	})
-
-	if err := g.Wait(); err != nil {
+			return err
+		},
+	)
+	if err != nil {
 		return envTarget{}, false, err
 	}
 
@@ -178,47 +172,53 @@ func (s *EnvService) resolveTarget(ctx context.Context, deployment, env string) 
 	return target, found, nil
 }
 
+func (s *EnvService) applicationsOf(ctx context.Context, deployment, env string) (*restapi.K8sListResponse, error) {
+	resp, err := s.client.K8sListWithResponse(ctx, s.listBody(applicationResourceConfig, map[string]string{
+		labelPipeline: deployment,
+		labelStage:    env,
+	}))
+	if err != nil {
+		return nil, fmt.Errorf("listing applications for env %q in deployment %q: %w", env, deployment, err)
+	}
+
+	return resp, checkResponse(resp.StatusCode(), resp.Body)
+}
+
 // Get returns the full detail of one stage. Fans out three k8s calls in
 // parallel: list Stages (to resolve env-name → metadata.name), get parent
 // CDPipeline (to enumerate registered apps), list Applications scoped to the
 // (pipeline, stage) pair. The Application label `app.edp.epam.com/stage`
 // carries `stage.spec.name` (the short identifier "dev"/"stage"/"prod"), not
-// the compound resource name.
+// the compound resource name. The error order is the resolveTarget error,
+// ErrEnvNotFound, then the Applications list error.
 func (s *EnvService) Get(ctx context.Context, deployment, env string) (*EnvDetail, error) {
 	var (
 		target  envTarget
-		found   bool
 		appResp *restapi.K8sListResponse
 	)
 
-	g, gctx := errgroup.WithContext(ctx)
+	err := fanOut(ctx,
+		func(ctx context.Context) error {
+			var (
+				found bool
+				err   error
+			)
 
-	g.Go(func() error {
-		var err error
-		target, found, err = s.resolveTarget(gctx, deployment, env)
+			target, found, err = s.resolveTarget(ctx, deployment, env)
+			if err == nil && !found {
+				return ErrEnvNotFound
+			}
 
-		return err
-	})
+			return err
+		},
+		func(ctx context.Context) (err error) {
+			appResp, err = s.applicationsOf(ctx, deployment, env)
 
-	g.Go(func() error {
-		var err error
-		appResp, err = s.client.K8sListWithResponse(gctx, s.listBody(applicationResourceConfig, map[string]string{
-			labelPipeline: deployment,
-			labelStage:    env,
-		}))
-		if err != nil {
-			return fmt.Errorf("listing applications for env %q in deployment %q: %w", env, deployment, err)
-		}
-
-		return checkResponse(appResp.StatusCode(), appResp.Body)
-	})
-
-	if err := g.Wait(); err != nil {
+			return err
+		},
+	)
+	if err != nil {
 		return nil, err
-	}
-
-	if !found {
-		return nil, ErrEnvNotFound
 	}
 
 	var appItems []k8sItem

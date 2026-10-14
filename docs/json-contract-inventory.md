@@ -66,6 +66,8 @@ Schema: [json-schemas.md](json-schemas.md#krci-env-get-deployment-env)
 | unknown-format | `krci env get my-pipeline dev -o xml` | 1 | empty | `Error: unknown output format: xml (use 'json' or 'table')` |
 | deployment-not-found | `krci env get my-pipeline dev -o json` | 1 | error envelope | `Error: deployment "my-pipeline" not found` |
 | env-not-found | `krci env get my-pipeline prod -o json` | 1 | error envelope | `Error: environment "prod" not found in deployment "my-pipeline"` |
+| long-deployment-name | `krci env get llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll dev -o json` | 1 | error envelope | `Error: deployment "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll" not found` |
+| long-env-name | `krci env get my-pipeline llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll -o json` | 1 | error envelope | `Error: environment "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll" not found in deployment "my-pipeline"` |
 
 ## `krci env pods`
 
@@ -244,6 +246,7 @@ Schema: [json-schemas.md](json-schemas.md#krci-deployment-get-name)
 | no-stages | `krci deployment get api-pipeline -o json` | 0 | bare | empty |
 | stages-page-not-json | `krci deployment get my-pipeline -o json` | 1 | empty | `Error: listing stages for cdpipeline "my-pipeline": unexpected portal response: HTTP 200 with Content-Type "text/html; charset=utf-8", not JSON` |
 | not-found | `krci deployment get my-pipeline -o json` | 1 | empty | `Error: deployment "my-pipeline" not found` |
+| long-name | `krci deployment get llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll -o json` | 1 | empty | `Error: deployment "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll" not found` |
 | unauthorized | `krci deployment get my-pipeline -o json` | 1 | empty | `Error: authentication required: unauthorized: please run 'krci auth login'` |
 | unknown-format | `krci deployment get my-pipeline -o xml` | 1 | empty | `Error: unknown output format: xml (use 'json' or 'table')` |
 

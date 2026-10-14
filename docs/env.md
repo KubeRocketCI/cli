@@ -185,6 +185,9 @@ Error: environment "wat" not found in deployment "my-pipeline"
 
 Both exit `1`. Under `-o json` the message is also written to stdout as
 `{"schemaVersion":"1","error":{"message":"…"}}`.
+When several reads fail, the first of these is reported: a missing deployment, a
+failed Stage list, a missing environment, a failed Applications read. A name of
+64 to 253 characters gets the same messages.
 
 ### JSON envelope
 

@@ -364,32 +364,95 @@ func TestEnvService_Get_EnvNotFound(t *testing.T) {
 	}
 }
 
-// TestEnvService_Get_FailedCallBeforeEnvNotFound pins the order of Get: a
-// missing environment is reported only after every call has answered, so a
-// call that failed is what the user sees. The Applications call answers last.
-func TestEnvService_Get_FailedCallBeforeEnvNotFound(t *testing.T) {
+// The losing call answers first.
+func TestEnvService_Get_ErrorOrder(t *testing.T) {
+	t.Parallel()
+
+	const late = 100 * time.Millisecond
+
+	stages := stageListJSON([]stageStub{{name: "my-pipeline-dev", deployment: "my-pipeline", env: "dev", order: 0}})
+	pipelines := map[string]string{"my-pipeline": cdPipelineGetJSON("my-pipeline", []string{"foo"})}
+
+	cases := map[string]struct {
+		rec  *envTestRecorder
+		env  string
+		want error
+	}{
+		"missing deployment before a failed stage list": {
+			rec: &envTestRecorder{
+				getByName:    map[string]string{},
+				statusByKind: map[string]int{"Stage": http.StatusBadRequest},
+				delayByKind:  map[string]time.Duration{"CDPipeline": late},
+			},
+			env:  "dev",
+			want: ErrDeploymentNotFound,
+		},
+		"failed stage list before a missing environment": {
+			rec: &envTestRecorder{
+				getByName:    pipelines,
+				statusByKind: map[string]int{"Stage": http.StatusForbidden},
+				delayByKind:  map[string]time.Duration{"Stage": late},
+			},
+			env:  "wat",
+			want: ErrPermissionDenied,
+		},
+		"missing environment before a failed applications list": {
+			rec: &envTestRecorder{
+				listByKind:   map[string]string{"Stage": stages},
+				getByName:    pipelines,
+				statusByKind: map[string]int{"Application": http.StatusBadRequest},
+				delayByKind:  map[string]time.Duration{"Stage": late},
+			},
+			env:  "wat",
+			want: ErrEnvNotFound,
+		},
+		"failed applications list of a found environment": {
+			rec: &envTestRecorder{
+				listByKind:   map[string]string{"Stage": stages},
+				getByName:    pipelines,
+				statusByKind: map[string]int{"Application": http.StatusForbidden},
+			},
+			env:  "dev",
+			want: ErrPermissionDenied,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			rec := tc.rec
+			rec.t = t
+
+			svc, closer := newEnvServiceForTest(t, rec)
+			defer closer()
+
+			_, err := svc.Get(t.Context(), "my-pipeline", tc.env)
+			if !errors.Is(err, tc.want) {
+				t.Fatalf("err = %v, want %v", err, tc.want)
+			}
+		})
+	}
+}
+
+// env pods and env events resolve through namespaceOf. The losing call answers
+// first.
+func TestEnvService_NamespaceOf_DeploymentFirst(t *testing.T) {
 	t.Parallel()
 
 	rec := &envTestRecorder{
-		t: t,
-		listByKind: map[string]string{
-			"Stage": stageListJSON([]stageStub{
-				{name: "my-pipeline-dev", deployment: "my-pipeline", env: "dev", order: 0},
-			}),
-		},
-		getByName: map[string]string{
-			"my-pipeline": cdPipelineGetJSON("my-pipeline", []string{"foo"}),
-		},
-		statusByKind: map[string]int{"Application": http.StatusForbidden},
-		delayByKind:  map[string]time.Duration{"Application": 200 * time.Millisecond},
+		t:            t,
+		getByName:    map[string]string{},
+		statusByKind: map[string]int{"Stage": http.StatusBadRequest},
+		delayByKind:  map[string]time.Duration{"CDPipeline": 100 * time.Millisecond},
 	}
 
 	svc, closer := newEnvServiceForTest(t, rec)
 	defer closer()
 
-	_, err := svc.Get(context.Background(), "my-pipeline", "wat")
-	if !errors.Is(err, ErrPermissionDenied) {
-		t.Fatalf("expected ErrPermissionDenied from the Applications call, got %v", err)
+	_, _, err := svc.namespaceOf(t.Context(), "my-pipeline", "dev")
+	if !errors.Is(err, ErrDeploymentNotFound) {
+		t.Fatalf("err = %v, want %v", err, ErrDeploymentNotFound)
 	}
 }
 
