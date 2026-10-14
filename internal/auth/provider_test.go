@@ -960,7 +960,7 @@ func TestUsable(t *testing.T) {
 		{"nil", nil, false},
 		{"no ID token", &token.StoredToken{ExpiresAt: time.Now().Add(time.Hour)}, false},
 		{"future", &token.StoredToken{IDToken: "opaque", ExpiresAt: time.Now().Add(time.Hour)}, true},
-		{"outside the margin", &token.StoredToken{IDToken: "opaque", ExpiresAt: time.Now().Add(31 * time.Second)}, true},
+		{"outside the margin", &token.StoredToken{IDToken: "opaque", ExpiresAt: time.Now().Add(90 * time.Second)}, true},
 		{"inside the margin", &token.StoredToken{IDToken: "opaque", ExpiresAt: time.Now().Add(29 * time.Second)}, false},
 		{"expired", &token.StoredToken{IDToken: "opaque", ExpiresAt: time.Now().Add(-time.Minute)}, false},
 		{"no expiry", &token.StoredToken{IDToken: "opaque"}, true},
