@@ -353,7 +353,7 @@ func extractAppFields(item k8sItem) appFields {
 	labels := ptr.Deref(item.Metadata.Labels, nil)
 	summary := deepGet(status, "summary")
 
-	out := appFields{IngressURLs: []string{}}
+	var out appFields
 
 	if v := stringVal(deepGet(status, "health"), "status"); v != "" {
 		l := strings.ToLower(v)
@@ -377,9 +377,7 @@ func extractAppFields(item k8sItem) appFields {
 		out.ImageDigest = &v
 	}
 
-	if urls := stringSliceVal(summary, "externalURLs"); urls != nil {
-		out.IngressURLs = urls
-	}
+	out.IngressURLs = stringSliceVal(summary, "externalURLs")
 
 	if u, ok := argocdURL(labels); ok {
 		out.ArgocdURL = &u

@@ -1,6 +1,7 @@
 package portal
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -97,6 +98,40 @@ func TestExtractQualityGates_NoGatesIsEmpty(t *testing.T) {
 		assert.NotNil(t, got, name)
 		assert.Empty(t, got, name)
 	}
+}
+
+func TestStringSliceVal(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		m    map[string]any
+		want []string
+	}{
+		"nil map":       {nil, []string{}},
+		"key missing":   {map[string]any{"name": "demo"}, []string{}},
+		"not an array":  {map[string]any{"applications": "my-app"}, []string{}},
+		"null value":    {map[string]any{"applications": nil}, []string{}},
+		"empty array":   {map[string]any{"applications": []any{}}, []string{}},
+		"skips non-str": {map[string]any{"applications": []any{"my-app", 1, "my-api"}}, []string{"my-app", "my-api"}},
+	}
+
+	for name, tc := range cases {
+		assert.Equal(t, tc.want, stringSliceVal(tc.m, "applications"), name)
+	}
+}
+
+func TestMapDeployment_NoApplicationsIsEmptyArray(t *testing.T) {
+	t.Parallel()
+
+	spec := map[string]any{"name": "demo"}
+
+	list, err := json.Marshal(mapDeployment(k8sItem{Spec: &spec}))
+	require.NoError(t, err)
+	assert.Contains(t, string(list), `"applications":[]`)
+
+	detail, err := json.Marshal(mapDeploymentDetail(restapi.K8sGet_200_Metadata{Name: "demo"}, &spec, nil))
+	require.NoError(t, err)
+	assert.Contains(t, string(detail), `"applications":[]`)
 }
 
 func TestDeploymentService_Get_ListsOnlyItsStages(t *testing.T) {

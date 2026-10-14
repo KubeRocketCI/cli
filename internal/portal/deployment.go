@@ -330,21 +330,10 @@ func filterAndSortStages(items []k8sItem, pipelineName string) []Stage {
 	return stages
 }
 
+// stringSliceVal returns the strings of the slice at m[key], skipping other
+// items; never nil, so a missing or non-slice value is [] in JSON.
 func stringSliceVal(m map[string]any, key string) []string {
-	if m == nil {
-		return nil
-	}
-
-	raw, ok := m[key]
-	if !ok {
-		return nil
-	}
-
-	items, ok := raw.([]any)
-	if !ok {
-		return nil
-	}
-
+	items := sliceVal(m, key)
 	result := make([]string, 0, len(items))
 
 	for _, item := range items {
