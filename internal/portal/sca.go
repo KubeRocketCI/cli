@@ -268,10 +268,6 @@ func (s *SCAService) List(ctx context.Context, params SCAListParams) (*SCAProjec
 		return nil, err
 	}
 
-	if resp.JSON200 == nil {
-		return nil, fmt.Errorf("portal returned empty sca list response")
-	}
-
 	return mapSCAProjectList(resp.JSON200), nil
 }
 
@@ -291,10 +287,6 @@ func (s *SCAService) Get(ctx context.Context, codebase, branch string) (*SCAProj
 
 	if err := checkResponse(resp.StatusCode(), resp.Body); err != nil {
 		return nil, scaBranchNotFoundErr(err, resp.Body, codebase, branch)
-	}
-
-	if resp.JSON200 == nil {
-		return nil, fmt.Errorf("portal returned empty sca get response")
 	}
 
 	return mapSCAProjectDetail(resp.JSON200), nil
@@ -327,10 +319,6 @@ func (s *SCAService) Components(ctx context.Context, params SCAComponentsParams)
 		return nil, scaBranchNotFoundErr(err, resp.Body, params.Codebase, params.Branch)
 	}
 
-	if resp.JSON200 == nil {
-		return nil, fmt.Errorf("portal returned empty sca components response")
-	}
-
 	return mapSCAComponentList(resp.JSON200), nil
 }
 
@@ -357,10 +345,6 @@ func (s *SCAService) Findings(ctx context.Context, params SCAFindingsParams) (*S
 
 	if err := checkResponse(resp.StatusCode(), resp.Body); err != nil {
 		return nil, scaBranchNotFoundErr(err, resp.Body, params.Codebase, params.Branch)
-	}
-
-	if resp.JSON200 == nil {
-		return nil, fmt.Errorf("portal returned empty sca findings response")
 	}
 
 	return mapSCAFindingList(resp.JSON200), nil

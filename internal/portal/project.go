@@ -58,10 +58,6 @@ func (s *ProjectService) List(ctx context.Context) ([]Project, error) {
 		return nil, fmt.Errorf("listing projects: %w", err)
 	}
 
-	if resp.JSON200 == nil {
-		return nil, nil
-	}
-
 	projects := make([]Project, 0, len(resp.JSON200.Items))
 	for _, item := range resp.JSON200.Items {
 		p := mapK8sProject(
@@ -91,10 +87,6 @@ func (s *ProjectService) Get(ctx context.Context, name string) (*Project, error)
 
 	if err := checkResponse(resp.StatusCode(), resp.Body); err != nil {
 		return nil, fmt.Errorf("getting project %q: %w", name, err)
-	}
-
-	if resp.JSON200 == nil {
-		return nil, fmt.Errorf("project %q: %w", name, ErrNotFound)
 	}
 
 	p := mapK8sProject(

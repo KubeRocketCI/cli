@@ -15,7 +15,9 @@ const maxErrorBodyLen = 200
 // checkResponse maps HTTP status codes to domain errors. 502, 503 and 504 map
 // to ErrUpstreamUnavailable with the Portal envelope message (status phrase when
 // the body is not an envelope). Unlisted statuses, 500 included, return the
-// generic message with the truncated body.
+// generic message with the truncated body. nil means HTTP 200: on a client from
+// NewRestClient the response's JSON200 is then set, and callers read it without
+// a nil check.
 func checkResponse(statusCode int, body []byte) error {
 	switch statusCode {
 	case http.StatusOK:

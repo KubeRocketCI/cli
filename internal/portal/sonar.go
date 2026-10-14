@@ -172,10 +172,6 @@ func (s *SonarService) List(ctx context.Context, params SonarListParams) (*Sonar
 		return nil, err
 	}
 
-	if resp.JSON200 == nil {
-		return nil, fmt.Errorf("portal returned empty sonar list response")
-	}
-
 	return mapSonarProjectList(resp.JSON200), nil
 }
 
@@ -218,10 +214,6 @@ func (s *SonarService) Get(ctx context.Context, project string, scope SonarScope
 		return nil, sonarNotFoundErr(err, project, scope)
 	}
 
-	if resp.JSON200 == nil {
-		return nil, fmt.Errorf("portal returned empty sonar get response")
-	}
-
 	return mapSonarProjectDetail(resp.JSON200), nil
 }
 
@@ -237,10 +229,6 @@ func (s *SonarService) Gate(ctx context.Context, project string, scope SonarScop
 
 	if err := checkResponse(resp.StatusCode(), resp.Body); err != nil {
 		return nil, sonarNotFoundErr(err, project, scope)
-	}
-
-	if resp.JSON200 == nil {
-		return nil, fmt.Errorf("portal returned empty sonar gate response")
 	}
 
 	return mapSonarGate(resp.JSON200), nil
@@ -292,10 +280,6 @@ func (s *SonarService) Issues(ctx context.Context, params SonarIssuesParams) (*S
 
 	if err := checkResponse(resp.StatusCode(), resp.Body); err != nil {
 		return nil, sonarNotFoundErr(err, params.ProjectKey, scope)
-	}
-
-	if resp.JSON200 == nil {
-		return nil, fmt.Errorf("portal returned empty sonar issues response")
 	}
 
 	return mapSonarIssueList(resp.JSON200), nil

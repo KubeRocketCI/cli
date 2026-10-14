@@ -205,7 +205,7 @@ func (s *PipelineRunService) getFromResults(
 		return nil, fmt.Errorf("getting pipeline run: %w", err)
 	}
 
-	if resp.JSON200 == nil || len(resp.JSON200.Results) == 0 {
+	if len(resp.JSON200.Results) == 0 {
 		return nil, fmt.Errorf("pipeline run %q: %w", name, ErrNotFound)
 	}
 
@@ -326,10 +326,6 @@ func (s *PipelineRunService) listFromResults(
 
 	if err := checkResponse(resp.StatusCode(), resp.Body); err != nil {
 		return nil, fmt.Errorf("listing pipeline runs: %w", err)
-	}
-
-	if resp.JSON200 == nil {
-		return nil, nil
 	}
 
 	runs := make([]PipelineRunInfo, 0, len(resp.JSON200.Results))
@@ -484,10 +480,6 @@ func (s *PipelineRunService) fetchLiveRuns(ctx context.Context, filter PipelineR
 
 	if err := checkResponse(resp.StatusCode(), resp.Body); err != nil {
 		return nil, fmt.Errorf("fetching live pipeline runs: %w", err)
-	}
-
-	if resp.JSON200 == nil || len(resp.JSON200.Items) == 0 {
-		return []PipelineRunInfo{}, nil
 	}
 
 	now := s.now()
@@ -757,10 +749,6 @@ func (s *PipelineRunService) fetchLogs(ctx context.Context, r *tektonResult) (st
 		return "", fmt.Errorf("fetching pipeline run logs: %w", err)
 	}
 
-	if resp.JSON200 == nil {
-		return "", nil
-	}
-
 	return stripANSI(resp.JSON200.Logs), nil
 }
 
@@ -799,12 +787,6 @@ func (s *PipelineRunService) fetchReason(
 
 	if err := checkResponse(resp.StatusCode(), resp.Body); err != nil {
 		return fmt.Errorf("fetching task runs: %w", err)
-	}
-
-	if resp.JSON200 == nil {
-		out.TasksUnavailable = TasksNotIndexed
-
-		return nil
 	}
 
 	taskRuns := resp.JSON200.TaskRuns
@@ -865,13 +847,11 @@ func (s *PipelineRunService) fetchReason(
 					return fmt.Errorf("fetching logs for task %q: %w", ft.Metadata.Name, err)
 				}
 
-				if logResp.JSON200 != nil {
-					if errStr, err := logResp.JSON200.Error.Get(); err == nil && errStr != "" {
-						return fmt.Errorf("task %q logs: %s", ft.Metadata.Name, errStr)
-					}
-
-					results[i] = taskLogs{name: ft.Metadata.Name, logs: stripANSI(logResp.JSON200.Logs)}
+				if errStr, err := logResp.JSON200.Error.Get(); err == nil && errStr != "" {
+					return fmt.Errorf("task %q logs: %s", ft.Metadata.Name, errStr)
 				}
+
+				results[i] = taskLogs{name: ft.Metadata.Name, logs: stripANSI(logResp.JSON200.Logs)}
 
 				return nil
 			})

@@ -160,16 +160,7 @@ func (s *DeploymentService) List(ctx context.Context) ([]Deployment, error) {
 		return nil, err
 	}
 
-	if pipelineResp.JSON200 == nil {
-		return nil, nil
-	}
-
-	var stageItems []k8sItem
-	if stageResp.JSON200 != nil {
-		stageItems = stageResp.JSON200.Items
-	}
-
-	stagesByPipeline := groupStagesByPipeline(stageItems)
+	stagesByPipeline := groupStagesByPipeline(stageResp.JSON200.Items)
 
 	deployments := make([]Deployment, 0, len(pipelineResp.JSON200.Items))
 	for _, item := range pipelineResp.JSON200.Items {
@@ -205,18 +196,8 @@ func (s *DeploymentService) Get(ctx context.Context, name string) (*DeploymentDe
 		return nil, err
 	}
 
-	if getResp.JSON200 == nil {
-		return nil, fmt.Errorf("cdpipeline %q: %w", name, ErrNotFound)
-	}
-
 	detail := mapDeploymentDetail(getResp.JSON200.Metadata, getResp.JSON200.Spec, getResp.JSON200.Status)
-
-	var stageItems []k8sItem
-	if stageResp.JSON200 != nil {
-		stageItems = stageResp.JSON200.Items
-	}
-
-	detail.Stages = filterAndSortStages(stageItems, name)
+	detail.Stages = filterAndSortStages(stageResp.JSON200.Items, name)
 
 	return &detail, nil
 }
