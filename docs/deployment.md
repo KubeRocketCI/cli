@@ -40,6 +40,8 @@ krci deployment get my-pipeline
 
 `<name>` must be a DNS-1123 name (lowercase alphanumerics + hyphens, no dots,
 ≤ 253 chars). Invalid input fails with exit `1` before contacting the Portal.
+An unknown name, including one of 64 to 253 characters, is
+`deployment "<name>" not found`.
 
 ```
 Name:         my-pipeline

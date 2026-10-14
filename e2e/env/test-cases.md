@@ -133,6 +133,8 @@ typed message. Under `-o json` the error envelope is on stdout.
 | ENV-E-03 | `krci env get {{DEPLOYMENT_MISSING}} {{ENV_OK}} -o json`           | portal | —                                  | `exit=1; stdout_json.schemaVersion=1; stdout_json.error.message:exists`                                             |
 | ENV-E-04 | `krci env get {{DEPLOYMENT_OK}} {{ENV_MISSING}} -o json`           | portal | —                                  | `exit=1; stdout_json.error.message:exists`                                                                          |
 | ENV-E-05 | `krci env list --deployment {{DEPLOYMENT_MISSING}}`                | portal | no matching stages                 | `exit=0; stderr~/No environments found\./`                                                                          |
+| ENV-E-06 | `krci env get $(printf 'd%.0s' $(seq 64)) {{ENV_OK}}`              | portal | 64-character name                  | `exit=1; stderr~/deployment "d{64}" not found/`                                                                     |
+| ENV-E-07 | `krci env get {{DEPLOYMENT_OK}} $(printf 'e%.0s' $(seq 64))`       | portal | 64-character name                  | `exit=1; stderr~/environment "e{64}" not found in deployment "{{DEPLOYMENT_OK}}"/`                                  |
 
 ## 8. `pods` (env: `portal`)
 

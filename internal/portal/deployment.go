@@ -104,6 +104,32 @@ func (s *DeploymentService) k8sList(
 	return s.client.K8sListWithResponse(ctx, buildK8sListBody(s.clusterName, s.namespace, rc, labels))
 }
 
+func (s *DeploymentService) getPipeline(ctx context.Context, name string) (*restapi.K8sGetResponse, error) {
+	ns := s.namespace
+	body := restapi.K8sGetJSONRequestBody{
+		ClusterName:    s.clusterName,
+		Namespace:      &ns,
+		Name:           name,
+		ResourceConfig: cdPipelineResourceConfig.ResourceConfig,
+	}
+
+	resp, err := s.client.K8sGetWithResponse(ctx, body)
+	if err != nil {
+		return nil, fmt.Errorf("getting cdpipeline %q: %w", name, err)
+	}
+
+	return resp, checkResponse(resp.StatusCode(), resp.Body)
+}
+
+func (s *DeploymentService) listStagesOf(ctx context.Context, name string) (*restapi.K8sListResponse, error) {
+	resp, err := s.k8sList(ctx, stageResourceConfig, map[string]string{labelCDPipelineName: name})
+	if err != nil {
+		return nil, fmt.Errorf("listing stages for cdpipeline %q: %w", name, err)
+	}
+
+	return resp, checkResponse(resp.StatusCode(), resp.Body)
+}
+
 // List returns all CDPipelines with their stage names ordered by spec.order.
 func (s *DeploymentService) List(ctx context.Context) ([]Deployment, error) {
 	var pipelineResp, stageResp *restapi.K8sListResponse
@@ -155,43 +181,27 @@ func (s *DeploymentService) List(ctx context.Context) ([]Deployment, error) {
 	return deployments, nil
 }
 
-// Get returns a single CDPipeline with its Stages sorted by order.
+// Get returns a single CDPipeline with its Stages sorted by order. A
+// CDPipeline error is reported before a Stage list error.
 func (s *DeploymentService) Get(ctx context.Context, name string) (*DeploymentDetail, error) {
-	ns := s.namespace
+	var (
+		getResp   *restapi.K8sGetResponse
+		stageResp *restapi.K8sListResponse
+	)
 
-	var getResp *restapi.K8sGetResponse
-	var stageResp *restapi.K8sListResponse
+	err := fanOut(ctx,
+		func(ctx context.Context) (err error) {
+			getResp, err = s.getPipeline(ctx, name)
 
-	g, ctx := errgroup.WithContext(ctx)
+			return err
+		},
+		func(ctx context.Context) (err error) {
+			stageResp, err = s.listStagesOf(ctx, name)
 
-	g.Go(func() error {
-		body := restapi.K8sGetJSONRequestBody{
-			ClusterName:    s.clusterName,
-			Namespace:      &ns,
-			Name:           name,
-			ResourceConfig: cdPipelineResourceConfig.ResourceConfig,
-		}
-
-		var err error
-		getResp, err = s.client.K8sGetWithResponse(ctx, body)
-		if err != nil {
-			return fmt.Errorf("getting cdpipeline %q: %w", name, err)
-		}
-
-		return checkResponse(getResp.StatusCode(), getResp.Body)
-	})
-
-	g.Go(func() error {
-		var err error
-		stageResp, err = s.k8sList(ctx, stageResourceConfig, map[string]string{labelCDPipelineName: name})
-		if err != nil {
-			return fmt.Errorf("listing stages for cdpipeline %q: %w", name, err)
-		}
-
-		return checkResponse(stageResp.StatusCode(), stageResp.Body)
-	})
-
-	if err := g.Wait(); err != nil {
+			return err
+		},
+	)
+	if err != nil {
 		return nil, err
 	}
 

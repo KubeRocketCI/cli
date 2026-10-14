@@ -482,6 +482,12 @@ Field absence rules:
   longer, but the OSC 8 hyperlink target retains the full URL. JSON output is
   unaffected by this rendering — `ingressUrls` is always the full array.
 
+Errors: when several reads fail, the first of these is reported: the CDPipeline
+get, the Stage list, a missing environment, the Applications list. `env pods`
+and `env events` report the CDPipeline get before the Stage list. A deployment
+or environment name of 64 to 253 characters is therefore the not-found error of
+that name, not the Portal's HTTP 400 for a label value over 63 characters.
+
 ## `krci env pods <deployment> <env>`
 
 ```json
@@ -947,6 +953,8 @@ Rules:
 - `-o` is checked after the Portal call.
 - Errors are reported on stderr only: `deployment "<name>" not found`, or e.g.
   `authentication required: unauthorized: please run 'krci auth login'`.
+- The CDPipeline lookup is reported before a failed Stage list, so a name of 64
+  to 253 characters is `deployment "<name>" not found`.
 
 ## `krci auth status`
 

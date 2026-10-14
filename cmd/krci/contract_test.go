@@ -116,6 +116,10 @@ const (
 	pathSCAFindings   = "/rest/v1/sca/findings"
 )
 
+// longName is one character over the 63 a label value may hold: a label
+// selector with it answers 400, a get by it 404.
+var longName = strings.Repeat("l", 64)
+
 // envToken is the default KRCI_TOKEN: an unsigned JWT that expires in 2100.
 var envToken = base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`)) + "." +
 	base64.RawURLEncoding.EncodeToString([]byte(
@@ -200,6 +204,10 @@ var contractRows = []contractRow{
 		wantExit: 1, name: nameDeploymentNotFound},
 	{cmd: cmdEnvGet, args: []string{envDeployment, missingEnv}, format: formatJSON, fixture: "env",
 		wantExit: 1, name: nameEnvNotFound},
+	{cmd: cmdEnvGet, args: []string{longName, envName}, format: formatJSON, fixture: "long-deployment",
+		wantExit: 1, name: "long-deployment-name"},
+	{cmd: cmdEnvGet, args: []string{envDeployment, longName}, format: formatJSON, fixture: "long-env",
+		wantExit: 1, name: "long-env-name"},
 	{cmd: cmdEnvPods, args: []string{envDeployment, envName}, format: formatJSON, fixture: "cdpipeline-404",
 		wantExit: 1, name: nameDeploymentNotFound},
 	{cmd: cmdEnvPods, args: []string{envDeployment, missingEnv}, format: formatJSON, fixture: "env",
@@ -291,6 +299,8 @@ var contractRows = []contractRow{
 		name: "stages-page-not-json"},
 	{cmd: cmdDeploymentGet, args: []string{envDeployment}, format: formatJSON, fixture: "cdpipeline-404",
 		wantExit: 1, name: nameNotFound},
+	{cmd: cmdDeploymentGet, args: []string{longName}, format: formatJSON, fixture: "long-deployment",
+		wantExit: 1, name: "long-name"},
 	{cmd: cmdDeploymentGet, args: []string{envDeployment}, format: formatJSON, fixture: "cdpipeline-401",
 		wantExit: 1, name: nameUnauthorized},
 	{cmd: cmdDeploymentGet, args: []string{envDeployment}, format: formatUnknown, fixture: "env", wantExit: 1,
@@ -372,6 +382,8 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 		return rt
 	}
 	missing := func(rt route) route { return fail(rt, http.StatusNotFound, notFound) }
+	badRequest := file("bad-request")
+	reject := func(rt route) route { return fail(rt, http.StatusBadRequest, badRequest) }
 	denyAll := func(rts []route) []route {
 		out := make([]route, 0, len(rts))
 		for _, rt := range rts {
@@ -431,6 +443,20 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 	pods := list("Pod", "env-pods").in(envNamespace)
 	events := list("Event", "env-events").in(envNamespace)
 	env := []route{stages, pipeline, apps, pods, events}
+
+	labelled := func(rt route, key, value string) route {
+		rt.bodyContains = []string{`"` + key + `":"` + value + `"`}
+
+		return rt
+	}
+	longPipeline := pipeline
+	longPipeline.name = longName
+	longDeployment := []route{
+		missing(longPipeline),
+		reject(labelled(stages, "app.edp.epam.com/cdPipelineName", longName)),
+		reject(labelled(apps, "app.edp.epam.com/pipeline", longName)),
+	}
+	longEnv := append([]route{reject(labelled(apps, "app.edp.epam.com/stage", longName))}, env...)
 
 	codebases := list("Codebase", "project-codebases")
 	codebase := at(http.MethodPost, pathGet, "project-codebase")
@@ -495,6 +521,8 @@ func fixtures(t *testing.T) (map[string][]route, map[string]bool) {
 		"stages-401":           append([]route{deny(stages)}, env...),
 		"cdpipeline-404":       append([]route{missing(pipeline)}, env...),
 		"cdpipeline-401":       append([]route{deny(pipeline)}, env...),
+		"long-deployment":      longDeployment,
+		"long-env":             longEnv,
 		"project":              project,
 		"codebase-404":         append([]route{missing(codebase)}, project...),
 		"codebase-401":         append(denyAll([]route{codebases, codebase}), project...),

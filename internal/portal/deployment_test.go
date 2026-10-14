@@ -2,8 +2,12 @@ package portal
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -149,4 +153,44 @@ func TestDeploymentService_Get_ListsOnlyItsStages(t *testing.T) {
 	calls := callsOfKind(rec, "Stage")
 	require.Len(t, calls, 1)
 	assert.Equal(t, map[string]string{labelCDPipelineName: "my-pipeline"}, calls[0].LabelSelectors)
+}
+
+// The losing call answers first.
+func TestDeploymentService_Get_ErrorOrder(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		getByName map[string]string
+		want      func(error) bool
+	}{
+		"missing pipeline": {
+			getByName: map[string]string{},
+			want:      func(err error) bool { return errors.Is(err, ErrNotFound) },
+		},
+		"found pipeline, failed stage list": {
+			getByName: map[string]string{"demo": cdPipelineGetJSON("demo", []string{"my-app"})},
+			want:      func(err error) bool { return err != nil && strings.Contains(err.Error(), "HTTP 400") },
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			rec := &envTestRecorder{
+				t:            t,
+				getByName:    tc.getByName,
+				statusByKind: map[string]int{"Stage": http.StatusBadRequest},
+				delayByKind:  map[string]time.Duration{"CDPipeline": 100 * time.Millisecond},
+			}
+
+			svc, closer := newDeploymentServiceForTest(t, rec)
+			defer closer()
+
+			_, err := svc.Get(t.Context(), "demo")
+			if !tc.want(err) {
+				t.Fatalf("unexpected err = %v", err)
+			}
+		})
+	}
 }
