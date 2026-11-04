@@ -159,7 +159,7 @@ make build        # → dist/krci
 make ci           # lint → test → build
 ```
 
-Requires Go 1.26+. For running against a local portal, see
+Requires Go 1.27+. For running against a local portal, see
 [`docs/development.md`](docs/development.md).
 
 ## License

@@ -136,11 +136,11 @@ func printDetail(w io.Writer, codebase, requestedBranch string, d *portal.SCAPro
 	}
 
 	vulnPairs := []output.DetailLine{
-		severityRow("Critical", "CRITICAL", d.Metrics.Critical),
-		severityRow("High", "HIGH", d.Metrics.High),
-		severityRow("Medium", "MEDIUM", d.Metrics.Medium),
-		severityRow("Low", "LOW", d.Metrics.Low),
-		severityRow("Info/Unassigned", "INFO", d.Metrics.Unassigned),
+		severityRow("Critical", scainternal.SeverityCritical, d.Metrics.Critical),
+		severityRow("High", scainternal.SeverityHigh, d.Metrics.High),
+		severityRow("Medium", scainternal.SeverityMedium, d.Metrics.Medium),
+		severityRow("Low", scainternal.SeverityLow, d.Metrics.Low),
+		severityRow("Info/Unassigned", scainternal.SeverityInfo, d.Metrics.Unassigned),
 		{Label: "Total", Value: fmt.Sprintf("%d", d.Metrics.Vulnerabilities)},
 	}
 	if err := output.PrintAligned(w, styled, vulnPairs, "  ", 0); err != nil {
