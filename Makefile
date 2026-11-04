@@ -22,7 +22,7 @@ GO_VERSION := $(shell sed -n 's/^go //p' go.mod)
 export GOTOOLCHAIN ?= go$(GO_VERSION)
 
 # Tools - pinned versions
-GOLANGCI_LINT_VERSION ?= v2.11.3
+GOLANGCI_LINT_VERSION ?= v2.15.0
 GORELEASER_VERSION ?= v2.10.2
 OAPICODEGEN_VERSION ?= v2.4.1
 

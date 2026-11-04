@@ -7,7 +7,7 @@ How to run the CLI against a locally running KubeRocketCI Portal.
 1. A KubeRocketCI portal backend on port 3001
 2. The portal's `.env` configured with a valid `OIDC_ISSUER_URL`
    (e.g. a Keycloak realm)
-3. Go 1.26+
+3. Go 1.27+
 
 ## Start the portal
 

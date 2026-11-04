@@ -85,13 +85,13 @@ func FormatRisk(r float32) string {
 // unstyled.
 func SeverityColor(severity string) output.Cell {
 	switch strings.ToUpper(severity) {
-	case "CRITICAL":
+	case SeverityCritical:
 		return output.Red(severity)
-	case "HIGH":
+	case SeverityHigh:
 		return output.Yellow(severity)
-	case "MEDIUM":
+	case SeverityMedium:
 		return output.Blue(severity)
-	case "LOW", "INFO", "UNASSIGNED":
+	case SeverityLow, SeverityInfo, SeverityUnassigned:
 		return output.Gray(severity)
 	default:
 		return output.Text(severity)

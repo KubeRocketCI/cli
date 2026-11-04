@@ -73,13 +73,15 @@ func Portal(cluster, kind, items string) http.Handler {
 func CheckInvalidTarget[T any](t *testing.T, cmd newCmd[T]) {
 	t.Helper()
 
+	const wantArgCount = "requires a deployment and an env"
+
 	cases := map[string]struct {
 		args []string
 		want string
 	}{
-		"no positionals":     {args: []string{}, want: "requires a deployment and an env"},
-		"one positional":     {args: []string{"only-one"}, want: "requires a deployment and an env"},
-		"three positionals":  {args: []string{"a", "b", "c"}, want: "requires a deployment and an env"},
+		"no positionals":     {args: []string{}, want: wantArgCount},
+		"one positional":     {args: []string{"only-one"}, want: wantArgCount},
+		"three positionals":  {args: []string{"a", "b", "c"}, want: wantArgCount},
 		"invalid deployment": {args: []string{"BAD_NAME", Env}, want: "<deployment> must be a valid DNS-1123 name"},
 		"invalid env":        {args: []string{Deployment, "Bad_Env"}, want: "<env> must be a valid DNS-1123 name"},
 		"unknown format":     {args: []string{Deployment, Env, "-o", "yaml"}, want: "unknown output format"},

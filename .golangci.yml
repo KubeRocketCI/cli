@@ -114,6 +114,8 @@ linters:
           deny:
             - pkg: github.com/KubeRocketCI/cli/internal/config
               desc: under pkg/cmd only root.go (flags), login.go, cmdtest and tests import config; commands get portal services, scoped to the configured target, from Factory.Services
+    goconst:
+      ignore-tests: true
     forbidigo:
       analyze-types: true
       forbid:

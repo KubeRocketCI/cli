@@ -76,22 +76,34 @@ func ValidateCodebaseCommand(cmd *cobra.Command, outputFormat, codebase, branch 
 	return ValidateNonEmptyFlag("branch", cmd.Flags().Changed("branch"), branch)
 }
 
+// Canonical Dep-Track severity values.
+const (
+	SeverityCritical   = "CRITICAL"
+	SeverityHigh       = "HIGH"
+	SeverityMedium     = "MEDIUM"
+	SeverityLow        = "LOW"
+	SeverityInfo       = "INFO"
+	SeverityUnassigned = "UNASSIGNED"
+)
+
 // Canonical Dep-Track severity values in descending severity order.
 // UNASSIGNED is filtered together with INFO per design §D4 — see
 // InclusiveSeverities.
-var severityOrder = []string{"CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO", "UNASSIGNED"}
+var severityOrder = []string{
+	SeverityCritical, SeverityHigh, SeverityMedium, SeverityLow, SeverityInfo, SeverityUnassigned,
+}
 
 // SeverityEnum is the set of values accepted by the `--severity` flag.
 // Lowercase "unassigned" is intentionally omitted from the user-facing list
 // (it is reachable via `--severity=info`) but is still accepted if typed
 // explicitly, for scripting symmetry with the upstream payload values.
 var allowedSeverityInputs = map[string]string{
-	"critical":   "CRITICAL",
-	"high":       "HIGH",
-	"medium":     "MEDIUM",
-	"low":        "LOW",
-	"info":       "INFO",
-	"unassigned": "UNASSIGNED",
+	"critical":   SeverityCritical,
+	"high":       SeverityHigh,
+	"medium":     SeverityMedium,
+	"low":        SeverityLow,
+	"info":       SeverityInfo,
+	"unassigned": SeverityUnassigned,
 }
 
 // ValidateSeverityCSV canonicalises the comma-separated / repeatable values
@@ -163,8 +175,8 @@ func InclusiveSeverities(min string) []string {
 	// "INFO" implicitly includes UNASSIGNED — design §D4. UNASSIGNED already
 	// sits beyond INFO in severityOrder; append it when the selected min is
 	// INFO so the filter set matches the design intent.
-	if upper == "INFO" && !slices.Contains(out, "UNASSIGNED") {
-		out = append(out, "UNASSIGNED")
+	if upper == SeverityInfo && !slices.Contains(out, SeverityUnassigned) {
+		out = append(out, SeverityUnassigned)
 	}
 	return out
 }
@@ -172,12 +184,12 @@ func InclusiveSeverities(min string) []string {
 // severityRank ranks Dep-Track severities ascending (UNASSIGNED=0 is least
 // severe). Used by InclusiveFromSet to pick the lowest-rank threshold.
 var severityRank = map[string]int{
-	"CRITICAL":   5,
-	"HIGH":       4,
-	"MEDIUM":     3,
-	"LOW":        2,
-	"INFO":       1,
-	"UNASSIGNED": 0,
+	SeverityCritical:   5,
+	SeverityHigh:       4,
+	SeverityMedium:     3,
+	SeverityLow:        2,
+	SeverityInfo:       1,
+	SeverityUnassigned: 0,
 }
 
 // ExpandSeverityFlag is the composite helper for run functions: it validates
