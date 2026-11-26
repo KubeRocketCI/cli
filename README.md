@@ -94,12 +94,42 @@ nicely on a TTY, plain text into pipes, JSON for automation.
 
 ## Install
 
+<details>
+<summary><b>macOS</b></summary>
+
 ```bash
 brew tap KubeRocketCI/homebrew-tap
 brew install krci
 ```
 
-Or grab a binary from [GitHub Releases](https://github.com/KubeRocketCI/cli/releases).
+</details>
+
+<details>
+<summary><b>Linux</b></summary>
+
+```bash
+curl -fsSL "https://github.com/KubeRocketCI/cli/releases/latest/download/krci_Linux_$(uname -m | sed s/aarch64/arm64/).tar.gz" | tar -xz krci
+sudo install krci /usr/local/bin/
+```
+
+</details>
+
+<details>
+<summary><b>Windows</b></summary>
+
+In PowerShell:
+
+```powershell
+$dir = "$env:LOCALAPPDATA\Programs\krci"
+Invoke-WebRequest https://github.com/KubeRocketCI/cli/releases/latest/download/krci_Windows_x86_64.zip -OutFile "$env:TEMP\krci.zip"
+Expand-Archive "$env:TEMP\krci.zip" $dir -Force
+$path = [Environment]::GetEnvironmentVariable("Path", "User")
+if (($path -split ";") -notcontains $dir) { [Environment]::SetEnvironmentVariable("Path", "$path;$dir", "User") }
+```
+
+</details>
+
+Check the installation with `krci version` (on Windows, in a new terminal).
 
 ## 30-second tour
 
